@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { signOut, auth } from "@/auth";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
+import { getModoNome, setModoNome } from "@/lib/preferencias";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,9 +12,17 @@ export const metadata: Metadata = {
   description: "Simulação de remuneração de sócios e líderes — WRE Consultoria → DSF",
 };
 
+async function alternarModoNomeAction() {
+  "use server";
+  const atual = await getModoNome();
+  await setModoNome(atual === "iniciais" ? "completo" : "iniciais");
+  revalidatePath("/", "layout");
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
+  const modoNome = await getModoNome();
 
   return (
     <html lang="pt-BR">
@@ -38,6 +48,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 )}
               </nav>
               <div className="ml-auto flex items-center gap-3 text-sm">
+                <form action={alternarModoNomeAction}>
+                  <button
+                    className={`rounded px-2 py-0.5 text-xs font-medium transition ring-1 ring-inset ${
+                      modoNome === "iniciais"
+                        ? "bg-mint-400/20 text-mint-300 ring-mint-400/40 hover:bg-mint-400/30"
+                        : "bg-peri-700/40 text-peri-100 ring-peri-400/40 hover:bg-peri-700/60"
+                    }`}
+                    title={modoNome === "iniciais" ? "Iniciais (clique para mostrar nomes completos)" : "Nomes completos (clique para anonimizar)"}
+                  >
+                    {modoNome === "iniciais" ? "🔒 iniciais" : "👁 nomes"}
+                  </button>
+                </form>
                 <span className="text-peri-200">{session.user.email}</span>
                 <Link href="/perfil/senha" className="text-peri-100 hover:text-mint-400 underline transition">senha</Link>
                 <form

@@ -5,10 +5,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { brl, pct } from "@/lib/format";
+import { brl, pct, nomeOuIniciais } from "@/lib/format";
 import { Deck } from "@/components/apresentacao/deck";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
+import { getModoNome } from "@/lib/preferencias";
 
 export default async function ApresentacaoPage({
   searchParams,
@@ -18,6 +19,8 @@ export default async function ApresentacaoPage({
   const sp = await searchParams;
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
+  const modoNome = await getModoNome();
+  const dn = (n: string) => nomeOuIniciais(n, modoNome);
 
   if (!sp.a || !sp.periodoId) {
     return <SeletorApresentacao escopo={escopo.ehSocioRestrito} />;
@@ -52,7 +55,9 @@ export default async function ApresentacaoPage({
 
   const totalA = cA.remuneracoes.reduce((acc, r) => acc + r.total, 0);
   const totalB = cB ? cB.remuneracoes.reduce((acc, r) => acc + r.total, 0) : 0;
-  const topA = [...cA.remuneracoes].sort((x, y) => y.total - x.total).slice(0, 10);
+  const aplicarNomeRem = (rs: typeof cA.remuneracoes) =>
+    rs.map((r) => ({ ...r, socio: { ...r.socio, nome: dn(r.socio.nome) } }));
+  const topA = aplicarNomeRem([...cA.remuneracoes].sort((x, y) => y.total - x.total).slice(0, 10));
 
   // Comparativo por sócio
   type Linha = { socioId: string; nome: string; a: number; b: number; diff: number; diffPct: number | null };
@@ -67,9 +72,10 @@ export default async function ApresentacaoPage({
             const rb = mapB.get(sid);
             const ta = ra?.total ?? 0;
             const tb = rb?.total ?? 0;
+            const nomeOriginal = ra?.socio.nome ?? rb?.socio.nome ?? "?";
             return {
               socioId: sid,
-              nome: ra?.socio.nome ?? rb?.socio.nome ?? "?",
+              nome: dn(nomeOriginal),
               a: ta, b: tb,
               diff: tb - ta,
               diffPct: ta > 0 ? (tb - ta) / ta : null,
@@ -96,7 +102,25 @@ export default async function ApresentacaoPage({
     />,
   );
 
-  // Slide 3 — Top sócios do A
+  // Slide 3 — Pesos por área de prática (apenas se cenário usa POR_AREA)
+  if (cA.modelo === "NOVO") {
+    const params = cA.premissa.parametros as Record<string, unknown>;
+    const distrib = params.distribuicaoBlocoB;
+    if (distrib === "POR_AREA" && params.pesosPorArea) {
+      const areas = await prisma.areaPratica.findMany({
+        where: { ativa: true }, orderBy: [{ ordem: "asc" }], take: 50,
+      });
+      slides.push(
+        <SlidePesosArea
+          key="pesosArea"
+          areas={areas.map((a) => ({ codigo: a.codigo, nome: a.nome }))}
+          pesos={params.pesosPorArea as PesosPorArea}
+        />,
+      );
+    }
+  }
+
+  // Slide 4 — Top sócios do A
   slides.push(
     <SlideTopSocios key="topA" titulo={`Top sócios — ${cA.nome}`} linhas={topA} />,
   );
@@ -110,7 +134,7 @@ export default async function ApresentacaoPage({
         cor="mint"
       />,
     );
-    const topB = [...cB.remuneracoes].sort((x, y) => y.total - x.total).slice(0, 10);
+    const topB = aplicarNomeRem([...cB.remuneracoes].sort((x, y) => y.total - x.total).slice(0, 10));
     slides.push(<SlideTopSocios key="topB" titulo={`Top sócios — ${cB.nome}`} linhas={topB} />);
 
     // Slide comparativo agregado
@@ -206,6 +230,62 @@ function SlideResumo({
           <div className="text-xs uppercase tracking-wider text-peri-200">Pacotes calculados</div>
           <div className={`mt-2 text-5xl md:text-6xl font-bold tabular-nums ${accent}`}>{numeroPacotes}</div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface PesosPorArea {
+  mixOrganico: number;
+  mixIncremental: number;
+  pesosOrganico: Record<string, number>;
+  pesosIncremental: Record<string, number>;
+}
+
+function SlidePesosArea({
+  areas, pesos,
+}: {
+  areas: Array<{ codigo: string; nome: string }>;
+  pesos: PesosPorArea;
+}) {
+  // Calcula peso efetivo combinado por área = mixOrg×org + mixInc×inc
+  const linhas = areas.map((a) => {
+    const org = pesos.pesosOrganico[a.codigo] ?? 0;
+    const inc = pesos.pesosIncremental[a.codigo] ?? 0;
+    const efetivo = pesos.mixOrganico * org + pesos.mixIncremental * inc;
+    return { ...a, org, inc, efetivo };
+  });
+  const max = Math.max(0.001, ...linhas.map((l) => l.efetivo));
+
+  return (
+    <div className="h-full w-full flex flex-col px-16 py-16">
+      <p className="text-peri-200 text-xs uppercase tracking-[0.2em]">Bloco B · distribuição POR_AREA</p>
+      <h2 className="mt-2 text-3xl font-bold tracking-tight">Pesos por área de prática</h2>
+      <p className="text-sm text-peri-200 mt-1">
+        Mix Orgânico {(pesos.mixOrganico * 100).toFixed(0)}% · Incremental {(pesos.mixIncremental * 100).toFixed(0)}%
+      </p>
+
+      <div className="mt-8 flex-1 grid grid-cols-[1fr_auto_auto_auto] gap-x-6 gap-y-2 text-sm items-center">
+        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50">Área</div>
+        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50 text-right">Orgânico</div>
+        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50 text-right">Incremental</div>
+        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50 text-right">Efetivo</div>
+        {linhas.map((l) => (
+          <div key={l.codigo} className="contents">
+            <div className="font-medium flex items-center gap-3">
+              <span className="w-32 truncate">{l.nome}</span>
+              <div className="flex-1 h-1.5 rounded-full bg-navy-700 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-peri-400 to-mint-400"
+                  style={{ width: `${(l.efetivo / max) * 100}%` }}
+                />
+              </div>
+            </div>
+            <div className="text-right tabular-nums text-peri-200">{(l.org * 100).toFixed(0)}%</div>
+            <div className="text-right tabular-nums text-peri-200">{(l.inc * 100).toFixed(0)}%</div>
+            <div className="text-right tabular-nums font-semibold text-mint-400">{(l.efetivo * 100).toFixed(2)}%</div>
+          </div>
+        ))}
       </div>
     </div>
   );

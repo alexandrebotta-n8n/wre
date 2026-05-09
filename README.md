@@ -68,6 +68,60 @@ e2e/                  Playwright
 
 A Política de Partnership DSF (cláusula 17.4) impõe sigilo de **5 anos pós-término** sobre dados de remuneração e estrutura societária. Auditoria + redação de PII em logs são **obrigatórias**.
 
+## Deploy em produção (Vercel + Neon)
+
+### 1. Provisionar Postgres (Neon, recomendado)
+
+- https://neon.tech → criar projeto
+- Copiar a **Pooled connection string** (com `?sslmode=require&pgbouncer=true`)
+- Provisionar também a **Direct connection string** se for usar `prisma migrate` em produção
+
+### 2. Conectar repo na Vercel
+
+- https://vercel.com → New Project → import `alexandrebotta-n8n/wre`
+- Framework preset: **Next.js** (auto-detectado)
+- Build command já está em `vercel.json`:
+  `prisma generate && prisma migrate deploy && next build`
+
+### 3. Variáveis de ambiente (Project Settings → Environment Variables)
+
+| Nome | Valor | Ambientes |
+|---|---|---|
+| `DATABASE_URL` | Pooled connection string do Neon (com sslmode=require) | Production, Preview |
+| `AUTH_SECRET` | `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` | Production, Preview |
+| `AUTH_TRUST_HOST` | `true` | Production, Preview |
+
+### 4. Primeiro deploy
+
+- Push para `main` → Vercel builda automaticamente
+- Migration roda no build → DB de prod fica pronto
+- Acessar a URL gerada → tela de login (sem usuários ainda)
+
+### 5. Seed inicial (uma vez)
+
+Localmente, com `.env` apontando para o DB de produção:
+
+```bash
+DATABASE_URL="postgres://...neon.tech..." npm run seed
+```
+
+Ou via `psql`:
+```bash
+psql "$DATABASE_URL" -f prisma/seed.sql   # se você gerar um SQL dump
+```
+
+O seed cria: tabela salarial · 8 áreas · 23 sócios/líderes · período 1T2026 + 2026 · 2 premissas · usuário `admin@wre.local` (senha provisória `trocar-em-producao`).
+
+**Trocar a senha do admin no 1º login** — middleware força.
+
+### Modo Docker self-hosted (alternativa)
+
+Para build standalone (Docker):
+```bash
+BUILD_STANDALONE=true npm run build
+```
+Gera `.next/standalone` pronto pra `docker build`.
+
 ## Próximos passos
 
 Veja `AGENTS.md` §13.

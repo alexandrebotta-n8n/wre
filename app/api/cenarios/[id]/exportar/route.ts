@@ -4,11 +4,15 @@ import { withAuth, ApiError } from "@/lib/api/handler";
 import { gerarXlsxCenario } from "@/lib/export/cenario-xlsx";
 import { escopoDe } from "@/lib/auth/escopo";
 import { logAudit } from "@/lib/audit";
+import { nomeOuIniciais } from "@/lib/format";
+import { getModoNome } from "@/lib/preferencias";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   return withAuth(async (session) => {
     const { id } = await ctx.params;
     const escopo = escopoDe(session);
+    const modoNome = await getModoNome();
+    const dn = (n: string) => nomeOuIniciais(n, modoNome);
 
     const cenario = await prisma.cenario.findUnique({
       where: { id },
@@ -41,7 +45,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       criadoEm: cenario.criadoEm,
       aplicadoEm: cenario.aplicadoEm,
       classificacoes: cenario.classificacoes.map((c) => ({
-        socioNome: c.socio.nome,
+        socioNome: dn(c.socio.nome),
         cargo: c.socio.cargo,
         publico: c.publico,
         unidadeCodigo: c.unidade?.codigo,
@@ -51,7 +55,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         isFundador: c.socio.isFundador,
       })),
       remuneracoes: cenario.remuneracoes.map((r) => ({
-        socioNome: r.socio.nome,
+        socioNome: dn(r.socio.nome),
         periodoRotulo: r.periodo.rotulo,
         proLabore: r.proLabore,
         remuneracaoGestao: r.remuneracaoGestao,

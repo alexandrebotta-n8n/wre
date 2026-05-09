@@ -101,7 +101,10 @@ const PREMISSA_NOVO_PARAMS = {
   faixaExecMin: 0.50, faixaExecMax: 0.70,
   faixaGestaoMin: 0.00, faixaGestaoMax: 0.15,
   proRataMinMeses: 3,
-  distribuicaoBlocoB: "UNIFORME" as const,
+  // POR_AREA é o modo que reflete a planilha 1T2026: cada gestor recebe Bloco B
+  // proporcional ao peso da sua área de prática. Sócios sem área (CEO, Diretores,
+  // fundadores) ficam fora do Bloco B nesse modo.
+  distribuicaoBlocoB: "POR_AREA" as const,
   // Pesos por área conforme planilha "SISTEMA DE REMUNERAÇÃO" 1T2026
   // (somente usados quando distribuicaoBlocoB="POR_AREA").
   pesosPorArea: {

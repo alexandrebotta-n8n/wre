@@ -3,7 +3,8 @@ import { Fragment } from "react";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ToggleTrace, TraceConteudo } from "@/components/cenario/trace";
-import { brl, dataHora } from "@/lib/format";
+import { brl, dataHora, nomeOuIniciais } from "@/lib/format";
+import { getModoNome } from "@/lib/preferencias";
 import { calcularCenario } from "@/lib/cenario-service";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/audit";
@@ -143,6 +144,8 @@ export default async function CenarioDetalhe({
   const sp = await searchParams;
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
+  const modoNome = await getModoNome();
+  const dn = (n: string) => nomeOuIniciais(n, modoNome);
 
   const cenario = await prisma.cenario.findUnique({
     where: { id },
@@ -291,7 +294,9 @@ export default async function CenarioDetalhe({
               {cenario.classificacoes.map((c) => (
                 <tr key={c.id} className="hover:bg-neutral-50">
                   <td className="px-4 py-2">
-                    <div className="font-medium">{c.socio.nome}</div>
+                    <div className="font-medium" title={modoNome === "iniciais" ? c.socio.nome : undefined}>
+                      {dn(c.socio.nome)}
+                    </div>
                     <div className="text-xs text-neutral-500 flex items-center gap-1.5 flex-wrap">
                       <span>{c.socio.cargo}</span>
                       {c.socio.isFundador && <span className="text-mint-700">· fundador</span>}
@@ -385,7 +390,11 @@ export default async function CenarioDetalhe({
                     <Fragment key={r.id}>
                       <tr className="hover:bg-peri-50">
                         <td className="px-4 py-2">
-                          <ToggleTrace alvo={`trace-${r.id}`} nome={r.socio.nome} temAlerta={alertas.length > 0} />
+                          <ToggleTrace
+                            alvo={`trace-${r.id}`}
+                            nome={dn(r.socio.nome)}
+                            temAlerta={alertas.length > 0}
+                          />
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.proLabore ? brl(r.proLabore, true) : "—"}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{r.remuneracaoGestao ? brl(r.remuneracaoGestao, true) : "—"}</td>

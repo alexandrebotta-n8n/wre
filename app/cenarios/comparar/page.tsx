@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { brl, pct } from "@/lib/format";
+import { brl, pct, nomeOuIniciais } from "@/lib/format";
 import { auth } from "@/auth";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
+import { getModoNome } from "@/lib/preferencias";
 
 async function selecionarAction(formData: FormData) {
   "use server";
@@ -24,6 +25,7 @@ export default async function CompararPage({
   const sp = await searchParams;
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
+  const modoNome = await getModoNome();
   const [cenarios, periodos] = await Promise.all([
     prisma.cenario.findMany({
       where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {},
@@ -116,7 +118,9 @@ export default async function CompararPage({
               <tbody className="divide-y divide-neutral-100">
                 {comparacao.linhas.map((l) => (
                   <tr key={l.socioId} className="hover:bg-neutral-50">
-                    <td className="px-4 py-2 font-medium">{l.nome}</td>
+                    <td className="px-4 py-2 font-medium" title={modoNome === "iniciais" ? l.nome : undefined}>
+                      {nomeOuIniciais(l.nome, modoNome)}
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums">{l.totalA ? brl(l.totalA, true) : "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{l.totalB ? brl(l.totalB, true) : "—"}</td>
                     <td className={`px-3 py-2 text-right tabular-nums font-medium ${l.diff >= 0 ? "text-mint-700" : "text-red-700"}`}>

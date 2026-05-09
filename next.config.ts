@@ -37,7 +37,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // standalone só faz sentido em Docker self-hosted. Vercel ignora.
+  // Mantemos condicional via env para suportar ambos os modos:
+  ...(process.env.BUILD_STANDALONE === "true" ? { output: "standalone" as const } : {}),
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

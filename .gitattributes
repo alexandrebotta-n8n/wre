@@ -1,0 +1,14 @@
+# Padronização de line endings — sempre LF no repo, sem warnings CRLF.
+* text=auto eol=lf
+
+# Binários — nunca normalizar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.xlsx binary
+*.xls binary
+*.docx binary
+*.zip binary
