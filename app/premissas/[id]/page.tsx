@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { ParamsAtualSchema, ParamsNovoSchema } from "@/lib/schemas/premissa";
 import { ModeloBadge } from "@/components/ui/badges";
 import { SumValidator } from "@/components/premissa/sum-validator";
+import { MatrizPesosArea } from "@/components/premissa/matriz-pesos-area";
 import { atualizarPremissaComSnapshot } from "@/lib/premissa-service";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
@@ -33,6 +34,15 @@ async function salvarAction(formData: FormData) {
         reservaViraPremio: formData.get("reservaViraPremio") === "on",
       });
     } else {
+      // Recompõe pesosPorArea a partir dos campos pesoOrg-<codigo> / pesoInc-<codigo>
+      const pesosOrganico: Record<string, number> = {};
+      const pesosIncremental: Record<string, number> = {};
+      for (const [k, v] of formData.entries()) {
+        if (k.startsWith("pesoOrg-")) pesosOrganico[k.slice(8)] = Number(v) || 0;
+        else if (k.startsWith("pesoInc-")) pesosIncremental[k.slice(8)] = Number(v) || 0;
+      }
+      const mixOrganico = Number(formData.get("mixOrganico") ?? 0);
+      const mixIncremental = Number(formData.get("mixIncremental") ?? 0);
       parametros = ParamsNovoSchema.parse({
         percentualBlocoA: Number(formData.get("percentualBlocoA")),
         percentualBlocoB: Number(formData.get("percentualBlocoB")),
@@ -50,7 +60,10 @@ async function salvarAction(formData: FormData) {
         faixaGestaoMin: Number(formData.get("faixaGestaoMin")),
         faixaGestaoMax: Number(formData.get("faixaGestaoMax")),
         proRataMinMeses: Number(formData.get("proRataMinMeses")),
-        distribuicaoBlocoB: String(formData.get("distribuicaoBlocoB")) as "UNIFORME" | "PESO_INDIVIDUAL" | "ORIGINACAO",
+        distribuicaoBlocoB: String(formData.get("distribuicaoBlocoB")) as "UNIFORME" | "PESO_INDIVIDUAL" | "ORIGINACAO" | "POR_AREA",
+        pesosPorArea: Object.keys(pesosOrganico).length > 0
+          ? { mixOrganico, mixIncremental, pesosOrganico, pesosIncremental }
+          : undefined,
       });
     }
   } catch (e) {
@@ -89,6 +102,10 @@ export default async function PremissaEdit({
   const p = await prisma.premissa.findUnique({ where: { id } });
   if (!p) notFound();
   const params_ = p.parametros as Record<string, unknown>;
+  // Áreas só são necessárias para o editor NOVO (matriz de pesos por área).
+  const areas = p.modelo === "NOVO"
+    ? await prisma.areaPratica.findMany({ where: { ativa: true }, orderBy: [{ ordem: "asc" }], take: 50 })
+    : [];
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
@@ -223,10 +240,23 @@ export default async function PremissaEdit({
                       <option value="UNIFORME">UNIFORME — partes iguais</option>
                       <option value="PESO_INDIVIDUAL">PESO_INDIVIDUAL — proporcional ao peso por sócio</option>
                       <option value="ORIGINACAO">ORIGINACAO — proporcional à originação esperada</option>
+                      <option value="POR_AREA">POR_AREA — pesos por área de prática (planilha 1T2026)</option>
                     </select>
                   </Field>
                   <Field label="Pro-rata mínimo (meses)"><Num name="proRataMinMeses" defaultValue={params_.proRataMinMeses as number} step="1" min="0" max="12" /></Field>
                 </div>
+              </Section>
+
+              <Section titulo="Pesos por área de prática (modo POR_AREA)">
+                <MatrizPesosArea
+                  areas={areas.map((a) => ({ codigo: a.codigo, nome: a.nome }))}
+                  defaults={params_.pesosPorArea as {
+                    mixOrganico: number;
+                    mixIncremental: number;
+                    pesosOrganico: Record<string, number>;
+                    pesosIncremental: Record<string, number>;
+                  } | undefined}
+                />
               </Section>
             </div>
           )}

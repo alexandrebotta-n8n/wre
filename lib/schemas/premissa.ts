@@ -56,7 +56,30 @@ export const ParamsNovoSchema = z.object({
   )
   .refine((p) => p.faixaOrigMin <= p.faixaOrigMax, { message: "Faixa originação: min > max", path: ["faixaOrigMin"] })
   .refine((p) => p.faixaExecMin <= p.faixaExecMax, { message: "Faixa execução: min > max", path: ["faixaExecMin"] })
-  .refine((p) => p.faixaGestaoMin <= p.faixaGestaoMax, { message: "Faixa gestão: min > max", path: ["faixaGestaoMin"] });
+  .refine((p) => p.faixaGestaoMin <= p.faixaGestaoMax, { message: "Faixa gestão: min > max", path: ["faixaGestaoMin"] })
+  .refine(
+    (p) => {
+      if (!p.pesosPorArea) return true;
+      return Math.abs(p.pesosPorArea.mixOrganico + p.pesosPorArea.mixIncremental - 1) <= TOL;
+    },
+    { message: "Mix Orgânico + Incremental deve somar 1.0", path: ["pesosPorArea"] },
+  )
+  .refine(
+    (p) => {
+      if (!p.pesosPorArea) return true;
+      const s = Object.values(p.pesosPorArea.pesosOrganico).reduce((a, v) => a + v, 0);
+      return Math.abs(s - 1) <= TOL;
+    },
+    { message: "Pesos Orgânicos por área devem somar 1.0", path: ["pesosPorArea"] },
+  )
+  .refine(
+    (p) => {
+      if (!p.pesosPorArea) return true;
+      const s = Object.values(p.pesosPorArea.pesosIncremental).reduce((a, v) => a + v, 0);
+      return Math.abs(s - 1) <= TOL;
+    },
+    { message: "Pesos Incrementais por área devem somar 1.0", path: ["pesosPorArea"] },
+  );
 export type ParamsNovoInput = z.infer<typeof ParamsNovoSchema>;
 
 export const CriarPremissaSchema = z.object({

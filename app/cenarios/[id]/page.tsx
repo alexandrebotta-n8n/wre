@@ -152,7 +152,7 @@ export default async function CenarioDetalhe({
         where: escopo.ehSocioRestrito
           ? { socioId: escopo.socioIdEscopo ?? "__nada__" }
           : {},
-        include: { socio: true, unidade: true },
+        include: { socio: { include: { areaPratica: true } }, unidade: true },
         orderBy: [{ socio: { isFundador: "desc" } }, { socio: { percentualQuotasDefault: "desc" } }],
       },
       remuneracoes: {
@@ -292,8 +292,14 @@ export default async function CenarioDetalhe({
                 <tr key={c.id} className="hover:bg-neutral-50">
                   <td className="px-4 py-2">
                     <div className="font-medium">{c.socio.nome}</div>
-                    <div className="text-xs text-neutral-500">
-                      {c.socio.cargo}{c.socio.isFundador ? " · fundador" : ""}
+                    <div className="text-xs text-neutral-500 flex items-center gap-1.5 flex-wrap">
+                      <span>{c.socio.cargo}</span>
+                      {c.socio.isFundador && <span className="text-mint-700">· fundador</span>}
+                      {c.socio.areaPratica && (
+                        <span className="inline-block rounded bg-peri-100 text-peri-700 px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-peri-200 ring-inset">
+                          {c.socio.areaPratica.nome}
+                        </span>
+                      )}
                     </div>
                   </td>
                   {isReadOnly ? (
