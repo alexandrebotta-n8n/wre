@@ -2,12 +2,13 @@
 
 /* ========================================================================
    Identidade visual WRE Simulador
-   Paleta de 3 cores fornecida pelo cliente:
-     - navy (deep blue)     — primário, backgrounds escuros, ações principais
-     - periwinkle (lilac)   — secundário, links, hover, info
-     - mint (spring green)  — accent, sucesso/positivo, modelo NOVO
 
-   Cinzas (neutral-*) ficam para texto/borda; vermelho fica para erros.
+   Paleta semântica:
+     - navy        — superfícies escuras (header), títulos
+     - periwinkle  — ação primária, links, destaque seletivo (peri-*)
+     - mint        — feedback positivo: sucesso, ✓, fundador
+     - amber/red   — warning / error
+     - neutral     — tipografia e divisores
    ======================================================================== */
 @theme {
   /* Navy — escala derivada do core #000087 */
@@ -28,6 +29,7 @@
   --color-peri-500: #5664e0;
   --color-peri-600: #4250c4;
   --color-peri-700: #2f3aa0;
+  --color-peri-900: #1a1f5c;
 
   /* Mint — escala derivada do core #2EFFA0 */
   --color-mint-50: #e6fff4;
@@ -38,6 +40,39 @@
   --color-mint-600: #00b063;
   --color-mint-700: #008045;
   --color-mint-900: #00472a;
+
+  /* Animações para Radix data-state */
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-fade-out: fade-out 150ms ease-in;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes collapsible-down {
+  from { height: 0; }
+  to { height: var(--radix-collapsible-content-height); }
+}
+@keyframes collapsible-up {
+  from { height: var(--radix-collapsible-content-height); }
+  to { height: 0; }
+}
+
+[data-state="open"][data-side] { animation: var(--animate-fade-in); }
+[data-state="closed"][data-side] { animation: var(--animate-fade-out); }
+
+/* Collapsible animations */
+[data-state="open"] > [data-radix-collection-item],
+[data-radix-collapsible-content][data-state="open"] {
+  animation: collapsible-down 200ms ease-out;
+}
+[data-radix-collapsible-content][data-state="closed"] {
+  animation: collapsible-up 200ms ease-in;
 }
 
 :root {
@@ -47,4 +82,23 @@
 
 body {
   background: var(--background);
+}
+
+/* Scrollbar mais discreto */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: theme(colors.neutral.300) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background-color: theme(colors.neutral.300);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: theme(colors.neutral.400); }
+
+/* Foco visível consistente para teclado */
+:focus-visible {
+  outline: 2px solid theme(colors.peri.400);
+  outline-offset: 2px;
 }

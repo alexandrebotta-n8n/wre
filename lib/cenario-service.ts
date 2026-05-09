@@ -102,8 +102,13 @@ export async function calcularCenario(args: {
     },
   });
   if (!cenario) throw new ApiError("Cenário não encontrado", 404);
-  if (cenario.status === "ARCHIVED") {
-    throw new ApiError("Cenário arquivado não pode ser recalculado", 409);
+  // Cenário PUBLICADO (APPLIED) tem snapshot imutável — recalcular descaracterizaria
+  // o que foi formalmente publicado. Cenário ARQUIVADO idem. Apenas DRAFT é editável.
+  if (cenario.status !== "DRAFT") {
+    throw new ApiError(
+      `Apenas cenários em rascunho podem ser calculados (status atual: ${cenario.status}).`,
+      409,
+    );
   }
 
   const periodo = await prisma.periodo.findUnique({ where: { id: args.periodoId } });

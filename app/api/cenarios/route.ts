@@ -3,10 +3,14 @@ import { withAuth, parseJson } from "@/lib/api/handler";
 import { CriarCenarioSchema } from "@/lib/schemas/cenario";
 import { criarCenarioComDefaults } from "@/lib/cenario-service";
 import { logAudit } from "@/lib/audit";
+import { escopoDe } from "@/lib/auth/escopo";
 
 export async function GET() {
-  return withAuth(async () => {
+  return withAuth(async (session) => {
+    const escopo = escopoDe(session);
     return prisma.cenario.findMany({
+      // SOCIO só vê cenários publicados.
+      where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {},
       orderBy: [{ criadoEm: "desc" }],
       include: { premissa: { select: { nome: true, modelo: true } } },
       take: 200,

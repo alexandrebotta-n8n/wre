@@ -3,6 +3,7 @@
 // id em a e b para "apresentar 1 cenário" — slides comparativos não aparecem).
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Play } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { brl, pct, nomeOuIniciais } from "@/lib/format";
@@ -10,6 +11,11 @@ import { Deck } from "@/components/apresentacao/deck";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 import { getModoNome } from "@/lib/preferencias";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { NativeSelect } from "@/components/ui/input";
 
 export default async function ApresentacaoPage({
   searchParams,
@@ -429,42 +435,57 @@ async function SeletorApresentacao({ escopo }: { escopo: boolean }) {
   ]);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight text-navy-900">Modo apresentação</h1>
-      <p className="text-sm text-neutral-600 mt-1">
-        Selecione 1 cenário (apresentação simples) ou 2 (comparativo) e o período.
-      </p>
+    <main className="mx-auto max-w-3xl px-4 sm:px-6 py-8 space-y-6">
+      <PageHeader
+        title="Modo apresentação"
+        description="Selecione 1 cenário (apresentação simples) ou 2 (comparativo) e o período."
+      />
 
-      <form action="/apresentacao" method="get" className="mt-6 rounded-lg border border-neutral-200 bg-white p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <select name="a" required className="rounded border border-neutral-300 px-3 py-2 text-sm">
-          <option value="">cenário A…</option>
-          {cenarios.map((c) => (
-            <option key={c.id} value={c.id}>{c.nome} ({c.modelo})</option>
-          ))}
-        </select>
-        <select name="b" defaultValue="" className="rounded border border-neutral-300 px-3 py-2 text-sm">
-          <option value="">— sem comparação —</option>
-          {cenarios.map((c) => (
-            <option key={c.id} value={c.id}>{c.nome} ({c.modelo})</option>
-          ))}
-        </select>
-        <select name="periodoId" required className="rounded border border-neutral-300 px-3 py-2 text-sm">
-          <option value="">período…</option>
-          {periodos.map((p) => (
-            <option key={p.id} value={p.id}>{p.rotulo}</option>
-          ))}
-        </select>
-        <button className="sm:col-span-3 rounded bg-navy-900 hover:bg-navy-700 text-white py-2 text-sm font-medium transition">
-          Iniciar apresentação ▶
-        </button>
-      </form>
+      <Card>
+        <form action="/apresentacao" method="get" className="p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Field label="Cenário A" htmlFor="apr-a" required>
+              <NativeSelect id="apr-a" name="a" required defaultValue="">
+                <option value="" disabled>Escolha…</option>
+                {cenarios.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome} ({c.modelo})</option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field label="Cenário B" htmlFor="apr-b" hint="Opcional — para comparativo">
+              <NativeSelect id="apr-b" name="b" defaultValue="">
+                <option value="">— sem comparação —</option>
+                {cenarios.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome} ({c.modelo})</option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field label="Período" htmlFor="apr-p" required>
+              <NativeSelect id="apr-p" name="periodoId" required defaultValue="">
+                <option value="" disabled>Período…</option>
+                {periodos.map((p) => (
+                  <option key={p.id} value={p.id}>{p.rotulo}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+          </div>
+          <Button type="submit" variant="secondary" className="w-full">
+            <Play className="h-4 w-4" /> Iniciar apresentação
+          </Button>
+        </form>
+      </Card>
 
-      <p className="text-xs text-neutral-500 mt-4">
-        Atalhos durante a apresentação: <kbd className="px-1 bg-neutral-200 rounded">←</kbd> / <kbd className="px-1 bg-neutral-200 rounded">→</kbd> navegar ·
-        {" "}<kbd className="px-1 bg-neutral-200 rounded">F</kbd> tela cheia ·
-        {" "}<kbd className="px-1 bg-neutral-200 rounded">Esc</kbd> fechar.
-      </p>
-      <p className="mt-2 text-xs">
+      <Card className="p-4 bg-peri-50/40 border-peri-200">
+        <p className="text-xs text-neutral-700">
+          <strong className="text-navy-900">Atalhos durante a apresentação:</strong>{" "}
+          <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded text-[10px]">←</kbd>{" "}
+          <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded text-[10px]">→</kbd> navegar ·{" "}
+          <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded text-[10px]">F</kbd> tela cheia ·{" "}
+          <kbd className="px-1.5 py-0.5 bg-white border border-neutral-300 rounded text-[10px]">Esc</kbd> fechar
+        </p>
+      </Card>
+
+      <p className="text-xs text-center">
         <Link href="/" className="text-peri-700 hover:underline">← voltar</Link>
       </p>
     </main>

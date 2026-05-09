@@ -49,7 +49,7 @@ export function dataHora(d: Date | string): string {
 export function iniciais(nome: string): string {
   const partes = nome
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // remove acentos
+    .replace(/[̀-ͯ]/g, "") // remove acentos (combining diacritics U+0300-U+036F)
     .split(/\s+/)
     .filter((p) => p.length > 0);
   const tokens: string[] = [];

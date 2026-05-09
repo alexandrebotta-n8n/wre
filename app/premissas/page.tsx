@@ -1,10 +1,21 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { Plus, Settings2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { dataHora } from "@/lib/format";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/audit";
-import { ModeloBadge } from "@/components/ui/badges";
+import { flashSuccess } from "@/lib/flash";
+import { ModeloBadge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription, DialogHeader, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input, NativeSelect } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { PremissaChips } from "@/components/premissa/chips";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 
@@ -46,62 +57,92 @@ async function criarAction(formData: FormData) {
     recurso: `Premissa:${p.id}`,
     meta: { nome, modelo },
   });
+  await flashSuccess(`Premissa "${nome}" criada com defaults.`);
   redirect(`/premissas/${p.id}`);
 }
 
 export default async function PremissasPage() {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  // SOCIO restrito não tem acesso a premissas (são detalhes internos do modelo).
   if (escopo.ehSocioRestrito) notFound();
 
   const premissas = await prisma.premissa.findMany({
     orderBy: [{ atualizadoEm: "desc" }],
     take: 100,
   });
+
+  const novoButton = escopo.podeMutar ? (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="primary">
+          <Plus className="h-4 w-4" /> Nova premissa
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Criar premissa</DialogTitle>
+          <DialogDescription>
+            Será criada com os parâmetros default do modelo. Você pode editar depois.
+          </DialogDescription>
+        </DialogHeader>
+        <form action={criarAction} className="space-y-4">
+          <Field label="Nome" htmlFor="prem-nome" required>
+            <Input id="prem-nome" name="nome" required maxLength={120} placeholder="ex: Política DSF v2 — 50/30/20" autoFocus />
+          </Field>
+          <Field label="Modelo" htmlFor="prem-modelo" required>
+            <NativeSelect id="prem-modelo" name="modelo" defaultValue="NOVO">
+              <option value="NOVO">Novo (Política DSF v1)</option>
+              <option value="ATUAL">Atual (Sistema 1T2026)</option>
+            </NativeSelect>
+          </Field>
+          <DialogFooter className="gap-2 pt-2">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancelar</Button>
+            </DialogClose>
+            <SubmitButton variant="primary">Criar premissa</SubmitButton>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  ) : null;
+
   return (
-    <main className="mx-auto max-w-7xl px-6 py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-navy-900">Premissas ({premissas.length})</h1>
-          <p className="text-sm text-neutral-600 mt-1">
-            Templates de parâmetros (pesos, %, faixas) reutilizáveis entre cenários.
-          </p>
+    <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-6">
+      <PageHeader
+        title="Premissas"
+        description={`${premissas.length} template(s) — parâmetros reutilizáveis entre cenários`}
+        actions={novoButton}
+      />
+
+      {premissas.length === 0 ? (
+        <EmptyState
+          icon={<Settings2 className="h-5 w-5" />}
+          title="Nenhuma premissa cadastrada"
+          description="Crie a primeira premissa para começar a modelar cenários."
+          action={novoButton}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {premissas.map((p) => (
+            <Card key={p.id} className="hover:border-peri-400 transition-colors">
+              <Link href={`/premissas/${p.id}`} className="block p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peri-400 rounded-lg">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-semibold text-navy-900 truncate">{p.nome}</h2>
+                  <ModeloBadge modelo={p.modelo} />
+                </div>
+                {p.descricao && <p className="text-sm text-neutral-600 mt-1.5 line-clamp-2">{p.descricao}</p>}
+                <div className="mt-3">
+                  <PremissaChips modelo={p.modelo} parametros={p.parametros as Record<string, unknown>} />
+                </div>
+                <div className="text-xs text-neutral-500 mt-3 flex items-center justify-between">
+                  <span>v{p.versao} · atualizada em {dataHora(p.atualizadoEm)}</span>
+                  <span className="text-peri-700">Editar →</span>
+                </div>
+              </Link>
+            </Card>
+          ))}
         </div>
-      </div>
-
-      {escopo.podeMutar && (
-      <form action={criarAction} className="mt-6 rounded-lg border border-neutral-200 bg-white p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <input name="nome" required maxLength={120} placeholder="Nome (ex: Política DSF v2 — 50/30/20)"
-          className="sm:col-span-2 rounded border border-neutral-300 px-3 py-2 text-sm" />
-        <select name="modelo" defaultValue="NOVO" className="rounded border border-neutral-300 px-3 py-2 text-sm">
-          <option value="NOVO">NOVO (Política DSF v1)</option>
-          <option value="ATUAL">ATUAL (Sistema 1T2026)</option>
-        </select>
-        <button className="sm:col-span-3 rounded bg-navy-900 hover:bg-navy-700 text-white py-2 text-sm font-medium transition">
-          Criar premissa (defaults — depois você edita)
-        </button>
-      </form>
       )}
-
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {premissas.map((p) => (
-          <Link
-            key={p.id} href={`/premissas/${p.id}`}
-            className="block rounded-lg border border-neutral-200 bg-white p-5 hover:border-peri-400 transition"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="font-medium text-navy-900">{p.nome}</h2>
-              <ModeloBadge modelo={p.modelo} />
-            </div>
-            {p.descricao && <p className="text-sm text-neutral-600 mt-1">{p.descricao}</p>}
-            <pre className="mt-3 text-xs bg-neutral-50 border border-neutral-200 rounded p-3 overflow-x-auto max-h-48">
-              {JSON.stringify(p.parametros, null, 2)}
-            </pre>
-            <div className="text-xs text-neutral-400 mt-2">Atualizada em {dataHora(p.atualizadoEm)}</div>
-          </Link>
-        ))}
-      </div>
     </main>
   );
 }

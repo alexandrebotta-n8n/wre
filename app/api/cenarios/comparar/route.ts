@@ -1,24 +1,44 @@
 // Comparativo entre 2 cenários para um mesmo período.
 // Retorna pacotes do A e do B alinhados por sócio + diff por componente.
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { withAuth, ApiError } from "@/lib/api/handler";
+import { escopoDe } from "@/lib/auth/escopo";
+
+const QuerySchema = z.object({
+  a: z.string().min(1, "cenário A obrigatório"),
+  b: z.string().min(1, "cenário B obrigatório"),
+  periodoId: z.string().min(1, "período obrigatório"),
+});
 
 export async function GET(req: Request) {
-  return withAuth(async () => {
+  return withAuth(async (session) => {
+    const escopo = escopoDe(session);
     const url = new URL(req.url);
-    const aId = url.searchParams.get("a");
-    const bId = url.searchParams.get("b");
-    const periodoId = url.searchParams.get("periodoId");
-    if (!aId || !bId || !periodoId) {
-      throw new ApiError("Parâmetros obrigatórios: a, b, periodoId", 400);
+    const parsed = QuerySchema.safeParse({
+      a: url.searchParams.get("a"),
+      b: url.searchParams.get("b"),
+      periodoId: url.searchParams.get("periodoId"),
+    });
+    if (!parsed.success) {
+      throw new ApiError(parsed.error.issues[0]?.message ?? "Parâmetros inválidos", 400);
     }
+    const { a: aId, b: bId, periodoId } = parsed.data;
+    if (aId === bId) {
+      throw new ApiError("Cenário A e B precisam ser diferentes", 400);
+    }
+
+    // Filtro de SOCIO restrito: só remunerações próprias.
+    const remuneracoesWhere = escopo.ehSocioRestrito
+      ? { periodoId, socioId: escopo.socioIdEscopo ?? "__nada__" }
+      : { periodoId };
 
     const [a, b, periodo] = await Promise.all([
       prisma.cenario.findUnique({
         where: { id: aId },
         include: {
           remuneracoes: {
-            where: { periodoId },
+            where: remuneracoesWhere,
             include: { socio: { select: { nome: true, isFundador: true, percentualQuotasDefault: true } } },
           },
         },
@@ -27,7 +47,7 @@ export async function GET(req: Request) {
         where: { id: bId },
         include: {
           remuneracoes: {
-            where: { periodoId },
+            where: remuneracoesWhere,
             include: { socio: { select: { nome: true, isFundador: true, percentualQuotasDefault: true } } },
           },
         },
@@ -37,6 +57,10 @@ export async function GET(req: Request) {
     if (!a) throw new ApiError(`Cenário A (${aId}) não encontrado`, 404);
     if (!b) throw new ApiError(`Cenário B (${bId}) não encontrado`, 404);
     if (!periodo) throw new ApiError("Período não encontrado", 404);
+    // SOCIO só pode comparar cenários publicados.
+    if (escopo.ehSocioRestrito && (a.status !== "APPLIED" || b.status !== "APPLIED")) {
+      throw new ApiError("Apenas cenários publicados estão disponíveis", 403);
+    }
 
     const mapA = new Map(a.remuneracoes.map((r) => [r.socioId, r]));
     const mapB = new Map(b.remuneracoes.map((r) => [r.socioId, r]));
@@ -61,8 +85,8 @@ export async function GET(req: Request) {
     linhas.sort((x, y) => Math.abs(y.diffTotal) - Math.abs(x.diffTotal));
 
     return {
-      cenarioA: { id: a.id, nome: a.nome, modelo: a.modelo },
-      cenarioB: { id: b.id, nome: b.nome, modelo: b.modelo },
+      cenarioA: { id: a.id, nome: a.nome, modelo: a.modelo, status: a.status },
+      cenarioB: { id: b.id, nome: b.nome, modelo: b.modelo, status: b.status },
       periodo: { id: periodo.id, rotulo: periodo.rotulo },
       totalA: linhas.reduce((acc, l) => acc + (l.a?.total ?? 0), 0),
       totalB: linhas.reduce((acc, l) => acc + (l.b?.total ?? 0), 0),

@@ -1,13 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Folders } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { dataHora } from "@/lib/format";
 import { criarCenarioComDefaults } from "@/lib/cenario-service";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/audit";
-import { ModeloBadge, StatusBadge } from "@/components/ui/badges";
+import { flashSuccess } from "@/lib/flash";
+import { ModeloBadge, StatusBadge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { Toolbar, SearchInput } from "@/components/ui/toolbar";
+import { NativeSelect } from "@/components/ui/input";
+import { TableShell, THead, TBody, TH, TR, TD } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { NovoCenarioDialog } from "@/components/cenario/novo-dialog";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
+import type { ModeloRegra, CenarioStatus } from "@prisma/client";
 
 async function criar(formData: FormData) {
   "use server";
@@ -18,7 +29,10 @@ async function criar(formData: FormData) {
   const premissaId = String(formData.get("premissaId") ?? "");
   if (!nome || !premissaId) return;
   const c = await criarCenarioComDefaults({
-    nome, ano, modelo, premissaId,
+    nome,
+    ano,
+    modelo,
+    premissaId,
     criadoPorId: session?.user?.id,
   });
   await logAudit({
@@ -27,107 +41,163 @@ async function criar(formData: FormData) {
     recurso: `Cenario:${c.id}`,
     meta: { nome, ano, modelo },
   });
+  await flashSuccess(`Cenário "${nome}" criado em rascunho.`);
   redirect(`/cenarios/${c.id}`);
 }
 
-export default async function CenariosPage() {
+export default async function CenariosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; modelo?: string; status?: string }>;
+}) {
+  const sp = await searchParams;
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  const [cenarios, premissas] = await Promise.all([
+
+  const where: Record<string, unknown> = {};
+  if (escopo.ehSocioRestrito) where.status = "APPLIED";
+  if (sp.modelo === "ATUAL" || sp.modelo === "NOVO") where.modelo = sp.modelo as ModeloRegra;
+  if (sp.status === "DRAFT" || sp.status === "APPLIED" || sp.status === "ARCHIVED")
+    where.status = sp.status as CenarioStatus;
+  if (sp.q) where.nome = { contains: sp.q, mode: "insensitive" };
+
+  const [cenarios, premissas, totalSemFiltro] = await Promise.all([
     prisma.cenario.findMany({
-      where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {},
+      where,
       orderBy: [{ criadoEm: "desc" }],
       include: { premissa: { select: { nome: true } } },
       take: 100,
     }),
     escopo.podeMutar
-      ? prisma.premissa.findMany({ where: { ativa: true }, take: 50 })
+      ? prisma.premissa.findMany({
+          where: { ativa: true },
+          orderBy: [{ atualizadoEm: "desc" }],
+          take: 50,
+          select: { id: true, nome: true, modelo: true },
+        })
       : Promise.resolve([]),
+    prisma.cenario.count({ where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {} }),
   ]);
 
+  const semFiltros = !sp.q && !sp.modelo && !sp.status;
+
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-navy-900">Cenários</h1>
-          <p className="text-sm text-neutral-600 mt-1">{cenarios.length} cenários criados</p>
-        </div>
-      </div>
+    <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-6">
+      <PageHeader
+        title="Cenários"
+        description={`${totalSemFiltro} cenário(s) cadastrado(s) — modele e compare configurações de remuneração`}
+        actions={
+          escopo.podeMutar && (
+            <NovoCenarioDialog
+              premissas={premissas as Array<{ id: string; nome: string; modelo: "ATUAL" | "NOVO" }>}
+              action={criar}
+            />
+          )
+        }
+      />
 
-      {/* Form de criação — apenas para perfis com mutação */}
-      {escopo.podeMutar && (
-      <form
-        action={criar}
-        className="mt-6 rounded-lg border border-neutral-200 bg-white p-5 grid grid-cols-1 sm:grid-cols-5 gap-3"
-      >
-        <input
-          name="nome" placeholder="Nome (ex: NOVO 2026 — base política v1)"
-          required maxLength={120}
-          className="sm:col-span-2 rounded border border-neutral-300 px-3 py-2 text-sm"
-        />
-        <input
-          name="ano" type="number" defaultValue={2026} min={2020} max={2100}
-          className="rounded border border-neutral-300 px-3 py-2 text-sm"
-        />
-        <select
-          name="modelo" defaultValue="NOVO"
-          className="rounded border border-neutral-300 px-3 py-2 text-sm"
-        >
-          <option value="ATUAL">ATUAL (1T2026)</option>
-          <option value="NOVO">NOVO (Política DSF v1)</option>
-        </select>
-        <select
-          name="premissaId" required
-          className="rounded border border-neutral-300 px-3 py-2 text-sm"
-        >
-          <option value="">premissa…</option>
-          {premissas.map((p) => (
-            <option key={p.id} value={p.id}>{p.nome} ({p.modelo})</option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="sm:col-span-5 rounded bg-navy-900 hover:bg-navy-700 text-white py-2 text-sm font-medium transition"
-        >
-          Criar cenário (gera classificações default)
-        </button>
-      </form>
-      )}
-
-      {/* Tabela */}
-      <div className="mt-8 rounded-lg border border-neutral-200 bg-white overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-neutral-600 text-left">
-            <tr>
-              <th className="px-4 py-2 font-medium">Nome</th>
-              <th className="px-4 py-2 font-medium">Modelo</th>
-              <th className="px-4 py-2 font-medium">Ano</th>
-              <th className="px-4 py-2 font-medium">Premissa</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Criado em</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-200">
-            {cenarios.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-neutral-500">
-                Nenhum cenário ainda. Crie um acima.
-              </td></tr>
+      <Card className="overflow-hidden">
+        <Toolbar>
+          <form method="get" className="flex flex-wrap items-center gap-2 flex-1">
+            <SearchInput name="q" defaultValue={sp.q ?? ""} placeholder="Buscar por nome…" />
+            <NativeSelect
+              name="modelo"
+              defaultValue={sp.modelo ?? ""}
+              className="h-9 w-auto min-w-[140px]"
+              aria-label="Filtrar por modelo"
+            >
+              <option value="">Todos modelos</option>
+              <option value="ATUAL">Atual</option>
+              <option value="NOVO">Novo</option>
+            </NativeSelect>
+            <NativeSelect
+              name="status"
+              defaultValue={sp.status ?? ""}
+              className="h-9 w-auto min-w-[140px]"
+              aria-label="Filtrar por status"
+            >
+              <option value="">Todos status</option>
+              <option value="DRAFT">Rascunho</option>
+              <option value="APPLIED">Publicado</option>
+              <option value="ARCHIVED">Arquivado</option>
+            </NativeSelect>
+            <Button type="submit" variant="secondary" size="sm">
+              Filtrar
+            </Button>
+            {!semFiltros && (
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/cenarios">Limpar</Link>
+              </Button>
             )}
-            {cenarios.map((c) => (
-              <tr key={c.id} className="hover:bg-peri-50">
-                <td className="px-4 py-2">
-                  <Link href={`/cenarios/${c.id}`} className="text-peri-700 hover:text-peri-500 font-medium">{c.nome}</Link>
-                </td>
-                <td className="px-4 py-2"><ModeloBadge modelo={c.modelo} /></td>
-                <td className="px-4 py-2 tabular-nums">{c.ano}</td>
-                <td className="px-4 py-2 text-neutral-600">{c.premissa.nome}</td>
-                <td className="px-4 py-2"><StatusBadge status={c.status} /></td>
-                <td className="px-4 py-2 text-neutral-500 text-xs">{dataHora(c.criadoEm)}</td>
+          </form>
+        </Toolbar>
+
+        {cenarios.length === 0 ? (
+          <div className="p-8">
+            {semFiltros ? (
+              <EmptyState
+                icon={<Folders className="h-5 w-5" />}
+                title="Nenhum cenário ainda"
+                description="Crie seu primeiro cenário para começar a simular pacotes de remuneração."
+                action={
+                  escopo.podeMutar && (
+                    <NovoCenarioDialog
+                      premissas={premissas as Array<{ id: string; nome: string; modelo: "ATUAL" | "NOVO" }>}
+                      action={criar}
+                    />
+                  )
+                }
+              />
+            ) : (
+              <EmptyState
+                title="Sem resultados para os filtros aplicados"
+                description="Ajuste a busca ou os filtros acima."
+                action={
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/cenarios">Limpar filtros</Link>
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        ) : (
+          <TableShell caption="Lista de cenários cadastrados">
+            <THead>
+              <tr>
+                <TH className="px-4">Nome</TH>
+                <TH>Modelo</TH>
+                <TH>Status</TH>
+                <TH className="text-right">Ano</TH>
+                <TH>Premissa</TH>
+                <TH>Criado em</TH>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </THead>
+            <TBody>
+              {cenarios.map((c) => (
+                <TR key={c.id}>
+                  <TD className="px-4 py-2.5">
+                    <Link
+                      href={`/cenarios/${c.id}`}
+                      className="text-peri-700 hover:text-peri-900 font-medium hover:underline"
+                    >
+                      {c.nome}
+                    </Link>
+                  </TD>
+                  <TD>
+                    <ModeloBadge modelo={c.modelo} />
+                  </TD>
+                  <TD>
+                    <StatusBadge status={c.status} />
+                  </TD>
+                  <TD className="text-right tabular-nums">{c.ano}</TD>
+                  <TD className="text-neutral-600 truncate max-w-[200px]">{c.premissa.nome}</TD>
+                  <TD className="text-neutral-500 text-xs">{dataHora(c.criadoEm)}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </TableShell>
+        )}
+      </Card>
     </main>
   );
 }

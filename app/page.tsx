@@ -1,56 +1,149 @@
 import Link from "next/link";
+import { Folders, Users, GitCompare, Calendar } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { escopoDe } from "@/lib/auth/escopo";
+import type { SessionUser } from "@/lib/auth/guards";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { ModeloBadge, StatusBadge } from "@/components/ui/badge";
+import { dataHora } from "@/lib/format";
 
 export default async function HomePage() {
-  const [cenarios, socios, periodos] = await Promise.all([
-    prisma.cenario.count(),
+  const session = await auth();
+  const escopo = escopoDe(session?.user as SessionUser | undefined);
+
+  const [cenarios, socios, periodos, ultimosCenarios] = await Promise.all([
+    prisma.cenario.count({ where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {} }),
     prisma.socio.count({ where: { ativo: true } }),
     prisma.periodo.count(),
+    prisma.cenario.findMany({
+      where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {},
+      orderBy: [{ criadoEm: "desc" }],
+      include: { premissa: { select: { nome: true } } },
+      take: 5,
+    }),
   ]);
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900">WRE Simulador</h1>
-      <p className="text-sm text-neutral-600 mt-1">
-        Simulação de remuneração de sócios e líderes — DSF (Dupont Spiller & Fadanelli).
-      </p>
+    <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-8">
+      <PageHeader
+        title={`Olá${session?.user?.name ? `, ${session.user.name}` : ""}`}
+        description="Simulação de remuneração de sócios e líderes — DSF (Dupont Spiller & Fadanelli)."
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
-        <Card href="/cenarios" titulo="Cenários" valor={cenarios} subtitulo="criados" />
-        <Card href="/socios" titulo="Sócios" valor={socios} subtitulo="ativos" />
-        <Card href="/" titulo="Períodos" valor={periodos} subtitulo="cadastrados" />
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard href="/cenarios" icon={<Folders className="h-4 w-4" />} label="Cenários" valor={cenarios} hint="modelados" />
+        <StatCard href="/socios" icon={<Users className="h-4 w-4" />} label="Sócios" valor={socios} hint="ativos na base" />
+        <StatCard icon={<Calendar className="h-4 w-4" />} label="Períodos" valor={periodos} hint="cadastrados" />
       </div>
 
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link
+      {/* Atalhos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ActionCard
           href="/cenarios"
-          className="block rounded-lg border border-neutral-200 bg-white p-6 hover:border-peri-400 transition group"
-        >
-          <h2 className="font-medium text-navy-900 group-hover:text-peri-600">Criar novo cenário →</h2>
-          <p className="text-sm text-neutral-600 mt-1">
-            Escolher modelo (ATUAL × NOVO), premissa e ano. Reclassificar sócios. Calcular o pacote anual.
-          </p>
-        </Link>
-        <Link
+          icon={<Folders className="h-5 w-5" />}
+          title="Criar ou abrir cenário"
+          description="Modelo Atual ou Novo, premissa, ano. Reclassifique sócios e calcule o pacote anual."
+        />
+        <ActionCard
           href="/cenarios/comparar"
-          className="block rounded-lg border border-neutral-200 bg-white p-6 hover:border-peri-400 transition group"
-        >
-          <h2 className="font-medium text-navy-900 group-hover:text-peri-600">Comparar cenários →</h2>
-          <p className="text-sm text-neutral-600 mt-1">
-            ATUAL × NOVO lado a lado, por sócio, com diff em R$ e %.
-          </p>
-        </Link>
+          icon={<GitCompare className="h-5 w-5" />}
+          title="Comparar cenários"
+          description="Atual × Novo lado a lado, com diff por sócio em R$ e %."
+        />
       </div>
+
+      {/* Últimos cenários */}
+      {ultimosCenarios.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-navy-900 uppercase tracking-wider mb-3">
+            Últimos cenários
+          </h2>
+          <Card className="overflow-hidden divide-y divide-neutral-100">
+            {ultimosCenarios.map((c) => (
+              <Link
+                key={c.id}
+                href={`/cenarios/${c.id}`}
+                className="flex items-center gap-3 p-4 hover:bg-peri-50/50 transition-colors focus-visible:outline-none focus-visible:bg-peri-50"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-navy-900 truncate">{c.nome}</div>
+                  <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                    <span>{c.premissa.nome}</span>
+                    <span>·</span>
+                    <span>Ano {c.ano}</span>
+                    <span>·</span>
+                    <span>criado {dataHora(c.criadoEm)}</span>
+                  </div>
+                </div>
+                <ModeloBadge modelo={c.modelo} />
+                <StatusBadge status={c.status} />
+                <span className="text-peri-700 text-sm">→</span>
+              </Link>
+            ))}
+          </Card>
+        </section>
+      )}
     </main>
   );
 }
 
-function Card({ href, titulo, valor, subtitulo }: { href: string; titulo: string; valor: number; subtitulo: string }) {
+function StatCard({
+  href,
+  icon,
+  label,
+  valor,
+  hint,
+}: {
+  href?: string;
+  icon: React.ReactNode;
+  label: string;
+  valor: number;
+  hint: string;
+}) {
+  const inner = (
+    <Card className="p-5 transition-colors hover:border-peri-400">
+      <div className="flex items-center gap-2 text-xs text-neutral-500 uppercase tracking-wider">
+        <span className="text-peri-600">{icon}</span>
+        {label}
+      </div>
+      <div className="text-3xl font-semibold mt-2 text-navy-900 tabular-nums">{valor}</div>
+      <div className="text-xs text-neutral-500 mt-0.5">{hint}</div>
+    </Card>
+  );
+  return href ? <Link href={href}>{inner}</Link> : inner;
+}
+
+function ActionCard({
+  href,
+  icon,
+  title,
+  description,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
   return (
-    <Link href={href} className="block rounded-lg border border-neutral-200 bg-white p-5 hover:border-peri-400 transition">
-      <div className="text-sm text-neutral-500">{titulo}</div>
-      <div className="text-3xl font-semibold mt-1 text-navy-900 tabular-nums">{valor}</div>
-      <div className="text-xs text-neutral-500 mt-1">{subtitulo}</div>
-    </Link>
+    <Card className="hover:border-peri-400 transition-colors">
+      <Link
+        href={href}
+        className="block p-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peri-400 rounded-lg"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-peri-100 text-peri-700 flex-shrink-0">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-navy-900">{title}</h3>
+            <p className="text-sm text-neutral-600 mt-1">{description}</p>
+            <span className="text-xs text-peri-700 mt-3 inline-block">Abrir →</span>
+          </div>
+        </div>
+      </Link>
+    </Card>
   );
 }

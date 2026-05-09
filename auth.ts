@@ -12,7 +12,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { registrarLoginEvent } from "@/lib/auth/events";
+import { registrarLoginEvent, loginEstaBloqueado } from "@/lib/auth/events";
 import { authConfig } from "@/auth.config";
 import type { UsuarioRole } from "@prisma/client";
 
@@ -56,6 +56,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const senha = String(credentials?.password ?? "");
         if (!email || !senha) {
           await registrarLoginEvent({ email: email || "?", sucesso: false, motivo: "sem-email" });
+          return null;
+        }
+        // Rate limit: 10 falhas em 5min bloqueiam o email.
+        // Bloqueio expira automaticamente quando as falhas saem da janela.
+        if (await loginEstaBloqueado(email)) {
+          await registrarLoginEvent({ email, sucesso: false, motivo: "rate-limit" });
           return null;
         }
         const u = await prisma.usuario.findUnique({ where: { email } });

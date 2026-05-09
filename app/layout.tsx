@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Toaster } from "sonner";
 import { revalidatePath } from "next/cache";
+import { Suspense } from "react";
 import { signOut, auth } from "@/auth";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 import { getModoNome, setModoNome } from "@/lib/preferencias";
+import { Header } from "@/components/shell/header";
+import { FlashConsumer } from "@/components/shell/flash-consumer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,75 +22,60 @@ async function alternarModoNomeAction() {
   revalidatePath("/", "layout");
 }
 
+async function signOutAction() {
+  "use server";
+  await signOut({ redirectTo: "/login" });
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
   const modoNome = await getModoNome();
 
+  const navItems = session?.user
+    ? [
+        { href: "/cenarios", label: "Cenários" },
+        { href: "/cenarios/comparar", label: "Comparar" },
+        { href: "/apresentacao", label: "Apresentar" },
+        { href: "/socios", label: "Sócios" },
+        ...(!escopo.ehSocioRestrito ? [{ href: "/premissas", label: "Premissas" }] : []),
+        ...(session.user.roles.includes("ADMIN") ? [{ href: "/usuarios", label: "Usuários" }] : []),
+      ]
+    : [];
+
   return (
     <html lang="pt-BR">
-      <body className="min-h-screen text-neutral-900 antialiased">
+      <body className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
+        <a
+          href="#conteudo"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-navy-900 focus:px-3 focus:py-1.5 focus:rounded focus:shadow"
+        >
+          Pular para o conteúdo
+        </a>
         {session?.user && (
-          <header className="bg-navy-900 text-white">
-            <div className="mx-auto max-w-7xl px-6 py-3 flex items-center gap-6">
-              <Link href="/" className="font-semibold tracking-tight flex items-center gap-2">
-                <Logomark />
-                <span>WRE Simulador</span>
-                <span className="text-peri-200 font-normal text-sm">· DSF</span>
-              </Link>
-              <nav className="flex items-center gap-5 text-sm text-peri-100">
-                <Link href="/cenarios" className="hover:text-mint-400 transition">Cenários</Link>
-                <Link href="/cenarios/comparar" className="hover:text-mint-400 transition">Comparar</Link>
-                <Link href="/apresentacao" className="hover:text-mint-400 transition">Apresentar</Link>
-                <Link href="/socios" className="hover:text-mint-400 transition">Sócios</Link>
-                {!escopo.ehSocioRestrito && (
-                  <Link href="/premissas" className="hover:text-mint-400 transition">Premissas</Link>
-                )}
-                {session.user.roles.includes("ADMIN") && (
-                  <Link href="/usuarios" className="hover:text-mint-400 transition">Usuários</Link>
-                )}
-              </nav>
-              <div className="ml-auto flex items-center gap-3 text-sm">
-                <form action={alternarModoNomeAction}>
-                  <button
-                    className={`rounded px-2 py-0.5 text-xs font-medium transition ring-1 ring-inset ${
-                      modoNome === "iniciais"
-                        ? "bg-mint-400/20 text-mint-300 ring-mint-400/40 hover:bg-mint-400/30"
-                        : "bg-peri-700/40 text-peri-100 ring-peri-400/40 hover:bg-peri-700/60"
-                    }`}
-                    title={modoNome === "iniciais" ? "Iniciais (clique para mostrar nomes completos)" : "Nomes completos (clique para anonimizar)"}
-                  >
-                    {modoNome === "iniciais" ? "🔒 iniciais" : "👁 nomes"}
-                  </button>
-                </form>
-                <span className="text-peri-200">{session.user.email}</span>
-                <Link href="/perfil/senha" className="text-peri-100 hover:text-mint-400 underline transition">senha</Link>
-                <form
-                  action={async () => {
-                    "use server";
-                    await signOut({ redirectTo: "/login" });
-                  }}
-                >
-                  <button className="text-peri-100 hover:text-mint-400 underline transition">sair</button>
-                </form>
-              </div>
-            </div>
-          </header>
+          <Header
+            email={session.user.email ?? ""}
+            navItems={navItems}
+            modoNomeIniciais={modoNome === "iniciais"}
+            alternarModoNomeAction={alternarModoNomeAction}
+            signOutAction={signOutAction}
+          />
         )}
-        {children}
+        <div id="conteudo">{children}</div>
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            classNames: {
+              toast: "border border-neutral-200 shadow-md",
+            },
+          }}
+        />
+        <Suspense fallback={null}>
+          <FlashConsumer />
+        </Suspense>
       </body>
     </html>
-  );
-}
-
-function Logomark() {
-  // 3 cores da identidade: navy (escuro) → periwinkle → mint, em pequenos quadrados
-  // empilhados verticalmente, espelhando o swatch fornecido.
-  return (
-    <span className="inline-flex flex-col gap-0.5" aria-hidden>
-      <span className="block h-1.5 w-3 rounded-xs bg-navy-700 ring-1 ring-peri-200/40" />
-      <span className="block h-1.5 w-3 rounded-xs bg-peri-400" />
-      <span className="block h-1.5 w-3 rounded-xs bg-mint-400" />
-    </span>
   );
 }

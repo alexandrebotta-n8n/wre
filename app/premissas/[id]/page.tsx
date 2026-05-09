@@ -1,15 +1,24 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { History } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { dataHora } from "@/lib/format";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/audit";
 import { ParamsAtualSchema, ParamsNovoSchema } from "@/lib/schemas/premissa";
-import { ModeloBadge } from "@/components/ui/badges";
+import { ModeloBadge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input, NativeSelect, Textarea } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { StickyActions } from "@/components/cenario/sticky-actions";
 import { SumValidator } from "@/components/premissa/sum-validator";
 import { MatrizPesosArea } from "@/components/premissa/matriz-pesos-area";
 import { atualizarPremissaComSnapshot } from "@/lib/premissa-service";
+import { flashError, flashSuccess } from "@/lib/flash";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 
@@ -34,7 +43,6 @@ async function salvarAction(formData: FormData) {
         reservaViraPremio: formData.get("reservaViraPremio") === "on",
       });
     } else {
-      // Recompõe pesosPorArea a partir dos campos pesoOrg-<codigo> / pesoInc-<codigo>
       const pesosOrganico: Record<string, number> = {};
       const pesosIncremental: Record<string, number> = {};
       for (const [k, v] of formData.entries()) {
@@ -69,7 +77,8 @@ async function salvarAction(formData: FormData) {
   } catch (e) {
     const z = e as { issues?: Array<{ message: string }> };
     const msg = z.issues?.[0]?.message ?? "Parâmetros inválidos";
-    redirect(`/premissas/${id}?erro=${encodeURIComponent(msg)}`);
+    await flashError(msg);
+    redirect(`/premissas/${id}`);
   }
 
   await atualizarPremissaComSnapshot(
@@ -83,171 +92,212 @@ async function salvarAction(formData: FormData) {
     recurso: `Premissa:${id}`,
     meta: { nome, modelo: existing.modelo },
   });
+  await flashSuccess("Premissa salva — versão anterior arquivada no histórico.");
   revalidatePath(`/premissas/${id}`);
   revalidatePath("/premissas");
-  redirect(`/premissas/${id}?ok=1`);
+  redirect(`/premissas/${id}`);
 }
 
 export default async function PremissaEdit({
-  params, searchParams,
+  params,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ erro?: string; ok?: string }>;
 }) {
   const { id } = await params;
-  const sp = await searchParams;
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
   if (escopo.ehSocioRestrito) notFound();
   const p = await prisma.premissa.findUnique({ where: { id } });
   if (!p) notFound();
   const params_ = p.parametros as Record<string, unknown>;
-  // Áreas só são necessárias para o editor NOVO (matriz de pesos por área).
   const areas = p.modelo === "NOVO"
     ? await prisma.areaPratica.findMany({ where: { ativa: true }, orderBy: [{ ordem: "asc" }], take: 50 })
     : [];
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-8">
-      <div className="text-sm text-neutral-500">
-        <Link href="/premissas" className="hover:underline">← Premissas</Link>
-      </div>
+    <main className="mx-auto max-w-4xl px-4 sm:px-6 py-8 pb-4 space-y-6">
+      <PageHeader
+        breadcrumb={[
+          { label: "Premissas", href: "/premissas" },
+          { label: p.nome },
+        ]}
+        title="Editar premissa"
+        meta={
+          <>
+            <ModeloBadge modelo={p.modelo} />
+            <span>·</span>
+            <span>v{p.versao}</span>
+            <span>·</span>
+            <span>atualizada em {dataHora(p.atualizadoEm)}</span>
+          </>
+        }
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/premissas/${p.id}/historico`}>
+              <History className="h-3.5 w-3.5" /> Histórico (v{p.versao})
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="mt-2 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-navy-900">Editar premissa</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/premissas/${p.id}/historico`}
-            className="rounded border border-neutral-300 px-3 py-1 text-xs font-medium text-navy-900 hover:border-peri-400 hover:bg-peri-50 transition"
-          >
-            histórico (v{p.versao})
-          </Link>
-          <ModeloBadge modelo={p.modelo} />
-        </div>
-      </div>
-
-      {sp.erro && (
-        <div className="mt-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {sp.erro}
-        </div>
-      )}
-      {sp.ok && !sp.erro && (
-        <div className="mt-4 rounded border border-mint-400 bg-mint-50 px-3 py-2 text-sm text-mint-900">
-          Premissa salva.
-        </div>
-      )}
-
-      <form action={salvarAction} className="mt-6 rounded-lg border border-neutral-200 bg-white p-6 space-y-5">
+      <form action={salvarAction} className="space-y-6">
         <input type="hidden" name="id" value={p.id} />
 
-        <Field label="Nome">
-          <input name="nome" defaultValue={p.nome} required maxLength={120}
-            className="w-full rounded border border-neutral-300 px-3 py-2 text-sm" />
-        </Field>
-        <Field label="Descrição">
-          <textarea name="descricao" defaultValue={p.descricao ?? ""} rows={2}
-            className="w-full rounded border border-neutral-300 px-3 py-2 text-sm" />
-        </Field>
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Identidade</CardTitle>
+              <CardDescription>Nome e descrição visíveis na lista de premissas.</CardDescription>
+            </div>
+          </CardHeader>
+          <div className="p-5 space-y-4">
+            <Field label="Nome" htmlFor="prem-nome" required>
+              <Input id="prem-nome" name="nome" defaultValue={p.nome} required maxLength={120} />
+            </Field>
+            <Field label="Descrição" htmlFor="prem-desc">
+              <Textarea id="prem-desc" name="descricao" defaultValue={p.descricao ?? ""} rows={2} placeholder="Opcional — contexto desta premissa" />
+            </Field>
+          </div>
+        </Card>
 
-        <div className="border-t border-neutral-200 pt-5">
-          <h2 className="text-sm font-medium text-neutral-700 uppercase tracking-wide">Parâmetros</h2>
-
-          {p.modelo === "ATUAL" ? (
-            <div className="mt-4 space-y-4">
+        {p.modelo === "ATUAL" ? (
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Parâmetros do modelo Atual</CardTitle>
+                <CardDescription>Replica o sistema de remuneração 1T2026.</CardDescription>
+              </div>
+            </CardHeader>
+            <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Pró-labore mensal (R$)">
-                  <Num name="proLaboreMensal" defaultValue={params_.proLaboreMensal as number} step="100" />
+                  <Input type="number" name="proLaboreMensal" defaultValue={params_.proLaboreMensal as number} step="100" required />
                 </Field>
                 <Field label="Reserva sobre funding (%)" hint="0.05 = 5%">
-                  <Num name="reservaPercentual" defaultValue={params_.reservaPercentual as number} step="0.01" />
+                  <Input type="number" name="reservaPercentual" defaultValue={params_.reservaPercentual as number} step="0.01" required />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Unidade dos fundadores" hint="código (ex: BG)">
-                  <input name="unidadeFundadores" defaultValue={String(params_.unidadeFundadores)}
-                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm" />
+                  <Input name="unidadeFundadores" defaultValue={String(params_.unidadeFundadores)} required />
                 </Field>
                 <Field label="Unidade matriz" hint="código (ex: DSF)">
-                  <input name="unidadeMatriz" defaultValue={String(params_.unidadeMatriz)}
-                    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm" />
+                  <Input name="unidadeMatriz" defaultValue={String(params_.unidadeMatriz)} required />
                 </Field>
               </div>
-              <Field label="Reserva vira prêmio uniforme entre elegíveis">
+              <Field label="Reserva vira prêmio uniforme">
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="reservaViraPremio"
-                    defaultChecked={Boolean(params_.reservaViraPremio)} />
-                  <span>sim, distribui a reserva como prêmio igual</span>
+                  <input
+                    type="checkbox"
+                    name="reservaViraPremio"
+                    defaultChecked={Boolean(params_.reservaViraPremio)}
+                    className="accent-peri-600"
+                  />
+                  <span>Sim, distribui a reserva como prêmio igual entre elegíveis</span>
                 </label>
               </Field>
             </div>
-          ) : (
-            <div className="mt-4 space-y-5">
-              <Section titulo="Blocos do RDA central (devem somar 1.0)">
+          </Card>
+        ) : (
+          <>
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Blocos do RDA central</CardTitle>
+                  <CardDescription>Devem somar 1.0 (100% do RDA distribuível).</CardDescription>
+                </div>
+              </CardHeader>
+              <div className="p-5 space-y-3">
                 <div className="grid grid-cols-3 gap-4">
-                  <Field label="Bloco A — Institucional"><Num name="percentualBlocoA" defaultValue={params_.percentualBlocoA as number} step="0.01" /></Field>
-                  <Field label="Bloco B — Performance"><Num name="percentualBlocoB" defaultValue={params_.percentualBlocoB as number} step="0.01" /></Field>
-                  <Field label="Bloco C — Estratégico"><Num name="percentualBlocoC" defaultValue={params_.percentualBlocoC as number} step="0.01" /></Field>
+                  <Field label="Bloco A — Institucional"><Input type="number" name="percentualBlocoA" defaultValue={params_.percentualBlocoA as number} step="0.01" required /></Field>
+                  <Field label="Bloco B — Performance"><Input type="number" name="percentualBlocoB" defaultValue={params_.percentualBlocoB as number} step="0.01" required /></Field>
+                  <Field label="Bloco C — Estratégico"><Input type="number" name="percentualBlocoC" defaultValue={params_.percentualBlocoC as number} step="0.01" required /></Field>
                 </div>
-                <div className="mt-2">
-                  <SumValidator
-                    names={["percentualBlocoA", "percentualBlocoB", "percentualBlocoC"]}
-                    alvo={1.0} rotulo="A + B + C" />
-                </div>
-              </Section>
+                <SumValidator names={["percentualBlocoA", "percentualBlocoB", "percentualBlocoC"]} alvo={1.0} rotulo="A + B + C" />
+              </div>
+            </Card>
 
-              <Section titulo="Pool de unidade (somam 1.0)">
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Pool de unidade</CardTitle>
+                  <CardDescription>Sociedade + Líder + Equipe/Reserva devem somar 1.0.</CardDescription>
+                </div>
+              </CardHeader>
+              <div className="p-5 space-y-3">
                 <div className="grid grid-cols-3 gap-4">
-                  <Field label="Sociedade"><Num name="poolSociedade" defaultValue={params_.poolSociedade as number} step="0.01" /></Field>
-                  <Field label="Líder"><Num name="poolLider" defaultValue={params_.poolLider as number} step="0.01" /></Field>
-                  <Field label="Equipe / reserva"><Num name="poolEquipeReserva" defaultValue={params_.poolEquipeReserva as number} step="0.01" /></Field>
+                  <Field label="Sociedade"><Input type="number" name="poolSociedade" defaultValue={params_.poolSociedade as number} step="0.01" required /></Field>
+                  <Field label="Líder"><Input type="number" name="poolLider" defaultValue={params_.poolLider as number} step="0.01" required /></Field>
+                  <Field label="Equipe / reserva"><Input type="number" name="poolEquipeReserva" defaultValue={params_.poolEquipeReserva as number} step="0.01" required /></Field>
                 </div>
-                <div className="mt-2">
-                  <SumValidator
-                    names={["poolSociedade", "poolLider", "poolEquipeReserva"]}
-                    alvo={1.0} rotulo="Sociedade + Líder + Equipe" />
-                </div>
-              </Section>
+                <SumValidator names={["poolSociedade", "poolLider", "poolEquipeReserva"]} alvo={1.0} rotulo="Sociedade + Líder + Equipe" />
+              </div>
+            </Card>
 
-              <Section titulo="Chave-padrão alocação interunidades">
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Chave-padrão de alocação interunidades</CardTitle>
+                  <CardDescription>Originação 20-40% · Execução 50-70% · Gestão 0-15%. Total = 1.0.</CardDescription>
+                </div>
+              </CardHeader>
+              <div className="p-5 space-y-3">
                 <div className="grid grid-cols-3 gap-4">
-                  <Field label="Originação" hint="20-40%"><Num name="chaveOriginacao" defaultValue={params_.chaveOriginacao as number} step="0.05" /></Field>
-                  <Field label="Execução" hint="50-70%"><Num name="chaveExecucao" defaultValue={params_.chaveExecucao as number} step="0.05" /></Field>
-                  <Field label="Gestão CP" hint="0-15%"><Num name="chaveGestaoCP" defaultValue={params_.chaveGestaoCP as number} step="0.05" /></Field>
+                  <Field label="Originação" hint="20-40%"><Input type="number" name="chaveOriginacao" defaultValue={params_.chaveOriginacao as number} step="0.05" required /></Field>
+                  <Field label="Execução" hint="50-70%"><Input type="number" name="chaveExecucao" defaultValue={params_.chaveExecucao as number} step="0.05" required /></Field>
+                  <Field label="Gestão CP" hint="0-15%"><Input type="number" name="chaveGestaoCP" defaultValue={params_.chaveGestaoCP as number} step="0.05" required /></Field>
                 </div>
-                <div className="mt-2">
-                  <SumValidator
-                    names={["chaveOriginacao", "chaveExecucao", "chaveGestaoCP"]}
-                    alvo={1.0} rotulo="Orig + Exec + Gestão" />
-                </div>
-              </Section>
+                <SumValidator names={["chaveOriginacao", "chaveExecucao", "chaveGestaoCP"]} alvo={1.0} rotulo="Orig + Exec + Gestão" />
+              </div>
+            </Card>
 
-              <Section titulo="Faixas de ajuste (mín / máx)">
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Originação min"><Num name="faixaOrigMin" defaultValue={params_.faixaOrigMin as number} step="0.05" /></Field>
-                  <Field label="Originação max"><Num name="faixaOrigMax" defaultValue={params_.faixaOrigMax as number} step="0.05" /></Field>
-                  <Field label="Execução min"><Num name="faixaExecMin" defaultValue={params_.faixaExecMin as number} step="0.05" /></Field>
-                  <Field label="Execução max"><Num name="faixaExecMax" defaultValue={params_.faixaExecMax as number} step="0.05" /></Field>
-                  <Field label="Gestão min"><Num name="faixaGestaoMin" defaultValue={params_.faixaGestaoMin as number} step="0.05" /></Field>
-                  <Field label="Gestão max"><Num name="faixaGestaoMax" defaultValue={params_.faixaGestaoMax as number} step="0.05" /></Field>
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Faixas de ajuste (mín / máx)</CardTitle>
+                  <CardDescription>Limites para cálculo dinâmico das chaves.</CardDescription>
                 </div>
-              </Section>
+              </CardHeader>
+              <div className="p-5 grid grid-cols-2 gap-4">
+                <Field label="Originação min"><Input type="number" name="faixaOrigMin" defaultValue={params_.faixaOrigMin as number} step="0.05" required /></Field>
+                <Field label="Originação max"><Input type="number" name="faixaOrigMax" defaultValue={params_.faixaOrigMax as number} step="0.05" required /></Field>
+                <Field label="Execução min"><Input type="number" name="faixaExecMin" defaultValue={params_.faixaExecMin as number} step="0.05" required /></Field>
+                <Field label="Execução max"><Input type="number" name="faixaExecMax" defaultValue={params_.faixaExecMax as number} step="0.05" required /></Field>
+                <Field label="Gestão min"><Input type="number" name="faixaGestaoMin" defaultValue={params_.faixaGestaoMin as number} step="0.05" required /></Field>
+                <Field label="Gestão max"><Input type="number" name="faixaGestaoMax" defaultValue={params_.faixaGestaoMax as number} step="0.05" required /></Field>
+              </div>
+            </Card>
 
-              <Section titulo="Distribuição do Bloco B + Pro-rata">
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Distribuição do Bloco B" hint="como ratear performance">
-                    <select name="distribuicaoBlocoB" defaultValue={String(params_.distribuicaoBlocoB ?? "UNIFORME")}
-                      className="w-full rounded border border-neutral-300 px-3 py-2 text-sm">
-                      <option value="UNIFORME">UNIFORME — partes iguais</option>
-                      <option value="PESO_INDIVIDUAL">PESO_INDIVIDUAL — proporcional ao peso por sócio</option>
-                      <option value="ORIGINACAO">ORIGINACAO — proporcional à originação esperada</option>
-                      <option value="POR_AREA">POR_AREA — pesos por área de prática (planilha 1T2026)</option>
-                    </select>
-                  </Field>
-                  <Field label="Pro-rata mínimo (meses)"><Num name="proRataMinMeses" defaultValue={params_.proRataMinMeses as number} step="1" min="0" max="12" /></Field>
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Distribuição do Bloco B + Pro-rata</CardTitle>
+                  <CardDescription>Como ratear performance e o mínimo de meses para entrar no rateio.</CardDescription>
                 </div>
-              </Section>
+              </CardHeader>
+              <div className="p-5 grid grid-cols-2 gap-4">
+                <Field label="Distribuição do Bloco B" hint="como ratear performance">
+                  <NativeSelect name="distribuicaoBlocoB" defaultValue={String(params_.distribuicaoBlocoB ?? "UNIFORME")}>
+                    <option value="UNIFORME">Uniforme — partes iguais</option>
+                    <option value="PESO_INDIVIDUAL">Por peso individual</option>
+                    <option value="ORIGINACAO">Por originação esperada</option>
+                    <option value="POR_AREA">Por área de prática (planilha 1T2026)</option>
+                  </NativeSelect>
+                </Field>
+                <Field label="Pro-rata mínimo (meses)">
+                  <Input type="number" name="proRataMinMeses" defaultValue={params_.proRataMinMeses as number} step="1" min="0" max="12" required />
+                </Field>
+              </div>
+            </Card>
 
-              <Section titulo="Pesos por área de prática (modo POR_AREA)">
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Pesos por área de prática</CardTitle>
+                  <CardDescription>Aplicado quando a distribuição do Bloco B for &quot;Por área&quot;.</CardDescription>
+                </div>
+              </CardHeader>
+              <div className="p-5">
                 <MatrizPesosArea
                   areas={areas.map((a) => ({ codigo: a.codigo, nome: a.nome }))}
                   defaults={params_.pesosPorArea as {
@@ -257,45 +307,23 @@ export default async function PremissaEdit({
                     pesosIncremental: Record<string, number>;
                   } | undefined}
                 />
-              </Section>
-            </div>
-          )}
-        </div>
+              </div>
+            </Card>
+          </>
+        )}
 
-        <div className="flex items-center justify-between border-t border-neutral-200 pt-5">
-          <span className="text-xs text-neutral-500">Atualizada em {dataHora(p.atualizadoEm)}</span>
-          <div className="flex gap-2">
-            <Link href="/premissas" className="rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-peri-50 transition">Cancelar</Link>
-            <button className="rounded bg-navy-900 hover:bg-navy-700 text-white px-4 py-2 text-sm font-medium transition">Salvar</button>
+        <StickyActions>
+          <span className="text-xs text-neutral-500">
+            Salvar cria um snapshot da versão anterior no histórico.
+          </span>
+          <div className="ml-auto flex gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/premissas">Cancelar</Link>
+            </Button>
+            <SubmitButton variant="primary" size="sm">Salvar alterações</SubmitButton>
           </div>
-        </div>
+        </StickyActions>
       </form>
     </main>
   );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <div className="text-xs font-medium text-neutral-700 mb-1">
-        {label}
-        {hint && <span className="text-neutral-400 font-normal ml-2">({hint})</span>}
-      </div>
-      {children}
-    </label>
-  );
-}
-
-function Section({ titulo, children }: { titulo: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">{titulo}</div>
-      {children}
-    </div>
-  );
-}
-
-function Num(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input type="number" required {...props}
-    className="w-full rounded border border-neutral-300 px-3 py-2 text-sm tabular-nums focus:border-peri-400 focus:outline-none focus:ring-1 focus:ring-peri-400" />;
 }

@@ -192,7 +192,50 @@ Veja `prisma/schema.prisma`. Princípios:
 - **Auditoria**:
   - `LoginEvent` — toda tentativa (sucesso/falha + motivo + IP + userAgent)
   - `AuditLog` — toda mutação (cenário aplicado, premissa salva, classificação editada) com `safeMeta` redaction
-  - `safeMeta` redige automaticamente: `senha`, `password`, `token`, `secret`, `salario`, `cpf`, `cnpj`, `prolabore`
+  - `safeMeta` redige: credenciais (`senha`, `password`, `token`, `secret`, `hash`), PII (`cpf`, `cnpj`, `rg`) e **toda chave de remuneração** (`salario`, `prolabore`, `bloco[abc]`, `pool*`, `premio`, `ajustes`, `total`, `creditoOriginacao`, `creditoExecucao`, `creditoGestaoCP`, `percentualQuotas`, `fundingVariavel`). Ver `lib/audit/index.ts`.
+
+### Padrões obrigatórios em código
+
+**1. APIs REST devem usar `withAuth` + escopo:**
+```ts
+// app/api/.../route.ts
+import { withAuth } from "@/lib/api/handler";
+import { escopoDe } from "@/lib/auth/escopo";
+
+export async function GET(req: Request) {
+  return withAuth(async (session) => {
+    const escopo = escopoDe(session);
+    // SOCIO restrito → filtra para o próprio sócio
+    const where = escopo.ehSocioRestrito
+      ? { ...baseWhere, socioId: escopo.socioIdEscopo ?? "__nada__" }
+      : baseWhere;
+    // ...
+  }, { roles: ["ADMIN", "CONSULTOR"] }); // opcional — bloqueia roles não-listadas
+}
+```
+
+**2. Server Actions devem usar `escopoDe` + early return:**
+```ts
+async function minhaAction(formData: FormData) {
+  "use server";
+  const session = await auth();
+  const escopo = escopoDe(session?.user as SessionUser | undefined);
+  if (!escopo.podeMutar) return; // ou redirect
+  // ...
+}
+```
+
+**3. SOCIO restrito NUNCA pode ver:**
+- Cenários `DRAFT` ou `ARCHIVED`
+- Pacote de outros sócios (em qualquer rota: detalhe, comparar, exportar, apresentar)
+- Premissas (são parâmetros internos do modelo)
+- Lista de usuários
+
+**4. Cenários `APPLIED` são imutáveis** — `calcularCenario` rejeita com 409 se status ≠ DRAFT. Para "editar" um cenário publicado, criar novo a partir dele.
+
+**5. Optimistic locking** — PUT `/api/cenarios/[id]/classificacoes` aceita `versionExpected`. Se diferir do `Cenario.versao` atual, retorna 409 (`Conflito de edição`). Use sempre que houver chance de edição concorrente.
+
+**6. Rate limit em login** — `lib/auth/events.ts:loginEstaBloqueado` bloqueia email com ≥10 falhas em 5min. Funciona em serverless (lê `LoginEvent`).
 
 ---
 

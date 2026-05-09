@@ -13,7 +13,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         usuarioId: session.id,
         acao: "cenario.calcular",
         recurso: `Cenario:${cenarioId}`,
-        meta: { periodoId: input.periodoId, modelo: resultado.modelo, totalDistribuido: resultado.totalDistribuido },
+        // Não logamos `totalDistribuido` — valor de remuneração é confidencial
+        // (cláusula 17.4) e o redactor já cobriria, mas explicitamos a omissão.
+        meta: { periodoId: input.periodoId, modelo: resultado.modelo, qtdPacotes: resultado.pacotes.length },
       });
       return resultado;
     },

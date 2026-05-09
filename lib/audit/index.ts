@@ -1,6 +1,14 @@
 import { prisma } from "@/lib/prisma";
 
-const SENSITIVE_KEYS = /senha|password|token|secret|salario|cpf|cnpj|prolabore|pro_labore/i;
+// Termos sensíveis que devem ser redigidos em logs de auditoria.
+// Cobre:
+//   - credenciais: senha, password, token, secret, hash
+//   - PII: cpf, cnpj, rg
+//   - remuneração (cláusula 17.4 — sigilo 5 anos): salario, pro-labore, bloco A/B/C,
+//     pool, prêmio, ajustes, total, originação/execução/gestão (créditos),
+//     percentualQuotas, fundingVariavel
+const SENSITIVE_KEYS =
+  /(senha|password|token|secret|hash|salario|cpf|cnpj|\brg\b|prolabore|pro.?labore|remuneracao|^bloco[abc]$|^pool|^premio$|^ajustes$|^total$|creditoOriginacao|creditoExecucao|creditoGestaoCP|percentualQuotas|fundingVariavel)/i;
 const MAX_VALUE_LEN = 200;
 
 // Sanitiza meta para AuditLog: redige chaves sensíveis, trunca valores longos.
