@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
 import { CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -8,6 +10,11 @@ import { Logomark } from "@/components/shell/logomark";
 
 const MENSAGENS: Record<string, string> = {
   "senha-trocada": "Senha trocada com sucesso. Faça login novamente.",
+};
+
+const ERROS: Record<string, string> = {
+  CredentialsSignin: "E-mail ou senha incorretos.",
+  default: "Não foi possível entrar. Tente novamente.",
 };
 
 export default async function LoginPage({
@@ -42,11 +49,21 @@ export default async function LoginPage({
           <form
             action={async (formData) => {
               "use server";
-              await signIn("credentials", {
-                email: formData.get("email"),
-                password: formData.get("password"),
-                redirectTo: "/",
-              });
+              try {
+                await signIn("credentials", {
+                  email: formData.get("email"),
+                  password: formData.get("password"),
+                  redirectTo: "/",
+                });
+              } catch (e) {
+                // signIn faz redirect via NEXT_REDIRECT — re-throw para o Next
+                // tratar normalmente. Apenas AuthError indica falha real.
+                if (e instanceof AuthError) {
+                  const code = (e.type ?? "default") as keyof typeof ERROS;
+                  redirect(`/login?erro=${encodeURIComponent(ERROS[code] ?? ERROS.default)}`);
+                }
+                throw e;
+              }
             }}
             className="p-6 space-y-3"
           >

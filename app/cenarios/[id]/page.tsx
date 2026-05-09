@@ -53,14 +53,25 @@ async function calcularAction(formData: FormData) {
   const session = await auth();
   const cenarioId = String(formData.get("cenarioId"));
   const periodoId = String(formData.get("periodoId"));
-  await calcularCenario({ cenarioId, periodoId });
-  await logAudit({
-    usuarioId: session?.user?.id,
-    acao: "cenario.calcular",
-    recurso: `Cenario:${cenarioId}`,
-    meta: { periodoId },
-  });
-  await flashSuccess("Pacotes calculados com sucesso.");
+  try {
+    await calcularCenario({ cenarioId, periodoId });
+    await logAudit({
+      usuarioId: session?.user?.id,
+      acao: "cenario.calcular",
+      recurso: `Cenario:${cenarioId}`,
+      meta: { periodoId },
+    });
+    await flashSuccess("Pacotes calculados com sucesso.");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Falha ao calcular";
+    await logAudit({
+      usuarioId: session?.user?.id,
+      acao: "cenario.calcular.falhou",
+      recurso: `Cenario:${cenarioId}`,
+      meta: { periodoId, erro: msg },
+    });
+    await flashError(`Falha ao calcular: ${msg}`);
+  }
   revalidatePath(`/cenarios/${cenarioId}`);
 }
 
@@ -86,21 +97,26 @@ async function atualizarClassificacaoAction(formData: FormData) {
   if (originacaoRaw) data.originacaoEsperada = Number(originacaoRaw);
   if (quotasRaw) data.percentualQuotas = Number(quotasRaw) / 100;
 
-  await prisma.classificacaoSocio.update({
-    where: { id: classificacaoId },
-    data,
-  });
-  await prisma.cenario.update({
-    where: { id: cenarioId },
-    data: { versao: { increment: 1 } },
-  });
-  await logAudit({
-    usuarioId: session?.user?.id,
-    acao: "cenario.classificacao.editar",
-    recurso: `Cenario:${cenarioId}`,
-    meta: { classificacaoId, publico, peso: data.pesoBlocoB, originacao: data.originacaoEsperada },
-  });
-  await flashSuccess("Classificação atualizada.");
+  try {
+    await prisma.classificacaoSocio.update({
+      where: { id: classificacaoId },
+      data,
+    });
+    await prisma.cenario.update({
+      where: { id: cenarioId },
+      data: { versao: { increment: 1 } },
+    });
+    await logAudit({
+      usuarioId: session?.user?.id,
+      acao: "cenario.classificacao.editar",
+      recurso: `Cenario:${cenarioId}`,
+      meta: { classificacaoId, publico, peso: data.pesoBlocoB, originacao: data.originacaoEsperada },
+    });
+    await flashSuccess("Classificação atualizada.");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Falha ao salvar";
+    await flashError(`Não foi possível salvar: ${msg}`);
+  }
   revalidatePath(`/cenarios/${cenarioId}`);
 }
 

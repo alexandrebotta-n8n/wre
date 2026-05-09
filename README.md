@@ -110,7 +110,7 @@ Ou via `psql`:
 psql "$DATABASE_URL" -f prisma/seed.sql   # se você gerar um SQL dump
 ```
 
-O seed cria: tabela salarial · 8 áreas · 23 sócios/líderes · período 1T2026 + 2026 · 2 premissas · usuário `admin@wre.local` (senha provisória `trocar-em-producao`).
+O seed cria: tabela salarial · 8 áreas · 23 sócios/líderes · período 1T2026 + 2026 · 2 premissas · usuário `admin@wre.com.br` (senha provisória `trocar-em-producao`).
 
 **Trocar a senha do admin no 1º login** — middleware força.
 

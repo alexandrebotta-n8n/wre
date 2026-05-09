@@ -248,7 +248,7 @@ async function main() {
   console.log("  ✓ Premissas: Sistema 1T2026 (ATUAL) + Política DSF v1 (NOVO)");
 
   // Usuário admin (senha provisória)
-  const adminEmail = "admin@wre.local";
+  const adminEmail = "admin@wre.com.br";
   const adminHash = await bcrypt.hash("trocar-em-producao", 10);
   await prisma.usuario.upsert({
     where: { email: adminEmail },
