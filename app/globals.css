@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* ========================================================================
+   Identidade visual WRE Simulador
+   Paleta de 3 cores fornecida pelo cliente:
+     - navy (deep blue)     — primário, backgrounds escuros, ações principais
+     - periwinkle (lilac)   — secundário, links, hover, info
+     - mint (spring green)  — accent, sucesso/positivo, modelo NOVO
+
+   Cinzas (neutral-*) ficam para texto/borda; vermelho fica para erros.
+   ======================================================================== */
+@theme {
+  /* Navy — escala derivada do core #000087 */
+  --color-navy-50: #eef0ff;
+  --color-navy-100: #d5dbff;
+  --color-navy-200: #abb6ff;
+  --color-navy-400: #4a55cc;
+  --color-navy-500: #2d3aae;
+  --color-navy-700: #161f7a;
+  --color-navy-800: #0a126b;
+  --color-navy-900: #000087;
+
+  /* Periwinkle — escala derivada do core #7280F0 */
+  --color-peri-50: #f1f3ff;
+  --color-peri-100: #e0e4ff;
+  --color-peri-200: #c5cdff;
+  --color-peri-400: #7280f0;
+  --color-peri-500: #5664e0;
+  --color-peri-600: #4250c4;
+  --color-peri-700: #2f3aa0;
+
+  /* Mint — escala derivada do core #2EFFA0 */
+  --color-mint-50: #e6fff4;
+  --color-mint-100: #c2ffe1;
+  --color-mint-200: #88ffc4;
+  --color-mint-400: #2effa0;
+  --color-mint-500: #00d97c;
+  --color-mint-600: #00b063;
+  --color-mint-700: #008045;
+  --color-mint-900: #00472a;
+}
+
+:root {
+  color-scheme: light;
+  --background: theme(colors.neutral.50);
+}
+
+body {
+  background: var(--background);
+}

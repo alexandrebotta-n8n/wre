@@ -1,0 +1,381 @@
+// WRE Simulador — schema DSF.
+//
+// Cliente: DSF (Dupont Spiller & Fadanelli Advogados Associados).
+// Single-tenant. Foco: simular remuneração anual de sócios e líderes
+// sob diferentes modelos de regras (ATUAL vs NOVO/Política DSF v1).
+//
+// Princípios:
+//   - Cenário APPLIED é imutável (snapshot JSON congelado).
+//   - State machine: DRAFT → APPLIED → ARCHIVED. Apenas 1 APPLIED por (modeloRegra, ano).
+//   - Engine de cálculo é puro (lib/domain/), parametrizado via Premissa (template salvo).
+//   - Não-sobreposição: validador automático impede duplo pagamento do mesmo fato gerador.
+//   - Períodos suportados: TRIMESTRE e ANO.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Auth & Auditoria (single-tenant)
+// ============================================================================
+
+enum UsuarioRole {
+  ADMIN        // Configuração, usuários, aprovação de cenários
+  CONSULTOR    // WRE: cria/edita cenários e premissas, vê tudo
+  SOCIO        // DSF: vê cenários aplicados + sua própria simulação
+  LEITOR       // Acesso somente leitura
+}
+
+model Usuario {
+  id               String        @id @default(cuid())
+  email            String        @unique
+  nome             String?
+  imagem           String?
+  senhaHash        String?       // null = só Google OAuth
+  senhaProvisoria  Boolean       @default(false)
+  roles            UsuarioRole[] @default([LEITOR])
+  ativo            Boolean       @default(true)
+  ultimoLogin      DateTime?
+  criadoEm         DateTime      @default(now())
+
+  // Vínculo opcional com Socio (perfil SOCIO vê seu próprio pacote)
+  socioId          String?       @unique
+  socio            Socio?        @relation(fields: [socioId], references: [id], onDelete: SetNull)
+
+  loginEvents       LoginEvent[]
+  auditLogs         AuditLog[]
+  cenariosCriados   Cenario[]            @relation("CenarioCriadoPor")
+  premissasSnapshots PremissaHistorico[]
+
+  @@index([email])
+}
+
+model LoginEvent {
+  id         String   @id @default(cuid())
+  email      String
+  usuarioId  String?
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  sucesso    Boolean
+  motivo     String   // ok | email-nao-cadastrado | usuario-inativo | senha-invalida | sem-senha | sem-email
+  ip         String?
+  userAgent  String?
+  ocorridoEm DateTime @default(now())
+
+  @@index([email])
+  @@index([usuarioId])
+  @@index([ocorridoEm])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  usuarioId  String?
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  acao       String   // ex: cenario.aplicar, premissa.salvar, classificacao.editar
+  recurso    String   // ex: Cenario:abc123
+  ip         String?
+  userAgent  String?
+  meta       Json?    // sanitizado via safeMeta (sem CPF/salário/senha)
+  ocorridoEm DateTime @default(now())
+
+  @@index([ocorridoEm])
+  @@index([acao])
+}
+
+// ============================================================================
+// Estrutura organizacional DSF
+// ============================================================================
+
+model Unidade {
+  id        String  @id @default(cuid())
+  codigo    String  @unique // "DSF" (matriz consolidada), "BG" (Bento Gonçalves)
+  nome      String
+  // Matriz = consolidado da DSF; demais unidades = praças/filiais com pool próprio.
+  isMatriz  Boolean @default(false)
+  ativa     Boolean @default(true)
+
+  resultados        ResultadoPeriodo[]
+  classificacoes    ClassificacaoSocio[] // sócios vinculados a esta unidade (líderes)
+}
+
+// Níveis de cargo para gestão (método DSF — pontuação 50-150 mapeia em A/B/C/D).
+enum NivelCargo {
+  A   // CEO (~150 pts)
+  B   // Diretor Executivo (~120-130 pts)
+  C   // Gestor Sr. (~100-120 pts)
+  D   // Gestor (~80-100 pts)
+}
+
+enum FaixaSalarial {
+  INICIAL  // 0.8x do valor de referência
+  PLENO    // 1.0x
+  EXPERT   // 1.2x
+}
+
+// Tabela de referência: salário-base mensal por (nível, faixa).
+// Conforme planilha "Tabela Salarial Gestão" do Excel atual.
+model TabelaSalario {
+  id      String        @id @default(cuid())
+  nivel   NivelCargo
+  faixa   FaixaSalarial
+  valor   Float         // mensal em BRL
+
+  @@unique([nivel, faixa])
+}
+
+// ============================================================================
+// Sócios e Líderes
+// ============================================================================
+
+// Públicos do novo modelo (Política DSF v1).
+// LIDER_TECNICO existe como categoria transitória (mapeada hoje a Sócio de
+// Serviços na proposta). Mantido para reproduzir o "Modelo Atual".
+enum Publico {
+  SOCIO_CAPITAL
+  SOCIO_CAPITAL_GESTOR
+  SOCIO_CAPITAL_LIDER_UNIDADE
+  SOCIO_SERVICOS
+  SOCIO_SERVICOS_ESTRATEGICO
+  LIDER_UNIDADE_NON_EQUITY
+  LIDER_TECNICO              // legado/transição
+  FUNDADOR                   // categoria especial do modelo ATUAL (% sobre LL unidade matriz/BG)
+}
+
+// Áreas de prática jurídica (Cível, Trabalhista, Societário, Tributário,
+// Imobiliário, Digital, Internacional, M&A — conforme planilha 1T2026).
+// Cada Sócio pode ser vinculado a uma área (gestor da área), o que permite
+// pesos de Bloco B por área (modo POR_AREA do engine NOVO).
+model AreaPratica {
+  id     String   @id @default(cuid())
+  codigo String   @unique // "civel", "trabalhista", "societario", ...
+  nome   String   // "Cível", "Trabalhista", ...
+  ordem  Int      @default(0)
+  ativa  Boolean  @default(true)
+
+  socios Socio[]
+}
+
+model Socio {
+  id              String        @id @default(cuid())
+  nome            String        @unique
+  cargo           String        // ex: "CEO", "Diretor Exec. Comercial e Marketing / CE"
+  // Pontuação já calculada externamente (5 fatores × 3 níveis, total 50-150).
+  pontuacaoCargo Int?
+  nivelCargo     NivelCargo?    // mapeado da pontuação; usado p/ Remuneração de Gestão
+  faixaSalarial  FaixaSalarial? // INICIAL/PLENO/EXPERT
+  // Participação societária default (referência); pode ser sobreposta por cenário.
+  percentualQuotasDefault Float @default(0)
+  isFundador     Boolean        @default(false)
+  ativo          Boolean        @default(true)
+  observacoes    String?
+  // Área de prática (gestor da área). Opcional — fundadores e líderes técnicos
+  // podem não ter. Quando definida, o engine NOVO em modo POR_AREA usa o peso
+  // configurado na Premissa para essa área.
+  areaPraticaId  String?
+  areaPratica    AreaPratica?  @relation(fields: [areaPraticaId], references: [id], onDelete: SetNull)
+
+  classificacoes  ClassificacaoSocio[]
+  remuneracoes    RemuneracaoCalculada[]
+  usuario         Usuario?
+
+  @@index([nome])
+  @@index([areaPraticaId])
+}
+
+// ============================================================================
+// Períodos e Resultados financeiros (insumos da simulação)
+// ============================================================================
+
+enum TipoPeriodo {
+  TRIMESTRE
+  ANO
+}
+
+model Periodo {
+  id        String      @id @default(cuid())
+  tipo      TipoPeriodo
+  ano       Int
+  trimestre Int?        // 1..4, null quando tipo=ANO
+  rotulo    String      // "1T2026", "2026"
+
+  resultados        ResultadoPeriodo[]
+  remuneracoes      RemuneracaoCalculada[]
+
+  @@unique([tipo, ano, trimestre])
+  @@index([ano])
+}
+
+// Lucro Líquido por unidade × período. Insumo principal do simulador
+// (substitui a importação de DRE hierárquica).
+model ResultadoPeriodo {
+  id            String   @id @default(cuid())
+  unidadeId     String
+  unidade       Unidade  @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+  periodoId     String
+  periodo       Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  lucroLiquido  Float    // BRL — já líquido de impostos/despesas/custos
+  // Já descontado de pró-labore + remuneração de gestão + remuneração de fundadores
+  // (compatível com a coluna "FUNDING PARA VARIÁVEIS" do Excel atual).
+  fundingVariavel Float?
+  ehReal        Boolean  @default(true) // false = orçado/projetado
+  fonte         String?  // "1T2026 oficial", "Orçamento 2026 v3", etc.
+  importadoEm   DateTime @default(now())
+
+  @@unique([unidadeId, periodoId])
+  @@index([periodoId])
+}
+
+// ============================================================================
+// Premissas — templates reutilizáveis de parâmetros
+// ============================================================================
+
+// Conjunto nomeado e versionado de premissas (pesos PE, % Blocos A/B/C, pool
+// 50/30/20, chave 30/60/10, reserva, faixas de ajuste, etc.). Reutilizável
+// entre cenários.
+model Premissa {
+  id          String       @id @default(cuid())
+  nome        String       @unique
+  descricao   String?
+  modelo      ModeloRegra  // a quais regras se aplica (ATUAL ou NOVO)
+  // Parâmetros completos serializados — schema validado por Zod em lib/schemas.
+  parametros  Json
+  // Versão atual (incrementa a cada save). Cada save antigo vira um
+  // PremissaHistorico — auditoria completa de mudanças de parâmetros.
+  versao      Int          @default(1)
+  ativa       Boolean      @default(true)
+  criadoEm    DateTime     @default(now())
+  atualizadoEm DateTime    @updatedAt
+
+  cenarios    Cenario[]
+  historico   PremissaHistorico[]
+}
+
+// Snapshot imutável de uma premissa em uma versão específica. Criado
+// automaticamente ANTES de cada update (antes do PUT/Server Action salvar).
+// Permite ver/restaurar versões anteriores sem perder histórico.
+model PremissaHistorico {
+  id            String   @id @default(cuid())
+  premissaId    String
+  premissa      Premissa @relation(fields: [premissaId], references: [id], onDelete: Cascade)
+  versao        Int      // versão capturada (não a próxima)
+  nome          String
+  descricao     String?
+  parametros    Json
+  snapshotEm    DateTime @default(now())
+  snapshotPorId String?
+  snapshotPor   Usuario? @relation(fields: [snapshotPorId], references: [id], onDelete: SetNull)
+  // Motivo opcional do snapshot (ex: "antes de mudar Bloco A para 50%").
+  motivo        String?
+
+  @@unique([premissaId, versao])
+  @@index([premissaId, snapshotEm])
+}
+
+enum ModeloRegra {
+  ATUAL  // Sistema de Remuneração DSF — 1º trim 2026 (planilha)
+  NOVO   // Política de Partnership DSF v1 (Blocos A/B/C + pool + créditos)
+}
+
+// ============================================================================
+// Cenários — uma simulação completa
+// ============================================================================
+
+enum CenarioStatus {
+  DRAFT      // editável; pode rodar simulação
+  APPLIED    // imutável; snapshot congelado; usado em deliberações
+  ARCHIVED   // referência histórica
+}
+
+model Cenario {
+  id              String         @id @default(cuid())
+  nome            String
+  descricao       String?
+  ano             Int            // ano-base de simulação (ex: 2026)
+  modelo          ModeloRegra    // ATUAL ou NOVO
+  status          CenarioStatus  @default(DRAFT)
+  premissaId      String
+  premissa        Premissa       @relation(fields: [premissaId], references: [id], onDelete: Restrict)
+  // Snapshot imutável quando APPLIED: { sócios, classificações, resultados,
+  // premissas, regras }. Nunca mutar.
+  snapshot        Json?
+  // Optimistic locking: incrementa em cada update de DRAFT.
+  versao          Int            @default(1)
+  criadoPorId     String?
+  criadoPor       Usuario?       @relation("CenarioCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoEm        DateTime       @default(now())
+  aplicadoEm      DateTime?
+
+  classificacoes  ClassificacaoSocio[]
+  remuneracoes    RemuneracaoCalculada[]
+
+  @@index([ano, status])
+  @@index([modelo, ano])
+}
+
+// Classificação de cada sócio dentro de UM cenário específico (snapshot-friendly).
+// Permite reenquadrar sem perder o histórico.
+model ClassificacaoSocio {
+  id                    String     @id @default(cuid())
+  cenarioId             String
+  cenario               Cenario    @relation(fields: [cenarioId], references: [id], onDelete: Cascade)
+  socioId               String
+  socio                 Socio      @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  publico               Publico
+  // Quando líder de unidade ou fundador atrelado a unidade matriz/BG.
+  unidadeId             String?
+  unidade               Unidade?   @relation(fields: [unidadeId], references: [id], onDelete: SetNull)
+  percentualQuotas      Float      @default(0) // % participação societária neste cenário
+  originacaoEsperada    Float      @default(0) // BRL anuais esperados de originação
+  // Peso individual no Bloco B. null = 1.0 (peso default).
+  // Usado quando Premissa.distribuicaoBlocoB = "PESO_INDIVIDUAL".
+  pesoBlocoB            Float?
+  // Overrides opcionais por cenário
+  nivelCargoOverride    NivelCargo?
+  faixaSalarialOverride FaixaSalarial?
+  observacoes           String?
+
+  @@unique([cenarioId, socioId])
+  @@index([cenarioId])
+}
+
+// ============================================================================
+// Resultado calculado: pacote de remuneração por sócio × período × cenário
+// ============================================================================
+
+model RemuneracaoCalculada {
+  id           String   @id @default(cuid())
+  cenarioId    String
+  cenario      Cenario  @relation(fields: [cenarioId], references: [id], onDelete: Cascade)
+  socioId      String
+  socio        Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  periodoId    String
+  periodo      Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+
+  // Breakdown — todos em BRL, valor do período (trimestral ou anual).
+  proLabore         Float @default(0)
+  remuneracaoGestao Float @default(0)
+  remuneracaoFundador Float @default(0) // só FUNDADOR no Modelo Atual
+  blocoA            Float @default(0)
+  blocoB            Float @default(0)
+  blocoC            Float @default(0)
+  poolUnidade       Float @default(0)
+  creditoOriginacao Float @default(0)
+  creditoExecucao   Float @default(0)
+  creditoGestaoCP   Float @default(0) // crédito de gestão de cliente/projeto
+  premio            Float @default(0) // prêmio uniforme (modelo atual: reserva-vira-prêmio)
+  ajustes           Float @default(0) // retenções, buy-in, diferimentos
+  total             Float @default(0)
+
+  // Alertas de não-sobreposição (ex: ["pool+blocoB sobre mesma base local"]).
+  alertas           Json?
+  // Ordem de apuração executada (para auditoria/depuração).
+  trace             Json?
+
+  calculadoEm       DateTime @default(now())
+
+  @@unique([cenarioId, socioId, periodoId])
+  @@index([cenarioId, periodoId])
+}

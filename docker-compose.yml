@@ -1,0 +1,25 @@
+# Banco de DEV — persistente em volume nomeado.
+# Para testes use docker-compose.test.yml (porta 5434, tmpfs).
+# Porta 5435 (host) → 5432 (container). 5432-5434 já ocupadas por outros projetos
+# (uning-pg, plr-pg, engine-pg-test) na máquina do dev.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wre-simulador-postgres
+    environment:
+      POSTGRES_USER: wre
+      POSTGRES_PASSWORD: wre
+      POSTGRES_DB: wre_simulador
+    ports:
+      - "5435:5432"
+    volumes:
+      - wre-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wre -d wre_simulador"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  wre-pgdata:

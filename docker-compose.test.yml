@@ -1,0 +1,17 @@
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: wre-simulador-postgres-test
+    environment:
+      POSTGRES_USER: wre
+      POSTGRES_PASSWORD: wre
+      POSTGRES_DB: wre_simulador_test
+    ports:
+      - "5434:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wre -d wre_simulador_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
