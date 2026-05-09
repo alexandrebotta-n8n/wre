@@ -200,12 +200,24 @@ export default async function CenarioDetalhe({
   if (!cenario) notFound();
   if (escopo.ehSocioRestrito && cenario.status !== "APPLIED") notFound();
 
-  const periodos = escopo.podeMutar
+  // Lista períodos + flag se tem ResultadoPeriodo (pra UI mostrar disponibilidade
+  // e selecionar default sensato). Trimestres ordenados antes do ANO para o
+  // primeiro item do <select> ser o mais provável de ter dados.
+  const periodosRaw = escopo.podeMutar
     ? await prisma.periodo.findMany({
-        orderBy: [{ ano: "desc" }, { trimestre: "asc" }],
+        orderBy: [{ ano: "desc" }, { tipo: "asc" }, { trimestre: "asc" }],
+        include: { _count: { select: { resultados: true } } },
         take: 50,
       })
     : [];
+  const periodos = periodosRaw.map((p) => ({
+    id: p.id,
+    rotulo: p.rotulo,
+    tipo: p.tipo,
+    temDados: p._count.resultados > 0,
+  }));
+  // Default = primeiro período com dados (ou primeiro da lista).
+  const periodoDefault = periodos.find((p) => p.temDados)?.id ?? periodos[0]?.id ?? "";
 
   const totalPacote = cenario.remuneracoes.reduce((acc, r) => acc + r.total, 0);
   const isReadOnly = !escopo.podeMutar || cenario.status !== "DRAFT";
@@ -318,11 +330,13 @@ export default async function CenarioDetalhe({
           <form action={calcularAction} className="p-5 flex items-end gap-3 flex-wrap">
             <input type="hidden" name="cenarioId" value={cenario.id} />
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-medium text-navy-900 mb-1">Período</label>
-              <NativeSelect name="periodoId" required>
+              <label className="block text-xs font-medium text-navy-900 mb-1">
+                Período <span className="text-neutral-500 font-normal">— ✓ tem resultado financeiro cadastrado</span>
+              </label>
+              <NativeSelect name="periodoId" required defaultValue={periodoDefault}>
                 {periodos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.rotulo}
+                  <option key={p.id} value={p.id} disabled={!p.temDados}>
+                    {p.temDados ? "✓" : "—"} {p.rotulo} {!p.temDados ? "(sem dados — cadastre Resultado primeiro)" : ""}
                   </option>
                 ))}
               </NativeSelect>

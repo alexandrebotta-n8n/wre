@@ -60,17 +60,60 @@ function classificacoesParaSocioInput(
 }
 
 async function carregarResultados(periodoId: string): Promise<ResultadoUnidade[]> {
-  const rs = await prisma.resultadoPeriodo.findMany({
+  // 1. Tenta carregar Resultado direto do período pedido.
+  const direto = await prisma.resultadoPeriodo.findMany({
     where: { periodoId },
     include: { unidade: true },
     take: 50,
   });
-  return rs.map((r) => ({
-    unidadeCodigo: r.unidade.codigo,
-    isMatriz: r.unidade.isMatriz,
-    lucroLiquido: r.lucroLiquido,
-    fundingVariavel: r.fundingVariavel ?? undefined,
-  }));
+  if (direto.length > 0) {
+    return direto.map((r) => ({
+      unidadeCodigo: r.unidade.codigo,
+      isMatriz: r.unidade.isMatriz,
+      lucroLiquido: r.lucroLiquido,
+      fundingVariavel: r.fundingVariavel ?? undefined,
+    }));
+  }
+
+  // 2. Se for período ANUAL sem Resultado próprio, derivar somando os
+  //    trimestres do mesmo ano (se houver). Assim, cadastrar 4 trimestres
+  //    automaticamente habilita o cálculo anual sem intervenção manual.
+  const periodo = await prisma.periodo.findUnique({ where: { id: periodoId } });
+  if (!periodo || periodo.tipo !== "ANO") return [];
+
+  const trimestres = await prisma.periodo.findMany({
+    where: { tipo: "TRIMESTRE", ano: periodo.ano },
+    take: 4,
+  });
+  if (trimestres.length === 0) return [];
+
+  const trimestresResultados = await prisma.resultadoPeriodo.findMany({
+    where: { periodoId: { in: trimestres.map((p) => p.id) } },
+    include: { unidade: true },
+    take: 200,
+  });
+  if (trimestresResultados.length === 0) return [];
+
+  // Agrega por unidade: lucroLiquido somado, fundingVariavel somado (se existir).
+  const porUnidade = new Map<
+    string,
+    { unidadeCodigo: string; isMatriz: boolean; lucroLiquido: number; fundingVariavel: number | undefined }
+  >();
+  for (const r of trimestresResultados) {
+    const k = r.unidade.codigo;
+    const cur = porUnidade.get(k) ?? {
+      unidadeCodigo: k,
+      isMatriz: r.unidade.isMatriz,
+      lucroLiquido: 0,
+      fundingVariavel: undefined as number | undefined,
+    };
+    cur.lucroLiquido += r.lucroLiquido;
+    if (r.fundingVariavel != null) {
+      cur.fundingVariavel = (cur.fundingVariavel ?? 0) + r.fundingVariavel;
+    }
+    porUnidade.set(k, cur);
+  }
+  return Array.from(porUnidade.values());
 }
 
 function periodoToInput(p: { tipo: string; trimestre: number | null; rotulo: string }): PeriodoInput {
