@@ -26,6 +26,7 @@ export function PainelParametros({
   editavel,
   areas,
   dirty,
+  versao,
   valoresPorEtapa = {},
 }: {
   cenarioId: string;
@@ -35,6 +36,9 @@ export function PainelParametros({
   editavel: boolean;
   areas: AreaOption[];
   dirty: boolean;
+  /** Versão do cenário — usada como `key` para remontar o form quando override muda
+   *  (uncontrolled inputs com `defaultValue` não re-sincronizam de outra forma). */
+  versao: number;
   /** Soma do `trace[].valor` por chave de etapa (ex "bloco-A"). Alimenta os chips. */
   valoresPorEtapa?: Record<string, number>;
 }) {
@@ -75,9 +79,9 @@ export function PainelParametros({
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-3">
         {modelo === "ATUAL" ? (
-          <FormParamsAtual cenarioId={cenarioId} parametros={parametros} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
+          <FormParamsAtual key={`atual-${cenarioId}-${versao}`} cenarioId={cenarioId} parametros={parametros} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         ) : (
-          <FormParamsNovo cenarioId={cenarioId} parametros={parametros} areas={areas} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
+          <FormParamsNovo key={`novo-${cenarioId}-${versao}`} cenarioId={cenarioId} parametros={parametros} areas={areas} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         )}
       </CollapsibleContent>
     </Collapsible>

@@ -201,6 +201,7 @@ export function ColunaCenario({
           editavel={editavel}
           areas={areas}
           dirty={dirty}
+          versao={cenario.versao}
           valoresPorEtapa={valoresPorEtapa}
         />
       </div>
