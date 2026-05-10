@@ -58,7 +58,7 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
     <main className="mx-auto max-w-[1600px] px-4 sm:px-6 py-6 space-y-5">
       <PageHeader
         title="Simulação"
-        description="Compare cenários lado a lado, ajuste parâmetros e publique. Tudo em um só lugar."
+        description="Compare cenários lado a lado ou analise um único cenário. Ajuste parâmetros e publique."
         actions={
           <div className="flex items-center gap-2">
             <DrawerCenarios
@@ -119,6 +119,7 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             modeloSugerido="ATUAL"
             premissaDefaultId={premissaDefaultAtual?.id}
             premissaDefaultNome={premissaDefaultAtual?.nome}
+            premissaOutroId={premissaDefaultNovo?.id}
             podeMutar={props.podeMutar && !props.ehSocioRestrito}
           />
         )}
@@ -140,6 +141,7 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             modeloSugerido="NOVO"
             premissaDefaultId={premissaDefaultNovo?.id}
             premissaDefaultNome={premissaDefaultNovo?.nome}
+            premissaOutroId={premissaDefaultAtual?.id}
             podeMutar={props.podeMutar && !props.ehSocioRestrito}
           />
         )}
@@ -153,6 +155,14 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           temB={!!props.cenarioB}
           nomeA={props.cenarioA?.nome}
           nomeB={props.cenarioB?.nome}
+          drawerHref={(() => {
+            const sp = new URLSearchParams();
+            if (aId) sp.set("a", aId);
+            if (bId) sp.set("b", bId);
+            if (periodoId) sp.set("periodoId", periodoId);
+            sp.set("drawer", "1");
+            return `/simulacao?${sp.toString()}`;
+          })()}
         />
       )}
     </main>

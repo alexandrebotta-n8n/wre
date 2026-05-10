@@ -12,12 +12,14 @@ import type { LinhaComparativa } from "./types";
 export function LinhaSocio({
   linha: l,
   podeCompararDiff,
+  singleLado,
   colSpan,
   nomeA,
   nomeB,
 }: {
   linha: LinhaComparativa;
   podeCompararDiff: boolean;
+  singleLado?: "a" | "b" | null;
   colSpan: number;
   nomeA?: string;
   nomeB?: string;
@@ -58,8 +60,18 @@ export function LinhaSocio({
             </span>
           )}
         </TD>
-        <TD className="text-right tabular-nums">{l.totalA != null ? brl(l.totalA, true) : "—"}</TD>
-        <TD className="text-right tabular-nums">{l.totalB != null ? brl(l.totalB, true) : "—"}</TD>
+        {singleLado ? (
+          <TD className="text-right tabular-nums">
+            {(singleLado === "a" ? l.totalA : l.totalB) != null
+              ? brl((singleLado === "a" ? l.totalA : l.totalB) as number, true)
+              : "—"}
+          </TD>
+        ) : (
+          <>
+            <TD className="text-right tabular-nums">{l.totalA != null ? brl(l.totalA, true) : "—"}</TD>
+            <TD className="text-right tabular-nums">{l.totalB != null ? brl(l.totalB, true) : "—"}</TD>
+          </>
+        )}
         {podeCompararDiff && (
           <TD className={cn("text-right tabular-nums font-medium", corClasse)}>
             <span className="inline-flex items-center gap-1 justify-end">

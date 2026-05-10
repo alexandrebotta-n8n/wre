@@ -32,7 +32,12 @@ export function construirLinhasComparativas(
       alertasB: (rb?.alertas as string[] | null) ?? [],
     };
   });
-  // Ordena por |diff| desc para destacar maiores impactos.
-  linhas.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff));
+  // Ordena por |diff| desc quando há 2 cenários; por valor único desc quando só um.
+  const single = !a || !b;
+  if (single) {
+    linhas.sort((x, y) => (Math.max(y.totalA ?? 0, y.totalB ?? 0)) - (Math.max(x.totalA ?? 0, x.totalB ?? 0)));
+  } else {
+    linhas.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff));
+  }
   return linhas;
 }

@@ -18,6 +18,8 @@ export interface ColunaEmptyProps {
   /** Premissa default daquele modelo (caso ofereça criar). */
   premissaDefaultId?: string;
   premissaDefaultNome?: string;
+  /** Premissa default do modelo oposto (caminho secundário "criar do outro modelo"). */
+  premissaOutroId?: string;
   podeMutar: boolean;
 }
 
@@ -33,8 +35,15 @@ export function ColunaEmpty({
   modeloSugerido,
   premissaDefaultId,
   premissaDefaultNome,
+  premissaOutroId,
   podeMutar,
 }: ColunaEmptyProps) {
+  const modeloOutro: "ATUAL" | "NOVO" | undefined = modeloSugerido
+    ? modeloSugerido === "ATUAL"
+      ? "NOVO"
+      : "ATUAL"
+    : undefined;
+  const podeCriarOutro = podeMutar && modeloOutro && premissaOutroId;
   // Link pra abrir drawer (escolher cenário existente)
   const drawerSp = new URLSearchParams();
   if (outroCenarioId) drawerSp.set(slot === "a" ? "b" : "a", outroCenarioId);
@@ -50,7 +59,11 @@ export function ColunaEmpty({
         <span className="text-[10px] uppercase tracking-wider text-neutral-500">
           Coluna {slot.toUpperCase()}
         </span>
-        {modeloSugerido && <ModeloBadge modelo={modeloSugerido} />}
+        {modeloSugerido && (
+          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-neutral-400">
+            sugestão: <ModeloBadge modelo={modeloSugerido} />
+          </span>
+        )}
       </div>
 
       <div className="mb-4">
@@ -110,6 +123,25 @@ export function ColunaEmpty({
           </Link>
         </Button>
       </div>
+
+      {podeCriarOutro && (
+        <form action={criarCenarioAction} className="mt-2">
+          <input
+            type="hidden"
+            name="nome"
+            value={`${modeloOutro === "ATUAL" ? "Atual" : "Novo"} ${new Date().getFullYear()}`}
+          />
+          <input type="hidden" name="ano" value={new Date().getFullYear()} />
+          <input type="hidden" name="modelo" value={modeloOutro!} />
+          <input type="hidden" name="premissaId" value={premissaOutroId!} />
+          <input type="hidden" name="slot" value={slot} />
+          <input type="hidden" name="outroCenarioId" value={outroCenarioId} />
+          <input type="hidden" name="periodoId" value={periodoId} />
+          <SubmitButton variant="ghost" size="sm" className="text-xs text-neutral-500 hover:text-peri-700">
+            ou criar cenário {modeloOutro === "ATUAL" ? "Atual" : "Novo"} aqui
+          </SubmitButton>
+        </form>
+      )}
     </Card>
   );
 }
