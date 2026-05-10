@@ -63,7 +63,9 @@ export function ColunaCenario({
   }
   const jaCalculou = cenario.remuneracoes.length > 0;
   const cobertura4Trims = trimsCalculados.size === 4;
-  const podePublicar = editavel && cobertura4Trims && errosCount === 0;
+  // Publicar é permitido mesmo sem cobertura 4/4 — a publicarAction faz
+  // auto-cálculo dos 4 trimestres antes de congelar o snapshot.
+  const podePublicar = editavel && errosCount === 0;
   const dirty = cenario.parametrosDirty;
 
   // Stepper
@@ -191,6 +193,8 @@ export function ColunaCenario({
                 cenarioId={cenario.id}
                 cenarioNome={cenario.nome}
                 status={cenario.status as CenarioStatusType}
+                slot={slot}
+                outroCenarioId={outroCenarioId}
               />
             )}
           </div>
@@ -281,17 +285,16 @@ export function ColunaCenario({
               <Tooltip
                 side="top"
                 content={
-                  !jaCalculou
-                    ? "Calcule antes de publicar."
-                    : !cobertura4Trims
-                    ? `Calcule todos os 4 trimestres (atual: ${trimsCalculados.size}/4) antes de publicar.`
-                    : errosCount > 0
+                  errosCount > 0
                     ? `Resolva os ${errosCount} alerta(s) ERROR antes de publicar.`
+                    : !cobertura4Trims
+                    ? `Vou calcular os 4 trimestres antes de publicar (atual: ${trimsCalculados.size}/4) e congelar o snapshot.`
                     : "Congela o cenário como snapshot imutável (status APPLIED). Outros cenários publicados do mesmo modelo+ano serão arquivados automaticamente."
                 }
               >
                 <Button variant="primary" size="sm" disabled={!podePublicar}>
-                  <FileCheck2 className="h-3.5 w-3.5" /> Publicar
+                  <FileCheck2 className="h-3.5 w-3.5" />
+                  {!cobertura4Trims ? "Calcular & Publicar" : "Publicar"}
                 </Button>
               </Tooltip>
             }
@@ -299,6 +302,8 @@ export function ColunaCenario({
             description={
               errosCount > 0
                 ? `Há ${errosCount} alerta(s) ERROR. Resolva antes de publicar.`
+                : !cobertura4Trims
+                ? `Vou calcular os 4 trimestres do ano antes de congelar o snapshot (atual: ${trimsCalculados.size}/4). Cenários APPLIED anteriores deste modelo/ano serão arquivados.`
                 : "O cálculo será congelado (snapshot imutável). Cenários APPLIED anteriores deste modelo/ano serão arquivados."
             }
             action={publicarAction}

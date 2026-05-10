@@ -365,6 +365,59 @@ export async function criarCenarioComDefaults(args: {
   return cenario;
 }
 
+/**
+ * Clona um cenário existente (qualquer status) em um novo DRAFT.
+ * Copia: nome (com sufixo "(cópia)"), premissa, ano, modelo, override
+ * e todas as classificações. Não copia RemuneracaoCalculada — usuário
+ * recalcula no novo cenário.
+ *
+ * Uso principal: "Reabrir como rascunho" para iterar em cima de um
+ * APPLIED/ARCHIVED sem mexer no original (que fica como registro).
+ */
+export async function clonarCenarioComoRascunho(args: {
+  cenarioId: string;
+  novoNome?: string;
+  criadoPorId?: string;
+}): Promise<{ id: string }> {
+  const src = await prisma.cenario.findUnique({
+    where: { id: args.cenarioId },
+    include: { classificacoes: true },
+  });
+  if (!src) throw new ApiError("Cenário não encontrado", 404);
+
+  const nome = (args.novoNome ?? `${src.nome} (cópia)`).slice(0, 120);
+
+  const novo = await prisma.cenario.create({
+    data: {
+      nome,
+      descricao: src.descricao,
+      ano: src.ano,
+      modelo: src.modelo,
+      premissaId: src.premissaId,
+      parametrosOverride: (src.parametrosOverride ?? undefined) as never,
+      status: "DRAFT",
+      parametrosDirty: false,
+      versao: 1,
+      criadoPorId: args.criadoPorId,
+      classificacoes: {
+        create: src.classificacoes.map((c) => ({
+          socioId: c.socioId,
+          publico: c.publico,
+          unidadeId: c.unidadeId,
+          percentualQuotas: c.percentualQuotas,
+          originacaoEsperada: c.originacaoEsperada,
+          pesoBlocoB: c.pesoBlocoB,
+          nivelCargoOverride: c.nivelCargoOverride,
+          faixaSalarialOverride: c.faixaSalarialOverride,
+          observacoes: c.observacoes,
+        })),
+      },
+    },
+    select: { id: true },
+  });
+  return novo;
+}
+
 // ============================================================================
 // Override de parâmetros — edição inline na simulação
 // ============================================================================

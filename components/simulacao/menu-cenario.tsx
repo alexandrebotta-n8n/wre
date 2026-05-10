@@ -3,7 +3,7 @@
 // Usado na coluna e no drawer.
 import * as React from "react";
 import { useState } from "react";
-import { MoreVertical, Archive, Trash2 } from "lucide-react";
+import { MoreVertical, Archive, Trash2, FilePlus2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { arquivarCenarioAction, excluirCenarioAction } from "@/app/simulacao/acoes";
+import { arquivarCenarioAction, excluirCenarioAction, reabrirComoRascunhoAction } from "@/app/simulacao/acoes";
 
 export type CenarioStatus = "DRAFT" | "APPLIED" | "ARCHIVED";
 
@@ -32,18 +32,26 @@ export function MenuCenario({
   cenarioId,
   cenarioNome,
   status,
+  slot,
+  outroCenarioId,
   size = "sm",
 }: {
   cenarioId: string;
   cenarioNome: string;
   status: CenarioStatus;
+  /** Slot da coluna onde o menu está aberto. Se omitido, action assume "a". */
+  slot?: "a" | "b";
+  /** ID do cenário aberto na outra coluna — preserva contexto após o redirect. */
+  outroCenarioId?: string;
   size?: "sm" | "md";
 }) {
   const [arquivarOpen, setArquivarOpen] = useState(false);
   const [excluirOpen, setExcluirOpen] = useState(false);
+  const [reabrirOpen, setReabrirOpen] = useState(false);
 
   const podeArquivar = status !== "ARCHIVED";
   const podeExcluir = status !== "APPLIED"; // APPLIED só pode arquivar
+  const podeReabrir = status === "APPLIED" || status === "ARCHIVED";
   const exigeConfirmacaoForte = status === "ARCHIVED"; // arquivado tinha valor — confirma 2×
 
   return (
@@ -55,6 +63,13 @@ export function MenuCenario({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {podeReabrir && (
+            <DropdownMenuItem onSelect={() => setReabrirOpen(true)}>
+              <FilePlus2 className="h-3.5 w-3.5" />
+              Reabrir como rascunho
+            </DropdownMenuItem>
+          )}
+          {podeReabrir && (podeArquivar || podeExcluir) && <DropdownMenuSeparator />}
           {podeArquivar && (
             <DropdownMenuItem onSelect={() => setArquivarOpen(true)}>
               <Archive className="h-3.5 w-3.5" />
@@ -68,11 +83,48 @@ export function MenuCenario({
               Excluir
             </DropdownMenuItem>
           )}
-          {!podeArquivar && !podeExcluir && (
+          {!podeArquivar && !podeExcluir && !podeReabrir && (
             <DropdownMenuItem disabled>Nenhuma ação disponível</DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Dialog: reabrir como rascunho */}
+      <Dialog open={reabrirOpen} onOpenChange={setReabrirOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reabrir como rascunho?</DialogTitle>
+            <DialogDescription>
+              Cria um novo cenário <strong>DRAFT</strong> com mesma premissa, parâmetros e
+              classificações de &ldquo;{cenarioNome}&rdquo;. O original fica intacto como
+              registro. O rascunho começa sem cálculo — recalcule depois.
+            </DialogDescription>
+          </DialogHeader>
+          <form action={reabrirComoRascunhoAction} className="space-y-3">
+            <input type="hidden" name="cenarioId" value={cenarioId} />
+            {slot && <input type="hidden" name="slot" value={slot} />}
+            {outroCenarioId && <input type="hidden" name="outroCenarioId" value={outroCenarioId} />}
+            <Field label="Nome do novo rascunho" htmlFor={`reab-${cenarioId}`}>
+              <Input
+                id={`reab-${cenarioId}`}
+                name="novoNome"
+                defaultValue={`${cenarioNome} (cópia)`}
+                maxLength={120}
+                autoFocus
+              />
+            </Field>
+            <DialogFooter className="gap-2 pt-1">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancelar</Button>
+              </DialogClose>
+              <SubmitButton variant="primary">
+                <FilePlus2 className="h-3.5 w-3.5" />
+                Criar rascunho
+              </SubmitButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: arquivar */}
       <Dialog open={arquivarOpen} onOpenChange={setArquivarOpen}>

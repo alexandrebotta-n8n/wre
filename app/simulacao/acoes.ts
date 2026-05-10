@@ -12,6 +12,7 @@ import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 import {
   calcularCenarioAnual,
+  clonarCenarioComoRascunho,
   criarCenarioComDefaults,
   atualizarParametrosOverride,
   salvarOverrideComoPremissa,
@@ -117,6 +118,29 @@ export async function publicarAction(formData: FormData) {
   const escopo = escopoDe(session?.user as SessionUser | undefined);
   if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
+
+  // Auto-cálculo: se faltam trimestres (ou tem override dirty), roda os 4
+  // antes de publicar. Garante que o snapshot final reflita o estado atual.
+  let calcSummary = "";
+  try {
+    const r = await calcularCenarioAnual({ cenarioId });
+    if (r.trimestresOk.length === 0) {
+      await flashError(
+        "Nenhum trimestre tem ResultadoPeriodo importado — importe a DRE antes de publicar.",
+      );
+      rev();
+      return;
+    }
+    if (r.trimestresSemDados.length > 0) {
+      calcSummary = ` (sem dados em ${r.trimestresSemDados.map((t) => t + "T").join(", ")})`;
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Falha ao calcular";
+    await flashError(`Falha ao calcular antes de publicar: ${msg}`);
+    rev();
+    return;
+  }
+
   const cenario = await prisma.cenario.findUnique({
     where: { id: cenarioId },
     include: { classificacoes: true, remuneracoes: true, premissa: true },
@@ -154,8 +178,48 @@ export async function publicarAction(formData: FormData) {
     recurso: `Cenario:${cenarioId}`,
     meta: { modelo: cenario.modelo, ano: cenario.ano },
   });
-  await flashSuccess("Cenário publicado — cálculo congelado.");
+  await flashSuccess(`Cenário publicado — cálculo congelado${calcSummary}.`);
   rev();
+}
+
+export async function reabrirComoRascunhoAction(formData: FormData) {
+  const session = await auth();
+  const escopo = escopoDe(session?.user as SessionUser | undefined);
+  if (!escopo.podeMutar) {
+    await flashError("Sem permissão para reabrir cenário.");
+    return;
+  }
+  const cenarioId = String(formData.get("cenarioId"));
+  const novoNome = String(formData.get("novoNome") ?? "").trim() || undefined;
+  const slot = String(formData.get("slot") ?? "a") as "a" | "b";
+  const outroSlot = String(formData.get("outroCenarioId") ?? "");
+  try {
+    const novo = await clonarCenarioComoRascunho({
+      cenarioId,
+      novoNome,
+      criadoPorId: session?.user?.id,
+    });
+    await logAudit({
+      usuarioId: session?.user?.id,
+      acao: "cenario.reabrir-como-rascunho",
+      recurso: `Cenario:${novo.id}`,
+      meta: { origemId: cenarioId },
+    });
+    await flashSuccess("Rascunho criado a partir do cenário publicado.");
+    const params = new URLSearchParams();
+    if (slot === "a") {
+      params.set("a", novo.id);
+      if (outroSlot) params.set("b", outroSlot);
+    } else {
+      if (outroSlot) params.set("a", outroSlot);
+      params.set("b", novo.id);
+    }
+    redirect(`/simulacao?${params.toString()}`);
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("NEXT_REDIRECT")) throw e;
+    const msg = e instanceof Error ? e.message : "Falha ao reabrir como rascunho";
+    await flashError(msg);
+  }
 }
 
 // ============================================================================
