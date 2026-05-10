@@ -13,6 +13,8 @@ import { PainelParametros } from "./painel-parametros";
 import { DrawerClassificacoes } from "./drawer-classificacoes";
 import { SalvarPremissaDialog } from "./salvar-premissa-dialog";
 import { MenuCenario, type CenarioStatus as CenarioStatusType } from "./menu-cenario";
+import { ExplicacaoDialog } from "./explicacao-dialog";
+import { gerarNarrativa } from "@/lib/explicacao/narrativa";
 import type { CenarioCompleto, AreaOption } from "./types";
 
 export function ColunaCenario({
@@ -87,6 +89,20 @@ export function ColunaCenario({
     (cenario.parametrosOverride as Record<string, unknown> | null) ??
     (cenario.premissa.parametros as Record<string, unknown>);
 
+  // Soma valores do trace por prefixo de etapa — alimenta os chips de "valor calculado"
+  // ao lado de cada parâmetro no painel. Ex: "8.bloco-A" → total Bloco A.
+  const valoresPorEtapa: Record<string, number> = {};
+  for (const r of cenario.remuneracoes) {
+    const trace = ((r as unknown as { trace?: Array<{ etapa: string; valor?: number }> }).trace) ?? [];
+    for (const item of trace) {
+      if (typeof item.valor !== "number") continue;
+      // chave = primeiro segmento depois do número (ex "8.bloco-A" → "bloco-A")
+      const m = /^\d+\.(.+)$/.exec(item.etapa);
+      const key = m ? m[1] : item.etapa;
+      valoresPorEtapa[key] = (valoresPorEtapa[key] ?? 0) + item.valor;
+    }
+  }
+
   return (
     <Card className="flex flex-col">
       {/* Header */}
@@ -119,6 +135,24 @@ export function ColunaCenario({
             </CardDescription>
           </div>
           <div className="flex items-center gap-1">
+            {jaCalculou && (
+              <ExplicacaoDialog
+                cenarioNome={cenario.nome}
+                paragrafos={gerarNarrativa({
+                  nome: cenario.nome,
+                  modelo: cenario.modelo as "ATUAL" | "NOVO",
+                  ano: cenario.ano,
+                  periodoRotulo: cenario.remuneracoes[0]?.periodo.rotulo ?? "—",
+                  premissaNome: cenario.premissa.nome,
+                  remuneracoes: cenario.remuneracoes.map((r) => ({
+                    socio: { nome: r.socio.nome, isFundador: r.socio.isFundador },
+                    total: r.total,
+                    trace: r.trace,
+                    alertas: r.alertas,
+                  })),
+                })}
+              />
+            )}
             <Button asChild variant="ghost" size="sm">
               <Link href={trocarHref}>
                 <Replace className="h-3.5 w-3.5" /> Trocar
@@ -167,6 +201,7 @@ export function ColunaCenario({
           editavel={editavel}
           areas={areas}
           dirty={dirty}
+          valoresPorEtapa={valoresPorEtapa}
         />
       </div>
 

@@ -3,16 +3,18 @@
 // Switch entre modelo ATUAL (campos diretos) e NOVO (5 grupos colapsáveis).
 import * as React from "react";
 import { useState } from "react";
-import { Settings2, ChevronDown } from "lucide-react";
+import { Settings2, ChevronDown, HelpCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip } from "@/components/ui/tooltip";
 import { SumValidator } from "@/components/premissa/sum-validator";
 import { MatrizPesosArea } from "@/components/premissa/matriz-pesos-area";
 import { PremissaChips } from "@/components/premissa/chips";
 import { atualizarOverrideAction } from "@/app/simulacao/acoes";
+import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { AreaOption } from "./types";
 
@@ -24,6 +26,7 @@ export function PainelParametros({
   editavel,
   areas,
   dirty,
+  valoresPorEtapa = {},
 }: {
   cenarioId: string;
   modelo: "ATUAL" | "NOVO";
@@ -32,6 +35,8 @@ export function PainelParametros({
   editavel: boolean;
   areas: AreaOption[];
   dirty: boolean;
+  /** Soma do `trace[].valor` por chave de etapa (ex "bloco-A"). Alimenta os chips. */
+  valoresPorEtapa?: Record<string, number>;
 }) {
   const [aberto, setAberto] = useState(editavel);
 
@@ -70,9 +75,9 @@ export function PainelParametros({
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-3">
         {modelo === "ATUAL" ? (
-          <FormParamsAtual cenarioId={cenarioId} parametros={parametros} />
+          <FormParamsAtual cenarioId={cenarioId} parametros={parametros} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         ) : (
-          <FormParamsNovo cenarioId={cenarioId} parametros={parametros} areas={areas} />
+          <FormParamsNovo cenarioId={cenarioId} parametros={parametros} areas={areas} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         )}
       </CollapsibleContent>
     </Collapsible>
@@ -83,12 +88,57 @@ export function PainelParametros({
 // Modelo ATUAL — formulário simples
 // ============================================================================
 
+/** Chip que mostra "→ R$ X" para o valor calculado da etapa. */
+function ChipValor({
+  etapa,
+  rotulo,
+  valoresPorEtapa,
+  dirty,
+}: {
+  etapa: string;
+  rotulo?: string;
+  valoresPorEtapa: Record<string, number>;
+  dirty: boolean;
+}) {
+  const v = valoresPorEtapa[etapa];
+  if (v === undefined) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-[11px] tabular-nums px-1.5 py-0.5 rounded ring-1 ring-inset",
+        dirty
+          ? "text-neutral-500 bg-neutral-50 ring-neutral-200"
+          : "text-peri-800 bg-peri-50 ring-peri-200",
+      )}
+      title={dirty ? "valor antes do recálculo" : "valor calculado nesta apuração"}
+    >
+      → {rotulo ? <span className="opacity-70">{rotulo}</span> : null} {brl(v, true)}
+    </span>
+  );
+}
+
+/** Label com tooltip de ajuda. */
+function LabelHelp({ children, ajuda }: { children: React.ReactNode; ajuda: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {children}
+      <Tooltip content={ajuda} side="top">
+        <HelpCircle className="h-3 w-3 text-neutral-400 hover:text-peri-600 cursor-help" />
+      </Tooltip>
+    </span>
+  );
+}
+
 function FormParamsAtual({
   cenarioId,
   parametros,
+  valoresPorEtapa,
+  dirty,
 }: {
   cenarioId: string;
   parametros: Record<string, unknown>;
+  valoresPorEtapa: Record<string, number>;
+  dirty: boolean;
 }) {
   return (
     <form
@@ -109,11 +159,28 @@ function FormParamsAtual({
       className="space-y-3"
     >
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Pró-labore mensal (R$)" htmlFor={`pl-${cenarioId}`}>
+        <Field
+          label={
+            <LabelHelp ajuda="Valor mensal do pró-labore por sócio elegível. Multiplicado por meses do período × N sócios.">
+              Pró-labore mensal (R$)
+            </LabelHelp>
+          }
+          htmlFor={`pl-${cenarioId}`}
+        >
           <Input id={`pl-${cenarioId}`} type="number" name="proLaboreMensal" defaultValue={Number(parametros.proLaboreMensal ?? 5000)} step="100" required />
+          <ChipValor etapa="pro-labore" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         </Field>
-        <Field label="Reserva (%)" htmlFor={`rp-${cenarioId}`} hint="0.05 = 5%">
+        <Field
+          label={
+            <LabelHelp ajuda="Percentual do funding residual reservado. Se 'Vira prêmio' estiver marcado, vira distribuição uniforme entre sócios.">
+              Reserva (%)
+            </LabelHelp>
+          }
+          htmlFor={`rp-${cenarioId}`}
+          hint="0.05 = 5%"
+        >
           <Input id={`rp-${cenarioId}`} type="number" name="reservaPercentual" defaultValue={Number(parametros.reservaPercentual ?? 0.05)} step="0.01" required />
+          <ChipValor etapa="reserva" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -143,10 +210,14 @@ function FormParamsNovo({
   cenarioId,
   parametros,
   areas,
+  valoresPorEtapa,
+  dirty,
 }: {
   cenarioId: string;
   parametros: Record<string, unknown>;
   areas: AreaOption[];
+  valoresPorEtapa: Record<string, number>;
+  dirty: boolean;
 }) {
   const distribAtual = String(parametros.distribuicaoBlocoB ?? "UNIFORME");
 
@@ -193,18 +264,28 @@ function FormParamsNovo({
       }}
       className="space-y-3"
     >
-      <Grupo titulo="Blocos do RDA (somam 1.0)" defaultOpen>
+      <Grupo
+        titulo="Blocos do RDA (somam 1.0)"
+        ajuda="O RDA (Resultado Distribuível Ajustado) é o LL Matriz menos a remuneração de administração. Os 3 blocos somam 100% e disciplinam como o RDA é alocado: A institucional (capital), B performance, C estratégica."
+        defaultOpen
+      >
         <div className="grid grid-cols-3 gap-3">
           <NumField name="percentualBlocoA" label="A" defaultValue={Number(parametros.percentualBlocoA ?? 0.45)} step="0.01" />
           <NumField name="percentualBlocoB" label="B" defaultValue={Number(parametros.percentualBlocoB ?? 0.35)} step="0.01" />
           <NumField name="percentualBlocoC" label="C" defaultValue={Number(parametros.percentualBlocoC ?? 0.20)} step="0.01" />
         </div>
-        <div className="mt-2">
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           <SumValidator names={["percentualBlocoA", "percentualBlocoB", "percentualBlocoC"]} alvo={1.0} rotulo="A+B+C" />
+          <ChipValor etapa="bloco-A" rotulo="A" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
+          <ChipValor etapa="bloco-B" rotulo="B" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
+          <ChipValor etapa="bloco-C" rotulo="C" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         </div>
       </Grupo>
 
-      <Grupo titulo="Pool de unidade (somam 1.0)">
+      <Grupo
+        titulo="Pool de unidade (somam 1.0)"
+        ajuda="Quando uma unidade tem líder, o LL local é dividido em 3: Sociedade (institucional), Líder (incentivo) e Equipe/Reserva. Aplicado APENAS sobre LL_unidade — não confundir com Blocos A/B/C do RDA central."
+      >
         <div className="grid grid-cols-3 gap-3">
           <NumField name="poolSociedade" label="Soc." defaultValue={Number(parametros.poolSociedade ?? 0.50)} step="0.01" />
           <NumField name="poolLider" label="Líder" defaultValue={Number(parametros.poolLider ?? 0.30)} step="0.01" />
@@ -215,7 +296,10 @@ function FormParamsNovo({
         </div>
       </Grupo>
 
-      <Grupo titulo="Chave-padrão interunidades (somam 1.0)">
+      <Grupo
+        titulo="Chave-padrão interunidades (somam 1.0)"
+        ajuda="Quando um serviço é originado em uma unidade e executado em outra, esta chave decide como o resultado é dividido: Originação (relacionamento), Execução (entrega) e Gestão (coordenação). Defaults da Política: 30/60/10."
+      >
         <div className="grid grid-cols-3 gap-3">
           <NumField name="chaveOriginacao" label="Orig." defaultValue={Number(parametros.chaveOriginacao ?? 0.30)} step="0.05" />
           <NumField name="chaveExecucao" label="Exec." defaultValue={Number(parametros.chaveExecucao ?? 0.60)} step="0.05" />
@@ -226,7 +310,10 @@ function FormParamsNovo({
         </div>
       </Grupo>
 
-      <Grupo titulo="Faixas de ajuste (mín / máx)">
+      <Grupo
+        titulo="Faixas de ajuste (mín / máx)"
+        ajuda="Limites para a chave O/E/G poder ser ajustada caso a caso. Política da Política: Originação 20-40%, Execução 50-70%, Gestão 0-15%. Pro-rata mínimo: meses para reconhecer parcela proporcional."
+      >
         <div className="grid grid-cols-2 gap-3">
           <NumField name="faixaOrigMin" label="Orig min" defaultValue={Number(parametros.faixaOrigMin ?? 0.20)} step="0.05" />
           <NumField name="faixaOrigMax" label="Orig max" defaultValue={Number(parametros.faixaOrigMax ?? 0.40)} step="0.05" />
@@ -240,7 +327,10 @@ function FormParamsNovo({
         </div>
       </Grupo>
 
-      <Grupo titulo="Distribuição do Bloco B + Pesos por área">
+      <Grupo
+        titulo="Distribuição do Bloco B + Pesos por área"
+        ajuda="O Bloco B (35%) pode ser distribuído por: UNIFORME (igual entre elegíveis), PESO_INDIVIDUAL, ORIGINACAO ou POR_AREA (mix orgânico/incremental por área de prática)."
+      >
         <Field label="Distribuição" htmlFor={`db-${cenarioId}`}>
           <NativeSelect id={`db-${cenarioId}`} name="distribuicaoBlocoB" defaultValue={distribAtual}>
             <option value="UNIFORME">Uniforme</option>
@@ -273,10 +363,12 @@ function FormParamsNovo({
 
 function Grupo({
   titulo,
+  ajuda,
   defaultOpen,
   children,
 }: {
   titulo: string;
+  ajuda?: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
@@ -285,7 +377,14 @@ function Grupo({
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <button className="w-full flex items-center justify-between text-left rounded px-2 py-1.5 hover:bg-neutral-50 transition-colors text-xs font-semibold text-navy-900 uppercase tracking-wider">
-          <span>{titulo}</span>
+          <span className="inline-flex items-center gap-1.5">
+            {titulo}
+            {ajuda && (
+              <Tooltip content={ajuda} side="top">
+                <HelpCircle className="h-3 w-3 text-neutral-400 hover:text-peri-600" />
+              </Tooltip>
+            )}
+          </span>
           <ChevronDown
             className={cn("h-3.5 w-3.5 text-neutral-400 transition-transform", open && "rotate-180")}
             aria-hidden

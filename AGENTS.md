@@ -123,8 +123,10 @@ A página principal é **`/simulacao`** — combina lista de cenários + compara
 
 | Rota | Propósito |
 |---|---|
-| `/simulacao?a=&b=&periodoId=` | **Página única.** 2 colunas (A | B) com painéis de parâmetros editáveis, stepper, KPIs, tabela alinhada por sócio com Δ. Drawer lateral = lista de cenários filtrada. |
+| `/simulacao?a=&b=&periodoId=` | **Página única.** 2 colunas (A | B) com painéis de parâmetros editáveis (com tooltips e chips do valor calculado), stepper, KPIs, tabela alinhada por sócio com Δ — **clicar no sócio expande o waterfall** com a composição passo a passo (trace). Botão "📖 Explicar" gera narrativa textual do cenário. Drawer lateral = lista de cenários filtrada. |
 | `/socios` | Base — sócios e líderes ativos. |
+| `/politica` | Política de Partnership DSF + Relatório Técnico (TOC + tabs + .docx download). Acesso a todos autenticados, **inclusive sócios restritos**. |
+| `/como-funciona` | Página explicativa do fluxo de cálculo (LL → RDA → Blocos A/B/C) + glossário. Linkada via "como cheguei aqui?" em cada drill-down. |
 | `/premissas` | Catálogo de templates (params iniciais para novos cenários). Mostra count "N cenários usando". |
 | `/premissas/[id]` | Editor da premissa-template + histórico de versões. |
 | `/usuarios` | ADMIN — gestão de acessos. |

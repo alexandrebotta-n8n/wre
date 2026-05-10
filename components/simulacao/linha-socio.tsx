@@ -1,0 +1,97 @@
+"use client";
+// Linha expansível da tabela comparativa — abre o waterfall do sócio.
+import { useState } from "react";
+import { ArrowUp, ArrowDown, Minus, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TR, TD } from "@/components/ui/data-table";
+import { brl, pct } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { SocioWaterfall } from "./socio-waterfall";
+import type { LinhaComparativa } from "./types";
+
+export function LinhaSocio({
+  linha: l,
+  podeCompararDiff,
+  colSpan,
+  nomeA,
+  nomeB,
+}: {
+  linha: LinhaComparativa;
+  podeCompararDiff: boolean;
+  colSpan: number;
+  nomeA?: string;
+  nomeB?: string;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const positivo = l.diff > 0;
+  const zero = l.diff === 0;
+  const Icon = zero ? Minus : positivo ? ArrowUp : ArrowDown;
+  const corClasse = zero ? "text-neutral-500" : positivo ? "text-mint-700" : "text-red-700";
+  const temAlgumTrace = l.traceA.length > 0 || l.traceB.length > 0;
+
+  return (
+    <>
+      <TR className={cn(aberto && "bg-peri-50/30")}>
+        <TD className="px-4 py-2 font-medium text-navy-900">
+          {temAlgumTrace ? (
+            <button
+              type="button"
+              onClick={() => setAberto((v) => !v)}
+              aria-expanded={aberto}
+              className="inline-flex items-center gap-1.5 text-left rounded hover:text-peri-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peri-400"
+              title="Ver composição do pacote"
+            >
+              <ChevronRight
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform text-neutral-400",
+                  aberto && "rotate-90 text-peri-700",
+                )}
+                aria-hidden
+              />
+              {l.nome}
+              {l.isFundador && <Badge variant="success" size="sm">fundador</Badge>}
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 pl-5">
+              {l.nome}
+              {l.isFundador && <Badge variant="success" size="sm">fundador</Badge>}
+            </span>
+          )}
+        </TD>
+        <TD className="text-right tabular-nums">{l.totalA != null ? brl(l.totalA, true) : "—"}</TD>
+        <TD className="text-right tabular-nums">{l.totalB != null ? brl(l.totalB, true) : "—"}</TD>
+        {podeCompararDiff && (
+          <TD className={cn("text-right tabular-nums font-medium", corClasse)}>
+            <span className="inline-flex items-center gap-1 justify-end">
+              <Icon className="h-3 w-3" aria-hidden />
+              {positivo ? "+" : ""}
+              {brl(l.diff, true)}
+            </span>
+          </TD>
+        )}
+        {podeCompararDiff && (
+          <TD className={cn("text-right tabular-nums text-xs", corClasse)}>
+            {l.diffPct === null ? "—" : (positivo ? "+" : "") + pct(l.diffPct)}
+          </TD>
+        )}
+      </TR>
+      {aberto && temAlgumTrace && (
+        <tr>
+          <td colSpan={colSpan} className="p-0">
+            <SocioWaterfall
+              nome={l.nome}
+              nomeA={nomeA}
+              nomeB={nomeB}
+              totalA={l.totalA}
+              totalB={l.totalB}
+              traceA={l.traceA}
+              traceB={l.traceB}
+              alertasA={l.alertasA}
+              alertasB={l.alertasB}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}

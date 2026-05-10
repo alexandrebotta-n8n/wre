@@ -52,6 +52,13 @@ export type CenarioCompleto = Prisma.CenarioGetPayload<{
 
 export type Slot = "a" | "b";
 
+/** Item do trace persistido em RemuneracaoCalculada.trace. */
+export interface TraceItem {
+  etapa: string;
+  descricao: string;
+  valor?: number;
+}
+
 /** Linha agregada da tabela comparativa. */
 export interface LinhaComparativa {
   socioId: string;
@@ -61,4 +68,9 @@ export interface LinhaComparativa {
   totalB: number | null;
   diff: number; // B − A; sinal positivo = ganhou no novo
   diffPct: number | null;
+  /** Trace + alertas de cada lado (vazio se sócio não estiver naquele cenário). */
+  traceA: TraceItem[];
+  traceB: TraceItem[];
+  alertasA: string[];
+  alertasB: string[];
 }

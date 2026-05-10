@@ -1,11 +1,11 @@
 // Tabela alinhada por sócio: linhas A vs B + Δ.
-import { ArrowUp, ArrowDown, Minus } from "lucide-react";
+// Cada linha é expansível (Radix Collapsible) para mostrar o waterfall do trace.
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { TableShell, THead, TBody, TH, TR, TD } from "@/components/ui/data-table";
+import { TableShell, THead, TBody, TH } from "@/components/ui/data-table";
 import { brl, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { LinhaComparativa } from "./types";
+import { LinhaSocio } from "./linha-socio";
 
 export function TabelaComparativa({
   linhas,
@@ -26,6 +26,7 @@ export function TabelaComparativa({
   const diffPctTotal = totalA > 0 ? diffTotal / totalA : null;
 
   const podeCompararDiff = temA && temB;
+  const colSpan = 1 + 2 + (podeCompararDiff ? 2 : 0);
 
   return (
     <Card className="overflow-hidden">
@@ -34,7 +35,8 @@ export function TabelaComparativa({
           <CardTitle>Pacotes por sócio</CardTitle>
           <CardDescription>
             Linhas alinhadas por sócio. Ordenado por |Δ| decrescente.
-            {!podeCompararDiff ? " — selecione 2 cenários para ver o diff." : ""}
+            {!podeCompararDiff ? " — selecione 2 cenários para ver o diff." : ""}{" "}
+            <span className="text-neutral-400">·</span> Clique no nome para abrir a composição passo-a-passo.
           </CardDescription>
         </div>
         {podeCompararDiff && (
@@ -62,42 +64,21 @@ export function TabelaComparativa({
         <TBody>
           {linhas.length === 0 && (
             <tr>
-              <td colSpan={5} className="text-center py-8 text-sm text-neutral-500">
+              <td colSpan={colSpan} className="text-center py-8 text-sm text-neutral-500">
                 Nenhum pacote calculado ainda. Use &ldquo;Calcular&rdquo; em alguma coluna.
               </td>
             </tr>
           )}
-          {linhas.map((l) => {
-            const positivo = l.diff > 0;
-            const zero = l.diff === 0;
-            const Icon = zero ? Minus : positivo ? ArrowUp : ArrowDown;
-            const corClasse = zero ? "text-neutral-500" : positivo ? "text-mint-700" : "text-red-700";
-            return (
-              <TR key={l.socioId}>
-                <TD className="px-4 py-2 font-medium text-navy-900">
-                  <span className="inline-flex items-center gap-1.5">
-                    {l.nome}
-                    {l.isFundador && <Badge variant="success" size="sm">fundador</Badge>}
-                  </span>
-                </TD>
-                <TD className="text-right tabular-nums">{l.totalA != null ? brl(l.totalA, true) : "—"}</TD>
-                <TD className="text-right tabular-nums">{l.totalB != null ? brl(l.totalB, true) : "—"}</TD>
-                {podeCompararDiff && (
-                  <TD className={cn("text-right tabular-nums font-medium", corClasse)}>
-                    <span className="inline-flex items-center gap-1 justify-end">
-                      <Icon className="h-3 w-3" aria-hidden />
-                      {positivo ? "+" : ""}{brl(l.diff, true)}
-                    </span>
-                  </TD>
-                )}
-                {podeCompararDiff && (
-                  <TD className={cn("text-right tabular-nums text-xs", corClasse)}>
-                    {l.diffPct === null ? "—" : (positivo ? "+" : "") + pct(l.diffPct)}
-                  </TD>
-                )}
-              </TR>
-            );
-          })}
+          {linhas.map((l) => (
+            <LinhaSocio
+              key={l.socioId}
+              linha={l}
+              podeCompararDiff={podeCompararDiff}
+              colSpan={colSpan}
+              nomeA={nomeA}
+              nomeB={nomeB}
+            />
+          ))}
           {linhas.length > 0 && (
             <tr className="bg-neutral-50 font-semibold">
               <td className="px-4 py-2.5">Total geral</td>

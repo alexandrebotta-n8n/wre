@@ -1,6 +1,6 @@
 // Construção das linhas comparativas (alinhadas por sócio entre A e B).
 import { nomeOuIniciais } from "@/lib/format";
-import type { CenarioCompleto, LinhaComparativa } from "./types";
+import type { CenarioCompleto, LinhaComparativa, TraceItem } from "./types";
 
 export function construirLinhasComparativas(
   a: CenarioCompleto | null,
@@ -26,6 +26,10 @@ export function construirLinhasComparativas(
       totalB,
       diff,
       diffPct,
+      traceA: (ra?.trace as TraceItem[] | null) ?? [],
+      traceB: (rb?.trace as TraceItem[] | null) ?? [],
+      alertasA: (ra?.alertas as string[] | null) ?? [],
+      alertasB: (rb?.alertas as string[] | null) ?? [],
     };
   });
   // Ordena por |diff| desc para destacar maiores impactos.
