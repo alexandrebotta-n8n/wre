@@ -23,7 +23,16 @@ export default async function SimulacaoPage({
     prisma.cenario.findMany({
       where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {},
       orderBy: [{ criadoEm: "desc" }],
-      include: { premissa: { select: { nome: true, modelo: true } } },
+      // select enxuto: drawer só precisa destes campos. Evita carregar
+      // parametrosOverride (jsonb pesado) para 100 cenários da lista lateral.
+      select: {
+        id: true,
+        nome: true,
+        modelo: true,
+        status: true,
+        ano: true,
+        premissa: { select: { nome: true, modelo: true } },
+      },
       take: 100,
     }),
     escopo.podeMutar

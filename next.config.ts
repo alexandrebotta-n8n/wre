@@ -40,6 +40,19 @@ const nextConfig: NextConfig = {
   // standalone só faz sentido em Docker self-hosted. Vercel ignora.
   // Mantemos condicional via env para suportar ambos os modos:
   ...(process.env.BUILD_STANDALONE === "true" ? { output: "standalone" as const } : {}),
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "@radix-ui/react-collapsible",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-select",
+      "@radix-ui/react-slot",
+      "@radix-ui/react-tooltip",
+    ],
+  },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

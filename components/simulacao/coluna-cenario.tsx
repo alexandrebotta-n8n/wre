@@ -38,15 +38,26 @@ export function ColunaCenario({
   void modoNome; // pode ser usado em futuras adições
   const isDraft = cenario.status === "DRAFT";
   const editavel = podeMutar && isDraft;
-  const totalPacote = cenario.remuneracoes.reduce((acc, r) => acc + r.total, 0);
-  const errosCount = cenario.remuneracoes.reduce(
-    (acc, r) => acc + ((r.alertas as string[] | null) ?? []).filter((a) => a.includes("[ERROR]")).length,
-    0,
-  );
-  const warnsCount = cenario.remuneracoes.reduce(
-    (acc, r) => acc + ((r.alertas as string[] | null) ?? []).filter((a) => a.includes("[WARNING]")).length,
-    0,
-  );
+  // Consolidado: 1 loop para somar total, contar erros/warns e agregar valoresPorEtapa.
+  let totalPacote = 0;
+  let errosCount = 0;
+  let warnsCount = 0;
+  const valoresPorEtapa: Record<string, number> = {};
+  for (const r of cenario.remuneracoes) {
+    totalPacote += r.total;
+    const alertas = (r.alertas as string[] | null) ?? [];
+    for (const a of alertas) {
+      if (a.includes("[ERROR]")) errosCount++;
+      else if (a.includes("[WARNING]")) warnsCount++;
+    }
+    const trace = ((r as unknown as { trace?: Array<{ etapa: string; valor?: number }> }).trace) ?? [];
+    for (const item of trace) {
+      if (typeof item.valor !== "number") continue;
+      const m = /^\d+\.(.+)$/.exec(item.etapa);
+      const key = m ? m[1] : item.etapa;
+      valoresPorEtapa[key] = (valoresPorEtapa[key] ?? 0) + item.valor;
+    }
+  }
   const jaCalculou = cenario.remuneracoes.length > 0;
   const podePublicar = editavel && jaCalculou && errosCount === 0;
   const dirty = cenario.parametrosDirty;
@@ -89,20 +100,6 @@ export function ColunaCenario({
   const paramsEfetivos =
     (cenario.parametrosOverride as Record<string, unknown> | null) ??
     (cenario.premissa.parametros as Record<string, unknown>);
-
-  // Soma valores do trace por prefixo de etapa — alimenta os chips de "valor calculado"
-  // ao lado de cada parâmetro no painel. Ex: "8.bloco-A" → total Bloco A.
-  const valoresPorEtapa: Record<string, number> = {};
-  for (const r of cenario.remuneracoes) {
-    const trace = ((r as unknown as { trace?: Array<{ etapa: string; valor?: number }> }).trace) ?? [];
-    for (const item of trace) {
-      if (typeof item.valor !== "number") continue;
-      // chave = primeiro segmento depois do número (ex "8.bloco-A" → "bloco-A")
-      const m = /^\d+\.(.+)$/.exec(item.etapa);
-      const key = m ? m[1] : item.etapa;
-      valoresPorEtapa[key] = (valoresPorEtapa[key] ?? 0) + item.valor;
-    }
-  }
 
   return (
     <Card className="flex flex-col">

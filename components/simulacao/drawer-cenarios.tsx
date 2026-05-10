@@ -45,13 +45,19 @@ export function DrawerCenarios({
   const [busca, setBusca] = React.useState("");
   const [filtroModelo, setFiltroModelo] = React.useState<"" | "ATUAL" | "NOVO">("");
   const [filtroStatus, setFiltroStatus] = React.useState<"" | "DRAFT" | "APPLIED" | "ARCHIVED">("");
+  // useDeferredValue: input atualiza imediatamente (responsivo) e a lista
+  // recalcula em prioridade baixa, evitando jank ao digitar.
+  const buscaDiferida = React.useDeferredValue(busca);
 
-  const filtrados = cenarios.filter((c) => {
-    if (busca && !c.nome.toLowerCase().includes(busca.toLowerCase())) return false;
-    if (filtroModelo && c.modelo !== filtroModelo) return false;
-    if (filtroStatus && c.status !== filtroStatus) return false;
-    return true;
-  });
+  const filtrados = React.useMemo(() => {
+    const termo = buscaDiferida.toLowerCase();
+    return cenarios.filter((c) => {
+      if (termo && !c.nome.toLowerCase().includes(termo)) return false;
+      if (filtroModelo && c.modelo !== filtroModelo) return false;
+      if (filtroStatus && c.status !== filtroStatus) return false;
+      return true;
+    });
+  }, [cenarios, buscaDiferida, filtroModelo, filtroStatus]);
 
   function abrirEm(slot: "a" | "b", cenarioId: string) {
     const params = new URLSearchParams();
