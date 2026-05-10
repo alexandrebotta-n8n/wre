@@ -1,19 +1,18 @@
 // Shell server component da página /simulacao.
-// Layout: Drawer (esquerda) + topbar (período + ações globais) + 2 colunas.
+// Layout: Drawer (esquerda) + 2 colunas (A | B). Sem seletor de período —
+// cada cenário é do seu ano e a UI mostra anual com drill-down por trim.
 import Link from "next/link";
-import { Eye, Download, Filter } from "lucide-react";
+import { Eye, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { ColunaCenario } from "./coluna-cenario";
 import { ColunaEmpty } from "./coluna-empty";
-import { SeletorPeriodo } from "./seletor-periodo";
 import { DrawerCenarios } from "./drawer-cenarios";
 import { TabelaComparativa } from "./tabela-comparativa";
 import type {
   CenarioListItem,
   CenarioCompleto,
   PremissaOption,
-  PeriodoOption,
   AreaOption,
   LinhaComparativa,
 } from "./types";
@@ -22,11 +21,9 @@ import { construirLinhasComparativas } from "./linhas";
 export interface SimulacaoShellProps {
   cenarios: CenarioListItem[];
   premissas: PremissaOption[];
-  periodos: PeriodoOption[];
   areas: AreaOption[];
   cenarioA: CenarioCompleto | null;
   cenarioB: CenarioCompleto | null;
-  periodoIdSelecionado: string;
   podeMutar: boolean;
   ehSocioRestrito: boolean;
   modoNome: "completo" | "iniciais";
@@ -42,23 +39,21 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
 
   const aId = props.cenarioA?.id ?? "";
   const bId = props.cenarioB?.id ?? "";
-  const periodoId = props.periodoIdSelecionado;
 
   // A=ATUAL (baseline), B=NOVO (proposta) — ordem de leitura natural.
   // Se a coluna está vazia, sugerimos criar com a premissa default daquele modelo.
   const premissaDefaultAtual = props.premissas.find((p) => p.modelo === "ATUAL");
   const premissaDefaultNovo = props.premissas.find((p) => p.modelo === "NOVO");
 
-  const apresentarHref =
-    aId && periodoId
-      ? `/apresentacao?a=${aId}${bId ? `&b=${bId}` : ""}&periodoId=${periodoId}`
-      : "/apresentacao";
+  const apresentarHref = aId
+    ? `/apresentacao?a=${aId}${bId ? `&b=${bId}` : ""}`
+    : "/apresentacao";
 
   return (
     <main className="mx-auto max-w-[1600px] px-4 sm:px-6 py-6 space-y-5">
       <PageHeader
         title="Simulação"
-        description="Compare cenários lado a lado ou analise um único cenário. Ajuste parâmetros e publique."
+        description="Compare cenários lado a lado ou analise um único cenário. Visão anual — expanda um sócio para ver por trimestre."
         actions={
           <div className="flex items-center gap-2">
             <DrawerCenarios
@@ -66,7 +61,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
               premissas={props.premissas}
               aId={aId}
               bId={bId}
-              periodoId={periodoId}
               podeMutar={props.podeMutar}
               defaultOpen={props.drawerAberto}
             />
@@ -86,19 +80,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
         }
       />
 
-      {/* Topbar — período global */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <SeletorPeriodo
-          periodos={props.periodos}
-          selecionado={periodoId}
-          aId={aId}
-          bId={bId}
-        />
-        <span className="text-xs text-neutral-500 inline-flex items-center gap-1">
-          <Filter className="h-3 w-3" /> Trocar período recarrega ambos os lados.
-        </span>
-      </div>
-
       {/* 2 colunas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {props.cenarioA ? (
@@ -106,7 +87,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             slot="a"
             cenario={props.cenarioA}
             outroCenarioId={bId}
-            periodoId={periodoId}
             areas={props.areas}
             podeMutar={props.podeMutar && !props.ehSocioRestrito}
             modoNome={props.modoNome}
@@ -115,7 +95,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           <ColunaEmpty
             slot="a"
             outroCenarioId={bId}
-            periodoId={periodoId}
             modeloSugerido="ATUAL"
             premissaDefaultId={premissaDefaultAtual?.id}
             premissaDefaultNome={premissaDefaultAtual?.nome}
@@ -128,7 +107,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             slot="b"
             cenario={props.cenarioB}
             outroCenarioId={aId}
-            periodoId={periodoId}
             areas={props.areas}
             podeMutar={props.podeMutar && !props.ehSocioRestrito}
             modoNome={props.modoNome}
@@ -137,7 +115,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           <ColunaEmpty
             slot="b"
             outroCenarioId={aId}
-            periodoId={periodoId}
             modeloSugerido="NOVO"
             premissaDefaultId={premissaDefaultNovo?.id}
             premissaDefaultNome={premissaDefaultNovo?.nome}
@@ -159,7 +136,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             const sp = new URLSearchParams();
             if (aId) sp.set("a", aId);
             if (bId) sp.set("b", bId);
-            if (periodoId) sp.set("periodoId", periodoId);
             sp.set("drawer", "1");
             return `/simulacao?${sp.toString()}`;
           })()}

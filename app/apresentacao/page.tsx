@@ -1,6 +1,5 @@
 // Modo apresentação — slide deck com identidade WRE/DSF.
-// Recebe ?a=&b=&periodoId= e mostra cenário-A vs cenário-B (pode usar mesmo
-// id em a e b para "apresentar 1 cenário" — slides comparativos não aparecem).
+// Recebe ?a=&b= e mostra cenário-A vs cenário-B (visão anual: soma 4 trimestres).
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Play } from "lucide-react";
@@ -20,7 +19,7 @@ import { NativeSelect } from "@/components/ui/input";
 export default async function ApresentacaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ a?: string; b?: string; periodoId?: string }>;
+  searchParams: Promise<{ a?: string; b?: string }>;
 }) {
   const sp = await searchParams;
   const session = await auth();
@@ -28,49 +27,74 @@ export default async function ApresentacaoPage({
   const modoNome = await getModoNome();
   const dn = (n: string) => nomeOuIniciais(n, modoNome);
 
-  if (!sp.a || !sp.periodoId) {
+  if (!sp.a) {
     return <SeletorApresentacao escopo={escopo.ehSocioRestrito} />;
   }
 
-  const remuneracoesWhere = escopo.socioIdEscopo
-    ? { periodoId: sp.periodoId, socioId: escopo.socioIdEscopo }
-    : { periodoId: sp.periodoId };
-
-  const [cA, cB, periodo] = await Promise.all([
-    prisma.cenario.findUnique({
-      where: { id: sp.a },
-      include: {
-        premissa: true,
-        remuneracoes: { where: remuneracoesWhere, include: { socio: true } },
+  // Visão anual: carrega remunerações de TODOS os trimestres do ano do cenário.
+  const cenariosArgs = (id: string, ano: number) => ({
+    where: { id },
+    include: {
+      premissa: true,
+      remuneracoes: {
+        where: {
+          ...(escopo.socioIdEscopo ? { socioId: escopo.socioIdEscopo } : {}),
+          periodo: { tipo: "TRIMESTRE" as const, ano },
+        },
+        include: { socio: true, periodo: true },
+        orderBy: [{ periodo: { trimestre: "asc" as const } }, { total: "desc" as const }],
       },
-    }),
+    },
+  });
+
+  const cAMeta = await prisma.cenario.findUnique({ where: { id: sp.a }, select: { ano: true } });
+  if (!cAMeta) redirect("/apresentacao");
+
+  const [cA, cB] = await Promise.all([
+    prisma.cenario.findUnique(cenariosArgs(sp.a, cAMeta.ano)),
     sp.b && sp.b !== sp.a
-      ? prisma.cenario.findUnique({
-          where: { id: sp.b },
-          include: {
-            premissa: true,
-            remuneracoes: { where: remuneracoesWhere, include: { socio: true } },
-          },
-        })
+      ? (async () => {
+          const meta = await prisma.cenario.findUnique({ where: { id: sp.b! }, select: { ano: true } });
+          if (!meta) return null;
+          return prisma.cenario.findUnique(cenariosArgs(sp.b!, meta.ano));
+        })()
       : Promise.resolve(null),
-    prisma.periodo.findUnique({ where: { id: sp.periodoId } }),
   ]);
 
-  if (!cA || !periodo) redirect("/apresentacao");
+  if (!cA) redirect("/apresentacao");
   if (escopo.ehSocioRestrito && cA.status !== "APPLIED") redirect("/apresentacao");
 
-  const totalA = cA.remuneracoes.reduce((acc, r) => acc + r.total, 0);
-  const totalB = cB ? cB.remuneracoes.reduce((acc, r) => acc + r.total, 0) : 0;
-  const aplicarNomeRem = (rs: typeof cA.remuneracoes) =>
-    rs.map((r) => ({ ...r, socio: { ...r.socio, nome: dn(r.socio.nome) } }));
-  const topA = aplicarNomeRem([...cA.remuneracoes].sort((x, y) => y.total - x.total).slice(0, 10));
+  const periodoRotulo = `Anual ${cA.ano}`;
 
-  // Comparativo por sócio
+  // Agrega remunerações por sócio (soma 4 trimestres por sócio).
+  type AggSocio = { socioId: string; socio: { nome: string }; total: number };
+  function agregarPorSocio(rs: NonNullable<typeof cA>["remuneracoes"]): AggSocio[] {
+    const map = new Map<string, AggSocio>();
+    for (const r of rs) {
+      let cur = map.get(r.socioId);
+      if (!cur) {
+        cur = { socioId: r.socioId, socio: { nome: r.socio.nome }, total: 0 };
+        map.set(r.socioId, cur);
+      }
+      cur.total += r.total;
+    }
+    return [...map.values()];
+  }
+
+  const aggA = agregarPorSocio(cA.remuneracoes);
+  const aggB = cB ? agregarPorSocio(cB.remuneracoes) : [];
+  const totalA = aggA.reduce((acc, r) => acc + r.total, 0);
+  const totalB = aggB.reduce((acc, r) => acc + r.total, 0);
+  const aplicarNome = (rs: AggSocio[]) =>
+    rs.map((r) => ({ ...r, socio: { ...r.socio, nome: dn(r.socio.nome) } }));
+  const topA = aplicarNome([...aggA].sort((x, y) => y.total - x.total).slice(0, 10));
+
+  // Comparativo por sócio (anual)
   type Linha = { socioId: string; nome: string; a: number; b: number; diff: number; diffPct: number | null };
   const comparativo: Linha[] = cB
     ? (() => {
-        const mapA = new Map(cA.remuneracoes.map((r) => [r.socioId, r]));
-        const mapB = new Map(cB.remuneracoes.map((r) => [r.socioId, r]));
+        const mapA = new Map(aggA.map((r) => [r.socioId, r]));
+        const mapB = new Map(aggB.map((r) => [r.socioId, r]));
         const ids = Array.from(new Set([...mapA.keys(), ...mapB.keys()]));
         return ids
           .map((sid) => {
@@ -82,7 +106,8 @@ export default async function ApresentacaoPage({
             return {
               socioId: sid,
               nome: dn(nomeOriginal),
-              a: ta, b: tb,
+              a: ta,
+              b: tb,
               diff: tb - ta,
               diffPct: ta > 0 ? (tb - ta) / ta : null,
             };
@@ -96,14 +121,17 @@ export default async function ApresentacaoPage({
 
   // Slide 1 — Capa
   slides.push(
-    <SlideCapa key="capa" cenarioA={cA} cenarioB={cB} periodoRotulo={periodo.rotulo} />,
+    <SlideCapa key="capa" cenarioA={cA} cenarioB={cB} periodoRotulo={periodoRotulo} />,
   );
 
   // Slide 2 — Resumo executivo do A
   slides.push(
     <SlideResumo
-      key="resA" titulo={cA.nome} subtitulo={`${cA.modelo} · ${cA.premissa.nome}`}
-      total={totalA} numeroPacotes={cA.remuneracoes.length}
+      key="resA"
+      titulo={cA.nome}
+      subtitulo={`${cA.modelo} · ${cA.premissa.nome}`}
+      total={totalA}
+      numeroPacotes={aggA.length}
       cor="navy"
     />,
   );
@@ -114,7 +142,9 @@ export default async function ApresentacaoPage({
     const distrib = params.distribuicaoBlocoB;
     if (distrib === "POR_AREA" && params.pesosPorArea) {
       const areas = await prisma.areaPratica.findMany({
-        where: { ativa: true }, orderBy: [{ ordem: "asc" }], take: 50,
+        where: { ativa: true },
+        orderBy: [{ ordem: "asc" }],
+        take: 50,
       });
       slides.push(
         <SlidePesosArea
@@ -127,29 +157,33 @@ export default async function ApresentacaoPage({
   }
 
   // Slide 4 — Top sócios do A
-  slides.push(
-    <SlideTopSocios key="topA" titulo={`Top sócios — ${cA.nome}`} linhas={topA} />,
-  );
+  slides.push(<SlideTopSocios key="topA" titulo={`Top sócios — ${cA.nome}`} linhas={topA} />);
 
   // Slides do B (se existir)
   if (cB) {
     slides.push(
       <SlideResumo
-        key="resB" titulo={cB.nome} subtitulo={`${cB.modelo} · ${cB.premissa.nome}`}
-        total={totalB} numeroPacotes={cB.remuneracoes.length}
+        key="resB"
+        titulo={cB.nome}
+        subtitulo={`${cB.modelo} · ${cB.premissa.nome}`}
+        total={totalB}
+        numeroPacotes={aggB.length}
         cor="mint"
       />,
     );
-    const topB = aplicarNomeRem([...cB.remuneracoes].sort((x, y) => y.total - x.total).slice(0, 10));
+    const topB = aplicarNome([...aggB].sort((x, y) => y.total - x.total).slice(0, 10));
     slides.push(<SlideTopSocios key="topB" titulo={`Top sócios — ${cB.nome}`} linhas={topB} />);
 
     // Slide comparativo agregado
     slides.push(
       <SlideComparativoTotal
         key="cmpTotal"
-        nomeA={cA.nome} nomeB={cB.nome}
-        modeloA={cA.modelo} modeloB={cB.modelo}
-        totalA={totalA} totalB={totalB}
+        nomeA={cA.nome}
+        nomeB={cB.nome}
+        modeloA={cA.modelo}
+        modeloB={cB.modelo}
+        totalA={totalA}
+        totalB={totalB}
       />,
     );
 
@@ -158,13 +192,12 @@ export default async function ApresentacaoPage({
   }
 
   // Slide final — fonte de dados
-  slides.push(<SlideFonte key="fim" periodo={periodo.rotulo} />);
+  slides.push(<SlideFonte key="fim" periodo={periodoRotulo} />);
 
-  // Voltar reabre /simulacao mantendo A/B/período — fluxo natural pós-apresentação.
+  // Voltar reabre /simulacao mantendo A/B — fluxo natural pós-apresentação.
   const voltarSp = new URLSearchParams();
   voltarSp.set("a", cA.id);
   if (cB) voltarSp.set("b", cB.id);
-  voltarSp.set("periodoId", periodo.id);
   const voltarHref = `/simulacao?${voltarSp.toString()}`;
 
   return (
@@ -236,11 +269,11 @@ function SlideResumo({
       <p className="mt-2 text-lg text-peri-200">{subtitulo}</p>
       <div className="mt-12 grid grid-cols-2 gap-12">
         <div>
-          <div className="text-xs uppercase tracking-wider text-peri-200">Total distribuído</div>
+          <div className="text-xs uppercase tracking-wider text-peri-200">Total anual</div>
           <div className={`mt-2 text-5xl md:text-6xl font-bold tabular-nums ${accent}`}>{brl(total, true)}</div>
         </div>
         <div>
-          <div className="text-xs uppercase tracking-wider text-peri-200">Pacotes calculados</div>
+          <div className="text-xs uppercase tracking-wider text-peri-200">Sócios</div>
           <div className={`mt-2 text-5xl md:text-6xl font-bold tabular-nums ${accent}`}>{numeroPacotes}</div>
         </div>
       </div>
@@ -314,7 +347,7 @@ function SlideTopSocios({
   return (
     <div className="h-full w-full flex flex-col px-16 py-16">
       <h2 className="text-3xl font-bold tracking-tight">{titulo}</h2>
-      <p className="text-sm text-peri-200 mt-1">por valor total no período</p>
+      <p className="text-sm text-peri-200 mt-1">por valor total anual</p>
       <div className="mt-8 flex-1 flex flex-col gap-3">
         {linhas.map((l) => (
           <div key={l.socio.nome} className="grid grid-cols-[1fr_auto] items-center gap-4">
@@ -380,7 +413,7 @@ function SlideTopDiffs({ linhas }: { linhas: Array<{ nome: string; a: number; b:
   return (
     <div className="h-full w-full flex flex-col px-16 py-16">
       <h2 className="text-3xl font-bold tracking-tight">Maiores impactos por sócio</h2>
-      <p className="text-sm text-peri-200 mt-1">B − A, ordenado por |Δ|</p>
+      <p className="text-sm text-peri-200 mt-1">B − A anual, ordenado por |Δ|</p>
       <div className="mt-8 grid grid-cols-[1fr_auto_auto_auto] gap-x-6 gap-y-2 text-sm">
         <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50">Sócio</div>
         <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50 text-right">A</div>
@@ -413,9 +446,7 @@ function SlideFonte({ periodo }: { periodo: string }) {
         <span className="block h-2 w-8 rounded-sm bg-mint-400" />
       </div>
       <h2 className="mt-6 text-3xl font-bold">Obrigado.</h2>
-      <p className="mt-3 text-peri-200">
-        Período: {periodo}
-      </p>
+      <p className="mt-3 text-peri-200">{periodo}</p>
       <p className="mt-12 text-xs text-peri-200/60">
         WRE Consultoria — Pessoas, Governança e Incentivos
       </p>
@@ -424,29 +455,23 @@ function SlideFonte({ periodo }: { periodo: string }) {
 }
 
 // ============================================================================
-// Seletor inicial (quando não há ?a&periodoId)
+// Seletor inicial (quando não há ?a)
 // ============================================================================
 
 async function SeletorApresentacao({ escopo }: { escopo: boolean }) {
-  const [cenarios, periodos] = await Promise.all([
-    prisma.cenario.findMany({
-      where: escopo ? { status: "APPLIED" } : {},
-      orderBy: [{ criadoEm: "desc" }],
-      include: { premissa: { select: { nome: true } } },
-      take: 100,
-    }),
-    prisma.periodo.findMany({
-      orderBy: [{ ano: "desc" }, { trimestre: "asc" }],
-      take: 50,
-    }),
-  ]);
+  const cenarios = await prisma.cenario.findMany({
+    where: escopo ? { status: "APPLIED" } : {},
+    orderBy: [{ criadoEm: "desc" }],
+    include: { premissa: { select: { nome: true } } },
+    take: 100,
+  });
 
   return (
     <main className="mx-auto max-w-3xl px-4 sm:px-6 py-8 space-y-6">
       <PageHeader
         breadcrumb={[{ label: "Simulação", href: "/simulacao" }, { label: "Apresentação" }]}
         title="Modo apresentação"
-        description="Selecione 1 cenário (apresentação simples) ou 2 (comparativo) e o período."
+        description="Selecione 1 cenário (apresentação simples) ou 2 (comparativo). A apresentação mostra a visão anual."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href="/simulacao">← Voltar à Simulação</Link>
@@ -456,7 +481,7 @@ async function SeletorApresentacao({ escopo }: { escopo: boolean }) {
 
       <Card>
         <form action="/apresentacao" method="get" className="p-5 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Cenário A" htmlFor="apr-a" required>
               <NativeSelect id="apr-a" name="a" required defaultValue="">
                 <option value="" disabled>Escolha…</option>
@@ -470,14 +495,6 @@ async function SeletorApresentacao({ escopo }: { escopo: boolean }) {
                 <option value="">— sem comparação —</option>
                 {cenarios.map((c) => (
                   <option key={c.id} value={c.id}>{c.nome} ({c.modelo})</option>
-                ))}
-              </NativeSelect>
-            </Field>
-            <Field label="Período" htmlFor="apr-p" required>
-              <NativeSelect id="apr-p" name="periodoId" required defaultValue="">
-                <option value="" disabled>Período…</option>
-                {periodos.map((p) => (
-                  <option key={p.id} value={p.id}>{p.rotulo}</option>
                 ))}
               </NativeSelect>
             </Field>

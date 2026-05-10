@@ -281,6 +281,50 @@ export async function calcularCenario(args: {
   return resultado;
 }
 
+/**
+ * Calcula o cenário para todos os 4 trimestres do seu ano em sequência.
+ * Loop sobre `Periodo.tipo=TRIMESTRE` ordenado por trimestre.
+ * Trimestres sem `ResultadoPeriodo` são silenciosamente ignorados (engine
+ * lança ApiError 400 que capturamos para não bloquear os demais).
+ */
+export async function calcularCenarioAnual(args: { cenarioId: string }): Promise<{
+  trimestresOk: number[];
+  trimestresSemDados: number[];
+}> {
+  const cenario = await prisma.cenario.findUnique({
+    where: { id: args.cenarioId },
+    select: { ano: true, status: true },
+  });
+  if (!cenario) throw new ApiError("Cenário não encontrado", 404);
+  if (cenario.status !== "DRAFT") {
+    throw new ApiError(
+      `Apenas cenários em rascunho podem ser calculados (status atual: ${cenario.status}).`,
+      409,
+    );
+  }
+  // eslint-disable-next-line no-restricted-syntax -- max 4 trimestres por ano (limite natural)
+  const trims = await prisma.periodo.findMany({
+    where: { ano: cenario.ano, tipo: "TRIMESTRE" },
+    orderBy: { trimestre: "asc" },
+    select: { id: true, trimestre: true },
+  });
+  const trimestresOk: number[] = [];
+  const trimestresSemDados: number[] = [];
+  for (const t of trims) {
+    try {
+      await calcularCenario({ cenarioId: args.cenarioId, periodoId: t.id });
+      trimestresOk.push(t.trimestre ?? 0);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 400) {
+        trimestresSemDados.push(t.trimestre ?? 0);
+      } else {
+        throw e;
+      }
+    }
+  }
+  return { trimestresOk, trimestresSemDados };
+}
+
 // ============================================================================
 // Criar cenário com classificações default
 // ============================================================================

@@ -12,7 +12,6 @@ import { SubmitButton } from "@/components/ui/submit-button";
 export interface ColunaEmptyProps {
   slot: "a" | "b";
   outroCenarioId: string;
-  periodoId: string;
   /** Se passada, oferece criar cenário do modelo correspondente com 1 clique. */
   modeloSugerido?: "ATUAL" | "NOVO";
   /** Premissa default daquele modelo (caso ofereça criar). */
@@ -31,7 +30,6 @@ const ROTULOS = {
 export function ColunaEmpty({
   slot,
   outroCenarioId,
-  periodoId,
   modeloSugerido,
   premissaDefaultId,
   premissaDefaultNome,
@@ -47,7 +45,6 @@ export function ColunaEmpty({
   // Link pra abrir drawer (escolher cenário existente)
   const drawerSp = new URLSearchParams();
   if (outroCenarioId) drawerSp.set(slot === "a" ? "b" : "a", outroCenarioId);
-  if (periodoId) drawerSp.set("periodoId", periodoId);
   drawerSp.set("drawer", "1");
   const drawerHref = `/simulacao?${drawerSp.toString()}`;
 
@@ -110,7 +107,6 @@ export function ColunaEmpty({
             <input type="hidden" name="premissaId" value={premissaDefaultId!} />
             <input type="hidden" name="slot" value={slot} />
             <input type="hidden" name="outroCenarioId" value={outroCenarioId} />
-            <input type="hidden" name="periodoId" value={periodoId} />
             <SubmitButton variant="primary" size="sm">
               <Sparkles className="h-3.5 w-3.5" />
               Criar cenário {modeloSugerido === "ATUAL" ? "Atual" : "Novo"}
@@ -136,7 +132,6 @@ export function ColunaEmpty({
           <input type="hidden" name="premissaId" value={premissaOutroId!} />
           <input type="hidden" name="slot" value={slot} />
           <input type="hidden" name="outroCenarioId" value={outroCenarioId} />
-          <input type="hidden" name="periodoId" value={periodoId} />
           <SubmitButton variant="ghost" size="sm" className="text-xs text-neutral-500 hover:text-peri-700">
             ou criar cenário {modeloOutro === "ATUAL" ? "Atual" : "Novo"} aqui
           </SubmitButton>

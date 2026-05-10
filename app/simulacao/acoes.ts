@@ -11,7 +11,7 @@ import { flashError, flashSuccess } from "@/lib/flash";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 import {
-  calcularCenario,
+  calcularCenarioAnual,
   criarCenarioComDefaults,
   atualizarParametrosOverride,
   salvarOverrideComoPremissa,
@@ -39,7 +39,6 @@ export async function criarCenarioAction(formData: FormData) {
   const premissaId = String(formData.get("premissaId") ?? "");
   const slot = String(formData.get("slot") ?? "a") as "a" | "b";
   const outroSlot = String(formData.get("outroCenarioId") ?? "");
-  const periodoId = String(formData.get("periodoId") ?? "");
   if (!nome || !premissaId) {
     await flashError("Nome e premissa são obrigatórios.");
     return;
@@ -55,17 +54,17 @@ export async function criarCenarioAction(formData: FormData) {
       meta: { nome, ano, modelo, slot },
     });
 
-    // Auto-calcular se houver período com dados — UX fluida: 1 clique
-    // do empty state já entrega cenário calculado, pronto pra comparar.
+    // Auto-calcular os 4 trimestres do ano — UX fluida: 1 clique do empty
+    // state já entrega cenário calculado. Trimestres sem ResultadoPeriodo
+    // são silenciosamente ignorados pelo serviço.
     let mensagem = `Cenário "${nome}" criado e aberto na coluna ${slot.toUpperCase()}.`;
-    if (periodoId) {
-      try {
-        await calcularCenario({ cenarioId: c.id, periodoId });
+    try {
+      const r = await calcularCenarioAnual({ cenarioId: c.id });
+      if (r.trimestresOk.length > 0) {
         mensagem = `Cenário "${nome}" criado e calculado. Veja a comparação.`;
-      } catch {
-        // Falha no cálculo automático não bloqueia — usuário vê cenário sem
-        // valores e pode clicar "Calcular" manualmente. Mensagem normal.
       }
+    } catch {
+      // Falha no cálculo automático não bloqueia.
     }
     await flashSuccess(mensagem);
     const params = new URLSearchParams();
@@ -76,7 +75,6 @@ export async function criarCenarioAction(formData: FormData) {
       if (outroSlot) params.set("a", outroSlot);
       params.set("b", c.id);
     }
-    if (periodoId) params.set("periodoId", periodoId);
     redirect(`/simulacao?${params.toString()}`);
   } catch (e) {
     if (e instanceof Error && e.message.includes("NEXT_REDIRECT")) throw e;
@@ -90,16 +88,23 @@ export async function calcularAction(formData: FormData) {
   const escopo = escopoDe(session?.user as SessionUser | undefined);
   if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
-  const periodoId = String(formData.get("periodoId"));
   try {
-    await calcularCenario({ cenarioId, periodoId });
+    const r = await calcularCenarioAnual({ cenarioId });
     await logAudit({
       usuarioId: session?.user?.id,
       acao: "cenario.calcular",
       recurso: `Cenario:${cenarioId}`,
-      meta: { periodoId },
+      meta: { trimestresOk: r.trimestresOk, trimestresSemDados: r.trimestresSemDados },
     });
-    await flashSuccess("Pacotes recalculados.");
+    if (r.trimestresOk.length === 0) {
+      await flashError("Nenhum trimestre tem ResultadoPeriodo importado — importe a DRE primeiro.");
+    } else if (r.trimestresSemDados.length > 0) {
+      await flashSuccess(
+        `Calculado ${r.trimestresOk.length} trimestre(s). Sem dados: ${r.trimestresSemDados.map((t) => t + "T").join(", ")}.`,
+      );
+    } else {
+      await flashSuccess("Pacotes recalculados (4 trimestres).");
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao calcular";
     await flashError(`Falha ao calcular: ${msg}`);

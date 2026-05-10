@@ -19,13 +19,6 @@ export interface PremissaOption {
   modelo: CenarioModelo;
 }
 
-export interface PeriodoOption {
-  id: string;
-  rotulo: string;
-  tipo: "TRIMESTRE" | "ANO";
-  temDados: boolean;
-}
-
 export interface AreaOption {
   codigo: string;
   nome: string;
@@ -59,18 +52,25 @@ export interface TraceItem {
   valor?: number;
 }
 
-/** Linha agregada da tabela comparativa. */
+export type Trimestre = 1 | 2 | 3 | 4;
+
+export interface DetalheTrimestre {
+  total: number;
+  trace: TraceItem[];
+  alertas: string[];
+}
+
+/** Linha agregada da tabela comparativa — totais anuais com breakdown por trim. */
 export interface LinhaComparativa {
   socioId: string;
   nome: string;
   isFundador: boolean;
+  /** Soma dos trimestres (anual). null se sócio não tem nenhuma remuneração no cenário. */
   totalA: number | null;
   totalB: number | null;
   diff: number; // B − A; sinal positivo = ganhou no novo
   diffPct: number | null;
-  /** Trace + alertas de cada lado (vazio se sócio não estiver naquele cenário). */
-  traceA: TraceItem[];
-  traceB: TraceItem[];
-  alertasA: string[];
-  alertasB: string[];
+  /** Detalhe por trimestre (1..4). Trimestres sem cálculo ficam ausentes. */
+  porTrimestreA: Partial<Record<Trimestre, DetalheTrimestre>>;
+  porTrimestreB: Partial<Record<Trimestre, DetalheTrimestre>>;
 }

@@ -27,7 +27,6 @@ export function DrawerCenarios({
   premissas,
   aId,
   bId,
-  periodoId,
   podeMutar,
   defaultOpen,
 }: {
@@ -35,7 +34,6 @@ export function DrawerCenarios({
   premissas: PremissaOption[];
   aId: string;
   bId: string;
-  periodoId: string;
   podeMutar: boolean;
   defaultOpen: boolean;
 }) {
@@ -68,7 +66,6 @@ export function DrawerCenarios({
       if (aId) params.set("a", aId);
       params.set("b", cenarioId);
     }
-    if (periodoId) params.set("periodoId", periodoId);
     router.push(`/simulacao?${params.toString()}`);
     setOpen(false);
   }
@@ -216,7 +213,6 @@ export function DrawerCenarios({
             </DialogDescription>
           </DialogHeader>
           <form action={criarCenarioAction} className="space-y-4">
-            <input type="hidden" name="periodoId" value={periodoId} />
             <input type="hidden" name="outroCenarioId" value={aId || bId} />
             <Field label="Nome" htmlFor="cn-nome" required>
               <Input id="cn-nome" name="nome" required maxLength={120} placeholder="ex: NOVO 2026 — base política v1" autoFocus />

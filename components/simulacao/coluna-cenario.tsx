@@ -22,7 +22,6 @@ export function ColunaCenario({
   slot,
   cenario,
   outroCenarioId,
-  periodoId,
   areas,
   podeMutar,
   modoNome,
@@ -30,7 +29,6 @@ export function ColunaCenario({
   slot: "a" | "b";
   cenario: CenarioCompleto;
   outroCenarioId: string;
-  periodoId: string;
   areas: AreaOption[];
   podeMutar: boolean;
   modoNome: "completo" | "iniciais";
@@ -38,13 +36,18 @@ export function ColunaCenario({
   void modoNome; // pode ser usado em futuras adições
   const isDraft = cenario.status === "DRAFT";
   const editavel = podeMutar && isDraft;
-  // Consolidado: 1 loop para somar total, contar erros/warns e agregar valoresPorEtapa.
+  // Consolidado: 1 loop para somar total anual (Σ trimestres), contar
+  // erros/warns e agregar valoresPorEtapa.
   let totalPacote = 0;
   let errosCount = 0;
   let warnsCount = 0;
   const valoresPorEtapa: Record<string, number> = {};
+  const sociosUnicos = new Set<string>();
+  const trimsCalculados = new Set<number>();
   for (const r of cenario.remuneracoes) {
     totalPacote += r.total;
+    sociosUnicos.add(r.socioId);
+    if (r.periodo.trimestre) trimsCalculados.add(r.periodo.trimestre);
     const alertas = (r.alertas as string[] | null) ?? [];
     for (const a of alertas) {
       if (a.includes("[ERROR]")) errosCount++;
@@ -59,21 +62,29 @@ export function ColunaCenario({
     }
   }
   const jaCalculou = cenario.remuneracoes.length > 0;
-  const podePublicar = editavel && jaCalculou && errosCount === 0;
+  const cobertura4Trims = trimsCalculados.size === 4;
+  const podePublicar = editavel && cobertura4Trims && errosCount === 0;
   const dirty = cenario.parametrosDirty;
 
   // Stepper
+  const calcDescricao = dirty
+    ? "params alterados"
+    : !jaCalculou
+    ? "pendente"
+    : cobertura4Trims
+    ? "4 trimestres ok"
+    : `${trimsCalculados.size}/4 trimestres`;
   const steps: Step[] = [
     { label: "Classificar", description: `${cenario.classificacoes.length} sócios`, state: "done" },
     {
       label: "Calcular",
-      description: dirty ? "params alterados" : jaCalculou ? "ok" : "pendente",
-      state: jaCalculou && !dirty ? "done" : "current",
+      description: calcDescricao,
+      state: cobertura4Trims && !dirty ? "done" : "current",
     },
     {
       label: "Revisar",
       description: errosCount > 0 ? `${errosCount} erro(s)` : "alertas ok",
-      state: jaCalculou ? (errosCount > 0 ? "current" : "done") : "pending",
+      state: cobertura4Trims ? (errosCount > 0 ? "current" : "done") : "pending",
     },
     {
       label: "Publicar",
@@ -81,7 +92,7 @@ export function ColunaCenario({
       state:
         cenario.status === "APPLIED"
           ? "done"
-          : jaCalculou && errosCount === 0
+          : cobertura4Trims && errosCount === 0
           ? "current"
           : "pending",
     },
@@ -91,7 +102,6 @@ export function ColunaCenario({
   const trocarHref = (() => {
     const sp = new URLSearchParams();
     if (outroCenarioId) sp.set(slot === "a" ? "b" : "a", outroCenarioId);
-    if (periodoId) sp.set("periodoId", periodoId);
     sp.set("drawer", "1");
     return `/simulacao?${sp.toString()}`;
   })();
@@ -140,14 +150,34 @@ export function ColunaCenario({
                   nome: cenario.nome,
                   modelo: cenario.modelo as "ATUAL" | "NOVO",
                   ano: cenario.ano,
-                  periodoRotulo: cenario.remuneracoes[0]?.periodo.rotulo ?? "—",
+                  periodoRotulo: `Anual ${cenario.ano}`,
                   premissaNome: cenario.premissa.nome,
-                  remuneracoes: cenario.remuneracoes.map((r) => ({
-                    socio: { nome: r.socio.nome, isFundador: r.socio.isFundador },
-                    total: r.total,
-                    trace: r.trace,
-                    alertas: r.alertas,
-                  })),
+                  // Agrega 4 trimestres por sócio para a narrativa: 1 entrada por sócio
+                  // com total anual, trace concatenado e alertas unificados.
+                  remuneracoes: (() => {
+                    const agg = new Map<
+                      string,
+                      { socio: { nome: string; isFundador: boolean }; total: number; trace: unknown[]; alertas: string[] }
+                    >();
+                    for (const r of cenario.remuneracoes) {
+                      let cur = agg.get(r.socioId);
+                      if (!cur) {
+                        cur = {
+                          socio: { nome: r.socio.nome, isFundador: r.socio.isFundador },
+                          total: 0,
+                          trace: [],
+                          alertas: [],
+                        };
+                        agg.set(r.socioId, cur);
+                      }
+                      cur.total += r.total;
+                      const tr = (r.trace as unknown[] | null) ?? [];
+                      cur.trace.push(...tr);
+                      const al = (r.alertas as string[] | null) ?? [];
+                      cur.alertas.push(...al);
+                    }
+                    return [...agg.values()];
+                  })(),
                 })}
               />
             )}
@@ -168,8 +198,8 @@ export function ColunaCenario({
 
         {/* KPIs */}
         <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-neutral-100">
-          <Kpi label="Total" valor={jaCalculou ? brl(totalPacote, true) : "—"} />
-          <Kpi label="Pacotes" valor={String(cenario.remuneracoes.length)} />
+          <Kpi label="Total anual" valor={jaCalculou ? brl(totalPacote, true) : "—"} />
+          <Kpi label="Sócios" valor={String(sociosUnicos.size)} />
           <Kpi
             label="Alertas"
             valor={
@@ -210,22 +240,18 @@ export function ColunaCenario({
           <>
             <form action={calcularAction}>
               <input type="hidden" name="cenarioId" value={cenario.id} />
-              <input type="hidden" name="periodoId" value={periodoId} />
               <Tooltip
                 side="top"
                 content={
-                  !periodoId
-                    ? "Selecione um período no topo para calcular."
-                    : jaCalculou
-                    ? "Roda o engine DSF com os parâmetros atuais (override ou premissa) e regrava os pacotes por sócio para o período selecionado."
-                    : "Roda o engine DSF pela primeira vez: calcula os pacotes por sócio para o período selecionado usando os parâmetros do cenário."
+                  jaCalculou
+                    ? "Roda o engine DSF nos 4 trimestres do ano com os parâmetros atuais (override ou premissa) e regrava os pacotes por sócio."
+                    : "Calcula os 4 trimestres do ano em sequência usando os parâmetros do cenário. Trimestres sem dados de DRE são ignorados."
                 }
               >
                 <Button
                   type="submit"
                   variant={dirty ? "primary" : "secondary"}
                   size="sm"
-                  disabled={!periodoId}
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   {jaCalculou ? "Recalcular" : "Calcular"}
@@ -256,7 +282,9 @@ export function ColunaCenario({
                 side="top"
                 content={
                   !jaCalculou
-                    ? "Calcule pelo menos uma vez antes de publicar."
+                    ? "Calcule antes de publicar."
+                    : !cobertura4Trims
+                    ? `Calcule todos os 4 trimestres (atual: ${trimsCalculados.size}/4) antes de publicar.`
                     : errosCount > 0
                     ? `Resolva os ${errosCount} alerta(s) ERROR antes de publicar.`
                     : "Congela o cenário como snapshot imutável (status APPLIED). Outros cenários publicados do mesmo modelo+ano serão arquivados automaticamente."
