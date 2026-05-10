@@ -53,17 +53,20 @@ export default async function LoginPage({
                 await signIn("credentials", {
                   email: formData.get("email"),
                   password: formData.get("password"),
-                  redirectTo: "/",
+                  // Auth.js v5 beta + Next 16: `redirectTo` retorna response
+                  // que o cliente do server action não consegue interpretar
+                  // (cai no <ErrorBoundary>: "An unexpected response..."). Padrão
+                  // estável: redirect:false + redirect() do next/navigation.
+                  redirect: false,
                 });
               } catch (e) {
-                // signIn faz redirect via NEXT_REDIRECT — re-throw para o Next
-                // tratar normalmente. Apenas AuthError indica falha real.
                 if (e instanceof AuthError) {
                   const code = (e.type ?? "default") as keyof typeof ERROS;
                   redirect(`/login?erro=${encodeURIComponent(ERROS[code] ?? ERROS.default)}`);
                 }
                 throw e;
               }
+              redirect("/");
             }}
             className="p-6 space-y-3"
           >
