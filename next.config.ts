@@ -30,7 +30,11 @@ function buildCSP(): string {
     "form-action": ["'self'"],
     "object-src": ["'none'"],
     "worker-src": ["'self'", "blob:"],
-    "upgrade-insecure-requests": [],
+    // Em prod (HTTPS-only), força upgrade de qualquer subrequest HTTP. Em dev
+    // (HTTP localhost) esta diretiva quebra navegação após redirects de
+    // server actions — browser tenta upgrade para https://localhost e falha
+    // SSL. Sintoma: "This page couldn't load" após trocar senha, login etc.
+    ...(isDev ? {} : { "upgrade-insecure-requests": [] }),
   };
   return Object.entries(directives)
     .map(([k, v]) => (v.length === 0 ? k : `${k} ${v.join(" ")}`))

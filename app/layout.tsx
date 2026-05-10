@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { signOut, auth } from "@/auth";
 import { escopoDe } from "@/lib/auth/escopo";
@@ -24,7 +25,10 @@ async function alternarModoNomeAction() {
 
 async function signOutAction() {
   "use server";
-  await signOut({ redirectTo: "/login" });
+  // signOut + redirectTo gera response inesperado no client de server action
+  // (Auth.js v5 beta + Next 16). Separar é o padrão estável.
+  await signOut({ redirect: false });
+  redirect("/login");
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

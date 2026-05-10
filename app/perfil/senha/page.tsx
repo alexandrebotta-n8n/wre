@@ -3,71 +3,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { auth, signOut } from "@/auth";
-import { logAudit } from "@/lib/audit";
-import { flashError } from "@/lib/flash";
+import { auth } from "@/auth";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Logomark } from "@/components/shell/logomark";
+import { trocarSenhaAction } from "./acoes";
 
 const SENHA_MIN = 8;
-
-async function trocarSenhaAction(formData: FormData) {
-  "use server";
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const atual = String(formData.get("senhaAtual") ?? "");
-  const nova = String(formData.get("senhaNova") ?? "");
-  const conf = String(formData.get("senhaConfirma") ?? "");
-
-  if (nova !== conf) {
-    await flashError("As senhas não conferem.");
-    redirect("/perfil/senha");
-  }
-  if (nova.length < SENHA_MIN) {
-    await flashError(`Senha muito curta (mín. ${SENHA_MIN} caracteres).`);
-    redirect("/perfil/senha");
-  }
-  if (nova === atual) {
-    await flashError("A nova senha deve ser diferente da atual.");
-    redirect("/perfil/senha");
-  }
-
-  const u = await prisma.usuario.findUnique({ where: { id: session.user.id } });
-  if (!u || !u.senhaHash) {
-    await flashError("Conta sem senha definida — peça ao admin.");
-    redirect("/perfil/senha");
-  }
-  const ok = await bcrypt.compare(atual, u.senhaHash);
-  if (!ok) {
-    await logAudit({
-      usuarioId: u.id,
-      acao: "perfil.senha.falhou",
-      recurso: `Usuario:${u.id}`,
-      meta: { motivo: "senha-atual-invalida" },
-    });
-    await flashError("Senha atual incorreta.");
-    redirect("/perfil/senha");
-  }
-
-  const novoHash = await bcrypt.hash(nova, 10);
-  await prisma.usuario.update({
-    where: { id: u.id },
-    data: { senhaHash: novoHash, senhaProvisoria: false },
-  });
-  await logAudit({
-    usuarioId: u.id,
-    acao: "perfil.senha.trocada",
-    recurso: `Usuario:${u.id}`,
-  });
-
-  await signOut({ redirectTo: "/login?msg=senha-trocada" });
-}
 
 export default async function PerfilSenhaPage() {
   const session = await auth();
