@@ -43,6 +43,7 @@ interface ClassificacaoComSocio extends ClassificacaoSocio {
 
 function classificacoesParaSocioInput(
   classificacoes: ClassificacaoComSocio[],
+  originacaoEfetivaPorSocio: Map<string, number>,
 ): SocioInput[] {
   return classificacoes.map((c) => ({
     id: c.socioId,
@@ -52,12 +53,53 @@ function classificacoesParaSocioInput(
     unidadeCodigo: c.unidade?.codigo,
     percentualQuotas: c.percentualQuotas,
     originacaoEsperadaAnual: c.originacaoEsperada,
+    originacaoEfetiva: originacaoEfetivaPorSocio.get(c.socioId) ?? 0,
     pesoBlocoB: c.pesoBlocoB ?? undefined,
     areaPraticaCodigo: c.socio.areaPratica?.codigo,
     nivelCargo: (c.nivelCargoOverride ?? c.socio.nivelCargo) as NivelCargo | undefined,
     faixaSalarial: (c.faixaSalarialOverride ?? c.socio.faixaSalarial) as FaixaSalarial | undefined,
     isFundador: c.socio.isFundador,
   }));
+}
+
+/**
+ * Carrega originação efetiva por sócio para o ano do cenário, aplicando
+ * o override do cenário quando houver. Para período TRIMESTRE, divide o
+ * valor anual por 4 (assumindo distribuição uniforme — coerente com o que
+ * carregarResultados faz para LL).
+ */
+async function carregarOriginacaoEfetiva(
+  ano: number,
+  periodoTipo: "TRIMESTRE" | "ANO",
+  override: Record<string, number> | null,
+): Promise<Map<string, number>> {
+  // Soma OriginacaoPeriodo do ano (todos os trimestres) por sócio
+  const trimestres = await prisma.periodo.findMany({
+    where: { tipo: "TRIMESTRE", ano },
+    take: 4,
+  });
+  const trimIds = trimestres.map((t) => t.id);
+  const linhas = trimIds.length > 0
+    ? await prisma.originacaoPeriodo.findMany({
+        where: { periodoId: { in: trimIds } },
+        take: 1000,
+      })
+    : [];
+  const anualPorSocio = new Map<string, number>();
+  for (const l of linhas) {
+    anualPorSocio.set(l.socioId, (anualPorSocio.get(l.socioId) ?? 0) + l.valor);
+  }
+  // Override sobrescreve total anual do sócio
+  if (override) {
+    for (const [socioId, valor] of Object.entries(override)) {
+      anualPorSocio.set(socioId, valor);
+    }
+  }
+  // Se cálculo é trimestral, divide por 4
+  if (periodoTipo === "TRIMESTRE") {
+    for (const [k, v] of anualPorSocio) anualPorSocio.set(k, v / 4);
+  }
+  return anualPorSocio;
 }
 
 /**
@@ -202,7 +244,15 @@ export async function calcularCenario(args: {
   if (resultados.length === 0) {
     throw new ApiError(`Nenhum ResultadoPeriodo para período ${periodo.rotulo}`, 400);
   }
-  const socios = classificacoesParaSocioInput(cenario.classificacoes);
+  const originacaoOverride = (cenario.originacaoOverride ?? null) as
+    | Record<string, number>
+    | null;
+  const originacaoEfetiva = await carregarOriginacaoEfetiva(
+    cenario.ano,
+    periodo.tipo as "TRIMESTRE" | "ANO",
+    originacaoOverride,
+  );
+  const socios = classificacoesParaSocioInput(cenario.classificacoes, originacaoEfetiva);
 
   // Override de parâmetros do cenário tem prioridade sobre os da Premissa.
   // Permite editar Blocos/Pool/Chave/etc inline na simulação sem afetar
@@ -250,6 +300,9 @@ export async function calcularCenario(args: {
       proRataMinMeses: Number(params.proRataMinMeses ?? 3),
       distribuicaoBlocoB: (params.distribuicaoBlocoB as PremissasModeloNovo["distribuicaoBlocoB"]) ?? "UNIFORME",
       pesosPorArea: params.pesosPorArea as PremissasModeloNovo["pesosPorArea"],
+      proLaboreMensal: params.proLaboreMensal != null ? Number(params.proLaboreMensal) : undefined,
+      taxaComissaoOriginacao: params.taxaComissaoOriginacao != null ? Number(params.taxaComissaoOriginacao) : undefined,
+      pesoCategoria: params.pesoCategoria as PremissasModeloNovo["pesoCategoria"],
       tabelaSalarial,
     };
     resultado = calcularModeloNovo({
@@ -382,6 +435,11 @@ export async function criarCenarioComDefaults(args: {
   });
   const unidadeMatriz = await prisma.unidade.findFirst({ where: { isMatriz: true } });
 
+  // Sets para definir unidade default da classificação:
+  // - Modelo NOVO: usa unidadeLideradaId (cadastro permanente do sócio) quando líder
+  // - Modelo ATUAL: usa matriz consolidada
+  const PUBLICOS_LIDER_NOVO: Publico[] = ["SOCIO_CAPITAL_LIDER_UNIDADE", "LIDER_UNIDADE_NON_EQUITY"];
+
   const cenario = await prisma.cenario.create({
     data: {
       nome: args.nome,
@@ -391,13 +449,26 @@ export async function criarCenarioComDefaults(args: {
       premissaId: args.premissaId,
       criadoPorId: args.criadoPorId,
       classificacoes: {
-        create: sociosAtivos.map((s) => ({
-          socioId: s.id,
-          publico: defaultPublico(s, args.modelo),
-          unidadeId: unidadeMatriz?.id,
-          percentualQuotas: s.percentualQuotasDefault,
-          originacaoEsperada: 0,
-        })),
+        create: sociosAtivos.map((s) => {
+          // No modelo NOVO, herda a classificação default permanente do sócio.
+          // No modelo ATUAL, mantém a heurística antiga (FUNDADOR/Líder Técnico/etc).
+          const publico =
+            args.modelo === "NOVO"
+              ? (s.publicoDefault as Publico)
+              : defaultPublico(s, args.modelo);
+          // Unidade: se for líder no NOVO, usa a unidade liderada; senão usa matriz.
+          const unidadeId =
+            args.modelo === "NOVO" && PUBLICOS_LIDER_NOVO.includes(publico) && s.unidadeLideradaId
+              ? s.unidadeLideradaId
+              : unidadeMatriz?.id;
+          return {
+            socioId: s.id,
+            publico,
+            unidadeId,
+            percentualQuotas: s.percentualQuotasDefault,
+            originacaoEsperada: 0,
+          };
+        }),
       },
     },
   });
@@ -434,6 +505,8 @@ export async function clonarCenarioComoRascunho(args: {
       modelo: src.modelo,
       premissaId: src.premissaId,
       parametrosOverride: (src.parametrosOverride ?? undefined) as never,
+      resultadosOverride: (src.resultadosOverride ?? undefined) as never,
+      originacaoOverride: (src.originacaoOverride ?? undefined) as never,
       status: "DRAFT",
       parametrosDirty: false,
       versao: 1,
@@ -576,6 +649,42 @@ export async function atualizarResultadosOverride(args: {
     where: { id: args.cenarioId },
     data: {
       resultadosOverride: final as never,
+      parametrosDirty: true,
+      versao: { increment: 1 },
+    },
+  });
+}
+
+/**
+ * Persiste o override do valor anual de originação por sócio.
+ * `originacaoOverride` é `{ "<socioId>": valorAnualBRL }`.
+ * Passar `null` ou `{}` limpa.
+ */
+export async function atualizarOriginacaoOverride(args: {
+  cenarioId: string;
+  originacaoOverride: Record<string, number> | null;
+}): Promise<void> {
+  const cenario = await prisma.cenario.findUnique({
+    where: { id: args.cenarioId },
+    select: { status: true },
+  });
+  if (!cenario) throw new ApiError("Cenário não encontrado", 404);
+  if (cenario.status !== "DRAFT") {
+    throw new ApiError("Apenas cenários em rascunho podem ter originação editada", 409);
+  }
+  const ov = args.originacaoOverride;
+  let final: Record<string, number> | null = null;
+  if (ov && Object.keys(ov).length > 0) {
+    const limpo: Record<string, number> = {};
+    for (const [k, v] of Object.entries(ov)) {
+      if (typeof v === "number" && isFinite(v) && v >= 0) limpo[k] = v;
+    }
+    final = Object.keys(limpo).length > 0 ? limpo : null;
+  }
+  await prisma.cenario.update({
+    where: { id: args.cenarioId },
+    data: {
+      originacaoOverride: final as never,
       parametrosDirty: true,
       versao: { increment: 1 },
     },

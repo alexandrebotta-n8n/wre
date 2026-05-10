@@ -21,7 +21,7 @@ export const ETAPAS: EtapaInfo[] = [
     modelo: "AMBOS",
     formula: "proLaboreMensal × meses × N sócios elegíveis",
     descricao:
-      "Pagamento mensal fixo a sócios em qualquer regime (capital ou serviços) com função operativa. Sai do LL antes de chegar ao RDA.",
+      "Pagamento mensal fixo aplicado a TODAS as 6 categorias da Política DSF v1 (Sócio de Capital, Capital Gestor, Capital Líder, Sócio de Serviços, Serviços Estratégico, Líder Non-Equity). Configurado em proLaboreMensal na Premissa NOVA. Sai do LL antes de chegar ao RDA.",
     exemploNumeros: "R$ 5.000 × 12 meses × 8 sócios elegíveis",
     exemploResultado: "R$ 480.000 ano",
     veja: "/politica/categorias-socio",
@@ -100,12 +100,24 @@ export const ETAPAS: EtapaInfo[] = [
   },
   {
     numero: 8,
+    slug: "comissao-originacao",
+    titulo: "Comissão de Originação (individual)",
+    modelo: "NOVO",
+    formula: "originacaoAnualSocio × taxaComissaoOriginacao",
+    descricao:
+      "Componente individual: cada sócio recebe um percentual sobre a receita que originou. O valor anual de originação por sócio é cadastrado na aba 'Individuais — Originação' de /resultados, e a taxa de comissão é configurada na Premissa NOVA (taxaComissaoOriginacao). Pode ser sobrescrito por cenário no sheet 'Originação'.",
+    exemploNumeros: "Sócio X originou R$ 800.000 × 5% taxa",
+    exemploResultado: "Comissão R$ 40.000 ano",
+    veja: "/politica/categorias-socio",
+  },
+  {
+    numero: 9,
     slug: "pool-unidade",
     titulo: "Pool de unidade (quando há líder)",
     modelo: "AMBOS",
     formula: "LL_unidade × { 50% Sociedade · 30% Líder · 20% Equipe/Reserva }",
     descricao:
-      "Aplicado SOBRE o resultado local de cada unidade não-matriz. Os 50% que voltam para a Sociedade alimentam o LL Matriz e entram no RDA.",
+      "Aplicado SOBRE o resultado local de cada unidade não-matriz. Os 50% que voltam para a Sociedade alimentam o LL Matriz e entram no RDA. O líder é definido pelo campo 'Unidade liderada' no cadastro do Sócio (/socios) ou herdado para a ClassificacaoSocio do cenário.",
     exemploNumeros: "Unidade Sul LL R$ 1.200.000",
     exemploResultado: "R$ 600k Soc · R$ 360k Líder · R$ 240k Equipe",
     veja: "/politica/pool-unidade",

@@ -46,6 +46,41 @@ export default async function ModeloNovoPage() {
       </Card>
 
       <Card className="p-6">
+        <h2 className="text-lg font-semibold text-navy-900 mb-3">
+          Os 5 componentes da remuneração de um Sócio de Capital
+        </h2>
+        <p className="text-sm text-neutral-600 mb-4">
+          No Modelo NOVO, o pacote de cada Sócio de Capital é composto por:
+        </p>
+        <ol className="space-y-2 text-sm text-neutral-800 leading-relaxed list-decimal list-inside">
+          <li>
+            <strong className="text-navy-900">Pró-labore</strong> — pagamento mensal fixo configurável na premissa
+            (<code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">proLaboreMensal</code>).
+          </li>
+          <li>
+            <strong className="text-navy-900">Bloco A — Retirada de Capital</strong> — proporcional às quotas, sobre o RDA.
+          </li>
+          <li>
+            <strong className="text-navy-900">Bloco B — Bônus de Performance</strong> — 4 modos (uniforme, peso individual, originação, por área).
+          </li>
+          <li>
+            <strong className="text-navy-900">Comissão de Originação</strong> — taxa configurável aplicada à receita
+            originada pelo sócio (cadastrada em <Link href="/resultados" className="text-peri-700 hover:underline">/resultados → Individuais</Link>).
+          </li>
+          <li>
+            <strong className="text-navy-900">Bloco C — Bônus Extraordinário</strong> — retido como reserva estratégica;
+            distribuição discricionária do Comitê.
+          </li>
+        </ol>
+        <div className="mt-4 p-3 bg-neutral-50 rounded text-xs text-neutral-700 leading-relaxed">
+          <strong className="text-navy-900">Capital Gestor</strong> recebe os 5 acima <strong>+ Remuneração de Administração</strong> pela tabela salarial (nível × faixa).
+          <br />
+          <strong className="text-navy-900">Capital Líder de Unidade / Líder Non-Equity</strong> recebem ainda{" "}
+          <strong>30% do LL da unidade</strong> que gerenciam (pool de líder).
+        </div>
+      </Card>
+
+      <Card className="p-6">
         <h2 className="text-lg font-semibold text-navy-900 mb-3">Por que essa estrutura?</h2>
         <ul className="space-y-3 text-sm text-neutral-800 leading-relaxed">
           <li>

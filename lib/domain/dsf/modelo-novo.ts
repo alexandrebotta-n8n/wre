@@ -54,6 +54,9 @@ const PUBLICOS_BLOCO_B: Publico[] = [
   "SOCIO_SERVICOS_ESTRATEGICO",
   "LIDER_UNIDADE_NON_EQUITY",
 ];
+// Categorias da Política DSF v1 que recebem pró-labore. Legado/transição
+// (LIDER_TECNICO, FUNDADOR) não recebem — esses são tratados pelo modelo ATUAL.
+const PUBLICOS_PRO_LABORE: Publico[] = [...PUBLICOS_BLOCO_B];
 
 export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const { periodo, socios, resultados, premissas } = input;
@@ -100,27 +103,48 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   // Distribuição Bloco B — modo configurável (default: UNIFORME)
   const distribuicaoB = premissas.distribuicaoBlocoB ?? "UNIFORME";
   const elegiveisB = socios.filter((s) => PUBLICOS_BLOCO_B.includes(s.publico));
+  // Pesos por categoria (multiplicador aplicado ao peso-base). Default 1.
+  const pesoCat = premissas.pesoCategoria ?? {};
   // Mapa peso efetivo por sócio elegível, conforme modo:
   //   UNIFORME: peso = 1
   //   PESO_INDIVIDUAL: peso = pesoBlocoB ?? 1
   //   ORIGINACAO: peso = originacaoEsperadaAnual (zero exclui)
   //   POR_AREA: peso = (mixOrg × pesoOrgArea) + (mixInc × pesoIncArea); sem área → 0
+  // Em todos os modos, o peso final é multiplicado por pesoCategoria[publico] ?? 1.
   const pesosBlocoB = new Map<string, number>();
   for (const s of elegiveisB) {
     let peso = 1;
     if (distribuicaoB === "PESO_INDIVIDUAL") peso = s.pesoBlocoB ?? 1;
     else if (distribuicaoB === "ORIGINACAO") peso = s.originacaoEsperadaAnual ?? 0;
     else if (distribuicaoB === "POR_AREA") peso = pesoPorArea(s.areaPraticaCodigo, premissas.pesosPorArea);
+    peso *= pesoCat[s.publico] ?? 1;
     pesosBlocoB.set(s.id, peso);
   }
   const somaPesosB = Array.from(pesosBlocoB.values()).reduce((acc, v) => acc + v, 0);
+
+  // Pró-labore: aplicado a todas as 6 categorias da Política DSF v1, proporcional
+  // ao período (3 meses para trimestre, 12 para ano).
+  const proLaboreMensal = premissas.proLaboreMensal ?? 0;
+  const taxaComissao = premissas.taxaComissaoOriginacao ?? 0;
 
   const pacotes: PacoteRemuneracao[] = [];
   let totalDistribuido = 0;
 
   for (const s of socios) {
     const trace: TraceItem[] = [];
-    const proLabore = 0; // pró-labore tratado fora do RDA (insumo da Política 2)
+    // Pró-labore — aplicado a todas as 6 categorias da Política DSF v1.
+    // Custo já refletido no LL — não é deduzido novamente do RDA, apenas
+    // contabilizado no pacote do sócio.
+    const proLabore = PUBLICOS_PRO_LABORE.includes(s.publico)
+      ? proLaboreMensal * periodo.meses
+      : 0;
+    if (proLabore > 0) {
+      trace.push({
+        etapa: "3.pro-labore",
+        descricao: `R$ ${proLaboreMensal.toLocaleString("pt-BR")} × ${periodo.meses} meses`,
+        valor: proLabore,
+      });
+    }
     const remGestao = adminPorSocio.get(s.id) ?? 0;
     if (remGestao > 0) trace.push({ etapa: "3.admin", descricao: "rem. de administração", valor: remGestao });
 
@@ -163,7 +187,20 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       });
     }
 
-    const total = proLabore + remGestao + blocoA + blocoB + poolUnidade;
+    // Comissão de Originação — taxa × valor originado (anual). O proporcional
+    // por trimestre é deixado a cargo do dado de origem (originacaoEfetiva é
+    // somada para o período relevante antes de chegar aqui).
+    let creditoOriginacao = 0;
+    if (taxaComissao > 0 && (s.originacaoEfetiva ?? 0) > 0) {
+      creditoOriginacao = (s.originacaoEfetiva ?? 0) * taxaComissao;
+      trace.push({
+        etapa: "5.comissao-orig",
+        descricao: `${(taxaComissao * 100).toFixed(1)}% × R$ ${(s.originacaoEfetiva ?? 0).toLocaleString("pt-BR")} originado`,
+        valor: creditoOriginacao,
+      });
+    }
+
+    const total = proLabore + remGestao + blocoA + blocoB + poolUnidade + creditoOriginacao;
     totalDistribuido += total;
 
     const pacote: PacoteRemuneracao = {
@@ -175,9 +212,9 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       remuneracaoFundador: 0,
       blocoA,
       blocoB,
-      blocoC: 0,
+      blocoC: 0, // Bloco C retido como reserva estratégica — sem distribuição individual no MVP
       poolUnidade,
-      creditoOriginacao: 0, // próximo: alocação interunidades por projeto
+      creditoOriginacao,
       creditoExecucao: 0,
       creditoGestaoCP: 0,
       premio: 0,

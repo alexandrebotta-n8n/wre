@@ -32,3 +32,20 @@ export const CriarPeriodoSchema = z.object({
 });
 
 export type CriarPeriodoInput = z.infer<typeof CriarPeriodoSchema>;
+
+export const SalvarOriginacaoSchema = z.object({
+  socioId: z.string().min(1),
+  periodoId: z.string().min(1),
+  valor: z.number().finite().min(0),
+  ehReal: z.boolean().optional(),
+  fonte: z.string().max(120).optional(),
+});
+
+export type SalvarOriginacaoInput = z.infer<typeof SalvarOriginacaoSchema>;
+
+export const OriginacaoOverrideSchema = z.record(
+  z.string().min(1),
+  z.number().finite().min(0),
+);
+
+export type OriginacaoOverride = z.infer<typeof OriginacaoOverrideSchema>;

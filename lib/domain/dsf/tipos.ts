@@ -24,6 +24,10 @@ export interface SocioInput {
   unidadeCodigo?: string; // "DSF" | "BG" | ...
   percentualQuotas: number; // 0..1
   originacaoEsperadaAnual: number; // BRL
+  // Originação efetiva no período (somatório de OriginacaoPeriodo no ano,
+  // já com override do cenário aplicado quando houver). Usado pelo engine
+  // NOVO para calcular a Comissão de Originação.
+  originacaoEfetiva?: number;
   // Peso individual no Bloco B (default 1.0). Usado quando a premissa está
   // configurada como distribuicaoBlocoB="PESO_INDIVIDUAL".
   pesoBlocoB?: number;
@@ -145,6 +149,19 @@ export interface PremissasModeloNovo {
 
   // Pesos por área (apenas usado quando distribuicaoBlocoB="POR_AREA")
   pesosPorArea?: PesosPorArea;
+
+  // Pró-labore mensal (BRL). Recebido por todas as 6 categorias da Política DSF v1
+  // (proporcional ao período). Default 0 → engine não calcula pró-labore.
+  proLaboreMensal?: number;
+
+  // Taxa de comissão sobre originação. Multiplicada pelo valor originado
+  // de cada sócio no período. Default 0 → engine não calcula comissão.
+  taxaComissaoOriginacao?: number;
+
+  // Pesos por categoria no Bloco B. Multiplicador aplicado ao peso-base de cada
+  // sócio elegível. Default = 1 para todas. Permite favorecer/desfavorecer
+  // categorias específicas (ex: SOCIO_SERVICOS_ESTRATEGICO = 1.2).
+  pesoCategoria?: Partial<Record<Publico, number>>;
 
   // Tabela salarial de gestão
   tabelaSalarial: TabelaSalarial;

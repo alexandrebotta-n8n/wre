@@ -99,6 +99,9 @@ model Unidade {
 
   resultados        ResultadoPeriodo[]
   classificacoes    ClassificacaoSocio[] // sócios vinculados a esta unidade (líderes)
+  // Sócios que lideram esta unidade no cadastro permanente (não por cenário).
+  // Preenchido quando Socio.publicoDefault é líder de unidade.
+  lideres           Socio[]              @relation("UnidadeLider")
 }
 
 // Níveis de cargo para gestão (método DSF — pontuação 50-150 mapeia em A/B/C/D).
@@ -177,12 +180,23 @@ model Socio {
   areaPraticaId  String?
   areaPratica    AreaPratica?  @relation(fields: [areaPraticaId], references: [id], onDelete: SetNull)
 
+  // Classificação default na nova política (Política DSF v1).
+  // Obrigatório — é o ponto de partida ao criar uma ClassificacaoSocio em
+  // qualquer novo cenário. Pode ser sobreposto por cenário se necessário.
+  publicoDefault Publico  @default(SOCIO_SERVICOS)
+  // Unidade que este sócio lidera no cadastro permanente. Só faz sentido
+  // quando publicoDefault ∈ {SOCIO_CAPITAL_LIDER_UNIDADE, LIDER_UNIDADE_NON_EQUITY}.
+  unidadeLideradaId String?
+  unidadeLiderada   Unidade?  @relation("UnidadeLider", fields: [unidadeLideradaId], references: [id], onDelete: SetNull)
+
   classificacoes  ClassificacaoSocio[]
   remuneracoes    RemuneracaoCalculada[]
+  originacoes     OriginacaoPeriodo[]
   usuario         Usuario?
 
   @@index([nome])
   @@index([areaPraticaId])
+  @@index([unidadeLideradaId])
 }
 
 // ============================================================================
@@ -203,6 +217,7 @@ model Periodo {
 
   resultados        ResultadoPeriodo[]
   remuneracoes      RemuneracaoCalculada[]
+  originacoes       OriginacaoPeriodo[]
 
   @@unique([tipo, ano, trimestre])
   @@index([ano])
@@ -225,6 +240,26 @@ model ResultadoPeriodo {
   importadoEm   DateTime @default(now())
 
   @@unique([unidadeId, periodoId])
+  @@index([periodoId])
+}
+
+// Originação por sócio × período. Usada pelo engine NOVO para calcular
+// "Comissão de Originação" (taxaComissao × valor originado). Insumo
+// individual — entra junto com os resultados de unidade no /resultados.
+model OriginacaoPeriodo {
+  id           String   @id @default(cuid())
+  socioId      String
+  socio        Socio    @relation(fields: [socioId], references: [id], onDelete: Cascade)
+  periodoId    String
+  periodo      Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  // BRL — valor de receita originado por este sócio no período.
+  valor        Float
+  ehReal       Boolean  @default(true) // false = orçado/projetado
+  fonte        String?  // "1T2026 oficial", "Estimativa Sócio", etc.
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([socioId, periodoId])
   @@index([periodoId])
 }
 
@@ -312,6 +347,10 @@ model Cenario {
   // ao chamar carregarResultados. Permite simular "what-if" (ex: -20% LL Sul)
   // sem alterar os números oficiais de /resultados.
   resultadosOverride Json?
+  // Override do valor anual de originação por sócio (apenas para este cenário).
+  // Formato: { "<socioId>": number } — valor anual em BRL.
+  // Quando definido, prevalece sobre a soma de OriginacaoPeriodo do ano.
+  originacaoOverride Json?
   // Marca quando o override (parâmetros OU resultados) foi alterado mas o
   // cenário ainda não foi recalculado. UI mostra ponto vermelho e destaca
   // botão "Recalcular".

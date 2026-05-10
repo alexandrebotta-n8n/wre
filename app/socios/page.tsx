@@ -38,6 +38,47 @@ async function atualizarAreaAction(formData: FormData) {
   revalidatePath("/socios");
 }
 
+const PUBLICOS_NOVA_POLITICA = [
+  { id: "SOCIO_CAPITAL", nome: "Sócio de Capital" },
+  { id: "SOCIO_CAPITAL_GESTOR", nome: "Sócio de Capital — Gestor" },
+  { id: "SOCIO_CAPITAL_LIDER_UNIDADE", nome: "Sócio de Capital — Líder de Unidade" },
+  { id: "SOCIO_SERVICOS", nome: "Sócio de Serviços" },
+  { id: "SOCIO_SERVICOS_ESTRATEGICO", nome: "Sócio de Serviços Estratégico" },
+  { id: "LIDER_UNIDADE_NON_EQUITY", nome: "Líder de Unidade Non-Equity" },
+] as const;
+const PUBLICOS_LIDER = new Set(["SOCIO_CAPITAL_LIDER_UNIDADE", "LIDER_UNIDADE_NON_EQUITY"]);
+
+async function atualizarClassificacaoNovaAction(formData: FormData) {
+  "use server";
+  const session = await auth();
+  const roles = session?.user?.roles ?? [];
+  if (!roles.some((r) => r === "ADMIN" || r === "CONSULTOR")) return;
+  const id = String(formData.get("id"));
+  const publicoDefault = String(formData.get("publicoDefault") ?? "");
+  const unidadeLideradaIdRaw = String(formData.get("unidadeLideradaId") ?? "") || null;
+  if (!PUBLICOS_NOVA_POLITICA.some((p) => p.id === publicoDefault)) {
+    await flashSuccess("Classificação inválida.");
+    return;
+  }
+  // Só persiste unidade liderada se a categoria for de líder.
+  const unidadeLideradaId = PUBLICOS_LIDER.has(publicoDefault) ? unidadeLideradaIdRaw : null;
+  await prisma.socio.update({
+    where: { id },
+    data: {
+      publicoDefault: publicoDefault as never,
+      unidadeLideradaId,
+    },
+  });
+  await logAudit({
+    usuarioId: session?.user?.id,
+    acao: "socio.classificacao.atualizar",
+    recurso: `Socio:${id}`,
+    meta: { publicoDefault, unidadeLideradaId },
+  });
+  await flashSuccess("Classificação atualizada.");
+  revalidatePath("/socios");
+}
+
 export default async function SociosPage({
   searchParams,
 }: {
@@ -56,10 +97,10 @@ export default async function SociosPage({
   if (sp.tipo === "fundadores") where.isFundador = true;
   if (sp.tipo === "nao-fundadores") where.isFundador = false;
 
-  const [socios, areas] = await Promise.all([
+  const [socios, areas, unidades] = await Promise.all([
     prisma.socio.findMany({
       where,
-      include: { areaPratica: true },
+      include: { areaPratica: true, unidadeLiderada: { select: { id: true, codigo: true, nome: true } } },
       orderBy: [
         { isFundador: "desc" },
         { percentualQuotasDefault: "desc" },
@@ -69,6 +110,14 @@ export default async function SociosPage({
     }),
     escopo.podeMutar
       ? prisma.areaPratica.findMany({ where: { ativa: true }, orderBy: [{ ordem: "asc" }], take: 50 })
+      : Promise.resolve([]),
+    escopo.podeMutar
+      ? prisma.unidade.findMany({
+          where: { ativa: true, isMatriz: false },
+          orderBy: [{ codigo: "asc" }],
+          take: 50,
+          select: { id: true, codigo: true, nome: true },
+        })
       : Promise.resolve([]),
   ]);
 
@@ -139,6 +188,7 @@ export default async function SociosPage({
                 <TH className="text-right">Quotas (default)</TH>
                 <TH>Nível · Faixa</TH>
                 <TH>Área de prática</TH>
+                <TH>Classificação (Política DSF v1)</TH>
                 <TH>Tipo</TH>
               </tr>
             </THead>
@@ -194,6 +244,54 @@ export default async function SociosPage({
                       </Badge>
                     ) : (
                       <span className="text-neutral-400">—</span>
+                    )}
+                  </TD>
+                  <TD>
+                    {escopo.podeMutar ? (
+                      <form action={atualizarClassificacaoNovaAction} className="inline-flex items-center gap-1.5 flex-wrap">
+                        <input type="hidden" name="id" value={s.id} />
+                        <NativeSelect
+                          name="publicoDefault"
+                          defaultValue={s.publicoDefault}
+                          className="h-8 text-xs w-auto min-w-[200px]"
+                          aria-label={`Classificação de ${s.nome}`}
+                        >
+                          {PUBLICOS_NOVA_POLITICA.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nome}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                        {PUBLICOS_LIDER.has(s.publicoDefault) && (
+                          <NativeSelect
+                            name="unidadeLideradaId"
+                            defaultValue={s.unidadeLideradaId ?? ""}
+                            className="h-8 text-xs w-auto min-w-[110px]"
+                            aria-label={`Unidade liderada por ${s.nome}`}
+                          >
+                            <option value="">— escolher unidade —</option>
+                            {unidades.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.codigo} — {u.nome}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        )}
+                        <SubmitButton size="sm" variant="subtle">
+                          Salvar
+                        </SubmitButton>
+                      </form>
+                    ) : (
+                      <div className="text-xs">
+                        <Badge variant="info" size="sm">
+                          {PUBLICOS_NOVA_POLITICA.find((p) => p.id === s.publicoDefault)?.nome ?? s.publicoDefault}
+                        </Badge>
+                        {s.unidadeLiderada && (
+                          <span className="ml-1.5 text-neutral-500">
+                            · {s.unidadeLiderada.codigo}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </TD>
                   <TD>

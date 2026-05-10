@@ -22,6 +22,17 @@ export const PesosPorAreaSchema = z.object({
 
 const TOL = 0.001; // tolerância para somatórios
 
+const PublicoEnum = z.enum([
+  "SOCIO_CAPITAL",
+  "SOCIO_CAPITAL_GESTOR",
+  "SOCIO_CAPITAL_LIDER_UNIDADE",
+  "SOCIO_SERVICOS",
+  "SOCIO_SERVICOS_ESTRATEGICO",
+  "LIDER_UNIDADE_NON_EQUITY",
+  "LIDER_TECNICO",
+  "FUNDADOR",
+]);
+
 export const ParamsNovoSchema = z.object({
   percentualBlocoA: z.number().min(0).max(1),
   percentualBlocoB: z.number().min(0).max(1),
@@ -41,6 +52,10 @@ export const ParamsNovoSchema = z.object({
   proRataMinMeses: z.number().int().min(0).max(12),
   distribuicaoBlocoB: DistribuicaoBlocoBEnum.default("UNIFORME"),
   pesosPorArea: PesosPorAreaSchema,
+  // Política DSF v1 — itens 5/6/7 dos requisitos:
+  proLaboreMensal: z.number().min(0).optional(),         // R$/mês — aplicado a todas as 6 categorias
+  taxaComissaoOriginacao: z.number().min(0).max(1).optional(), // ex: 0.05 = 5%
+  pesoCategoria: z.record(PublicoEnum, z.number().min(0).max(5)).optional(),
 })
   .strict()
   .refine(

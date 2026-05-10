@@ -28,8 +28,8 @@ const CARDS = [
   {
     href: "/como-funciona/etapas",
     icone: ListOrdered,
-    titulo: "8 Etapas do cálculo",
-    desc: "Da pró-labore ao prêmio final, passo a passo com fórmula e exemplo.",
+    titulo: "9 Etapas do cálculo",
+    desc: "Da pró-labore aos blocos, comissão de originação e pool de unidade — passo a passo com fórmula e exemplo.",
     badge: "passo a passo",
   },
   {
@@ -83,13 +83,35 @@ export default async function ComoFuncionaHub() {
         })}
       </div>
 
+      <Card className="p-5">
+        <h3 className="font-semibold text-navy-900 mb-2">Primeiros passos — fluxo recomendado</h3>
+        <ol className="text-sm text-neutral-700 space-y-2 list-decimal list-inside leading-relaxed">
+          <li>
+            <Link href="/socios" className="text-peri-700 hover:underline font-medium">/socios</Link> — defina a <strong>Classificação (Política DSF v1)</strong> de cada sócio (uma das 6 categorias) e, para líderes, a unidade que gerenciam.
+          </li>
+          <li>
+            <Link href="/resultados" className="text-peri-700 hover:underline font-medium">/resultados</Link> — cadastre os insumos financeiros nas 3 abas:{" "}
+            <strong>DSF Global</strong> (matriz consolidada), <strong>Unidades</strong> (não-matriz) e{" "}
+            <strong>Individuais — Originação</strong> (receita originada por cada sócio).
+          </li>
+          <li>
+            <Link href="/premissas" className="text-peri-700 hover:underline font-medium">/premissas</Link> — configure a premissa NOVA com{" "}
+            <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">proLaboreMensal</code>,{" "}
+            <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">taxaComissaoOriginacao</code> e os percentuais dos Blocos.
+          </li>
+          <li>
+            <Link href="/simulacao" className="text-peri-700 hover:underline font-medium">/simulacao</Link> — crie um Cenário NOVO; use os sheets <em>📊 Insumos</em> e <em>💰 Originação</em> para simular variações sem afetar os defaults oficiais.
+          </li>
+        </ol>
+      </Card>
+
       <Card className="p-5 bg-peri-50/40 border-peri-200">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="flex-1 min-w-[220px]">
             <h3 className="font-semibold text-navy-900">Pronto para simular?</h3>
             <p className="text-sm text-neutral-700 mt-1">
               A página de Simulação mostra dois cenários lado a lado. Clique em um sócio na tabela
-              para ver o waterfall com a composição.
+              para ver o waterfall com a composição (pró-labore + Bloco A/B + comissão de originação + pool).
             </p>
           </div>
           <Button asChild variant="primary" size="sm">

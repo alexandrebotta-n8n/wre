@@ -10,6 +10,7 @@ import type { SessionUser } from "@/lib/auth/guards";
 import {
   CriarPeriodoSchema,
   SalvarResultadoPeriodoSchema,
+  SalvarOriginacaoSchema,
 } from "@/lib/schemas/resultados";
 
 function rev() {
@@ -128,6 +129,64 @@ export async function criarPeriodoAction(formData: FormData) {
     await flashSuccess(`Período ${data.rotulo} criado.`);
   } catch (e) {
     await flashError(e instanceof Error ? e.message : "Erro ao criar período.");
+  }
+  rev();
+}
+
+export async function salvarOriginacaoAction(formData: FormData) {
+  try {
+    const { session } = await exigirMutacao();
+    const data = SalvarOriginacaoSchema.parse({
+      socioId: String(formData.get("socioId") ?? ""),
+      periodoId: String(formData.get("periodoId") ?? ""),
+      valor: Number(formData.get("valor") ?? 0),
+      ehReal: formData.get("ehReal") === "on" || formData.get("ehReal") === "true",
+      fonte: String(formData.get("fonte") ?? "").trim() || undefined,
+    });
+
+    const r = await prisma.originacaoPeriodo.upsert({
+      where: { socioId_periodoId: { socioId: data.socioId, periodoId: data.periodoId } },
+      create: {
+        socioId: data.socioId,
+        periodoId: data.periodoId,
+        valor: data.valor,
+        ehReal: data.ehReal ?? true,
+        fonte: data.fonte,
+      },
+      update: {
+        valor: data.valor,
+        ehReal: data.ehReal ?? true,
+        fonte: data.fonte,
+      },
+    });
+
+    await logAudit({
+      usuarioId: session?.user?.id,
+      acao: "originacao.salvar",
+      recurso: `OriginacaoPeriodo:${r.id}`,
+      meta: { socioId: data.socioId, periodoId: data.periodoId, valor: data.valor },
+    });
+    await flashSuccess("Originação salva.");
+  } catch (e) {
+    await flashError(e instanceof Error ? e.message : "Erro ao salvar originação.");
+  }
+  rev();
+}
+
+export async function excluirOriginacaoAction(formData: FormData) {
+  try {
+    const { session } = await exigirMutacao();
+    const id = String(formData.get("id") ?? "");
+    if (!id) throw new Error("id obrigatório");
+    await prisma.originacaoPeriodo.delete({ where: { id } });
+    await logAudit({
+      usuarioId: session?.user?.id,
+      acao: "originacao.excluir",
+      recurso: `OriginacaoPeriodo:${id}`,
+    });
+    await flashSuccess("Originação removida.");
+  } catch (e) {
+    await flashError(e instanceof Error ? e.message : "Erro ao remover originação.");
   }
   rev();
 }

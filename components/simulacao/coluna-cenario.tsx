@@ -18,6 +18,7 @@ import { ExplicacaoDialog } from "./explicacao-dialog";
 import { KpiAlertasButton } from "./kpi-alertas-button";
 import { gerarNarrativa } from "@/lib/explicacao/narrativa";
 import { InsumosSheet, type InsumosUnidadeBase } from "@/components/insumos/insumos-sheet";
+import { OriginacaoSheet, type OriginacaoSocioBase } from "@/components/insumos/originacao-sheet";
 import { prisma } from "@/lib/prisma";
 import { carregarHistoricoUnidades } from "@/lib/insumos/historico";
 import type { CenarioCompleto, AreaOption } from "./types";
@@ -135,11 +136,28 @@ export async function ColunaCenario({
     | null;
   const temInsumoOverride = !!resOverride && Object.keys(resOverride).length > 0;
 
+  // Originação override do cenário (anual por sócio)
+  const origOverride = (cenario.originacaoOverride ?? null) as
+    | Record<string, number>
+    | null;
+  const temOrigOverride = !!origOverride && Object.keys(origOverride).length > 0;
+
   // Carrega LL/funding default + histórico — só se for editável (ADMIN/CONSULTOR
   // em cenário DRAFT). Soma trimestres do ano para visão anual única.
   const unidadesParaSheet: InsumosUnidadeBase[] = editavel
     ? await carregarInsumosDoAno(cenario.ano, resOverride)
     : [];
+
+  // Carrega originação anual oficial + lista de sócios elegíveis (apenas modelo NOVO)
+  const ehNovo = cenario.modelo === "NOVO";
+  const sociosParaOriginacaoSheet: OriginacaoSocioBase[] = editavel && ehNovo
+    ? await carregarOriginacaoDoAno(cenario.ano, cenario.classificacoes, origOverride)
+    : [];
+  const taxaComissao = ehNovo
+    ? Number(
+        (paramsEfetivos as Record<string, unknown>).taxaComissaoOriginacao ?? 0,
+      )
+    : 0;
   const periodoRotulo = `${cenario.ano} (anual)`;
 
   return (
@@ -164,6 +182,11 @@ export async function ColunaCenario({
                   insumos custom
                 </Badge>
               )}
+              {temOrigOverride && (
+                <Badge variant="warning" size="sm" title="Cenário usa originação customizada">
+                  originação custom
+                </Badge>
+              )}
             </div>
             <CardTitle className="mt-2 text-base truncate">{cenario.nome}</CardTitle>
             <CardDescription>
@@ -186,6 +209,15 @@ export async function ColunaCenario({
                 periodoRotulo={periodoRotulo}
                 totalAtual={totalPacote}
                 unidades={unidadesParaSheet}
+              />
+            )}
+            {editavel && ehNovo && sociosParaOriginacaoSheet.length > 0 && (
+              <OriginacaoSheet
+                cenarioId={cenario.id}
+                cenarioNome={cenario.nome}
+                ano={cenario.ano}
+                taxaComissao={taxaComissao}
+                socios={sociosParaOriginacaoSheet}
               />
             )}
             {jaCalculou && (
@@ -464,5 +496,51 @@ async function carregarInsumosDoAno(
       },
     };
   });
+}
+
+// ============================================================================
+// Originação anual oficial (somatório dos OriginacaoPeriodo do ano)
+// + lista de sócios elegíveis à comissão (todas as 6 categorias da Política DSF v1).
+// ============================================================================
+
+async function carregarOriginacaoDoAno(
+  ano: number,
+  classificacoes: CenarioCompleto["classificacoes"],
+  override: Record<string, number> | null,
+): Promise<OriginacaoSocioBase[]> {
+  const trimestres = await prisma.periodo.findMany({
+    where: { tipo: "TRIMESTRE", ano },
+    take: 4,
+  });
+  const trimIds = trimestres.map((t) => t.id);
+  const linhas = trimIds.length > 0
+    ? await prisma.originacaoPeriodo.findMany({
+        where: { periodoId: { in: trimIds } },
+        take: 1000,
+      })
+    : [];
+  const anualPorSocio = new Map<string, number>();
+  for (const l of linhas) {
+    anualPorSocio.set(l.socioId, (anualPorSocio.get(l.socioId) ?? 0) + l.valor);
+  }
+  // Categorias elegíveis à comissão (todas que recebem Bloco B) — exclui legado.
+  const elegiveis = new Set([
+    "SOCIO_CAPITAL",
+    "SOCIO_CAPITAL_GESTOR",
+    "SOCIO_CAPITAL_LIDER_UNIDADE",
+    "SOCIO_SERVICOS",
+    "SOCIO_SERVICOS_ESTRATEGICO",
+    "LIDER_UNIDADE_NON_EQUITY",
+  ]);
+  return classificacoes
+    .filter((c) => elegiveis.has(c.publico))
+    .map((c) => ({
+      socioId: c.socioId,
+      nome: c.socio.nome,
+      cargo: c.socio.cargo,
+      publico: c.publico,
+      anualDefault: anualPorSocio.get(c.socioId) ?? 0,
+      anualOverride: override?.[c.socioId],
+    }));
 }
 

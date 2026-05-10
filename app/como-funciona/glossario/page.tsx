@@ -36,8 +36,28 @@ const TERMOS: Termo[] = [
   },
   {
     termo: "Bloco C",
-    def: "Parcela Estratégica e de Longo Prazo (20%) — reserva para expansão, retenção, sucessão. Não distribui automaticamente.",
+    def: "Parcela Estratégica e de Longo Prazo (20%) — reserva para expansão, retenção, sucessão. Não distribui automaticamente entre sócios; fica retida na matriz.",
     refs: [{ href: "/politica/expansao", label: "Cláusula 14 (Expansão)" }],
+  },
+  {
+    termo: "Comissão de Originação",
+    def: "Componente individual do pacote NOVO: taxa configurável (taxaComissaoOriginacao na premissa) aplicada sobre a receita anual que cada sócio originou. Valores cadastrados em /resultados aba 'Individuais — Originação'; podem ser sobrescritos por cenário no sheet 'Originação' da Simulação.",
+    refs: [{ href: "/politica/categorias-socio", label: "Categorias e regras" }],
+  },
+  {
+    termo: "Pró-labore (Política DSF v1)",
+    def: "Pagamento mensal fixo (proLaboreMensal × meses) aplicado a todas as 6 categorias da nova política. Configurado na Premissa NOVA. Distinto da Remuneração de Administração, que só vai para Capital Gestor.",
+    refs: [{ href: "/politica/categorias-socio", label: "Categorias" }],
+  },
+  {
+    termo: "Classificação (Política DSF v1)",
+    def: "Atributo permanente do sócio (campo publicoDefault) que define em qual das 6 categorias da nova política ele se enquadra. Definido em /socios e herdado para a ClassificacaoSocio em cada novo cenário.",
+    refs: [{ href: "/politica/categorias-socio", label: "6 Categorias" }],
+  },
+  {
+    termo: "Insumos individuais",
+    def: "Terceira camada de inputs (depois de DSF Global e Unidades): dados que variam por sócio dentro do período. Hoje contempla originação; futuramente pode incluir Bloco C nominativo e outros componentes.",
+    refs: [{ href: "/resultados?tab=originacao", label: "/resultados → Individuais" }],
   },
   {
     termo: "Pool S/L/E",
