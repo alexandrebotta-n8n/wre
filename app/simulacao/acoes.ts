@@ -25,6 +25,13 @@ function rev() {
   revalidatePath("/simulacao");
 }
 
+// Marca o tour de boas-vindas como visto (cookie de longa duração).
+// Não revalida — só preferência de exibição local do navegador.
+export async function marcarTourVistoAction(): Promise<void> {
+  const { marcarTourVisto } = await import("@/lib/preferencias");
+  await marcarTourVisto();
+}
+
 // ============================================================================
 // Cenário
 // ============================================================================

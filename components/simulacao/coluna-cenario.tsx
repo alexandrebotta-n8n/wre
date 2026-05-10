@@ -282,7 +282,7 @@ export async function ColunaCenario({
       )}
 
       {/* Painel de parâmetros */}
-      <div className="px-5 py-3 border-b border-neutral-100">
+      <div className="px-5 py-3 border-b border-neutral-100" data-tour="parametros">
         <PainelParametros
           cenarioId={cenario.id}
           modelo={cenario.modelo as "ATUAL" | "NOVO"}
@@ -297,7 +297,7 @@ export async function ColunaCenario({
       </div>
 
       {/* Ações */}
-      <div className="px-5 py-3 flex items-center gap-2 flex-wrap mt-auto">
+      <div className="px-5 py-3 flex items-center gap-2 flex-wrap mt-auto" data-tour="acoes-publicar">
         {editavel && (
           <>
             <form action={calcularAction}>

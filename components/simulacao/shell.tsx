@@ -9,6 +9,7 @@ import { ColunaCenario } from "./coluna-cenario";
 import { ColunaEmpty } from "./coluna-empty";
 import { DrawerCenarios } from "./drawer-cenarios";
 import { AjudaDrawer } from "./ajuda-drawer";
+import { TourOnboarding } from "./tour-onboarding";
 import { TabelaComparativa } from "./tabela-comparativa";
 import type {
   CenarioListItem,
@@ -29,6 +30,8 @@ export interface SimulacaoShellProps {
   ehSocioRestrito: boolean;
   modoNome: "completo" | "iniciais";
   drawerAberto: boolean;
+  /** Se true, exibe o tour de boas-vindas (1ª visita). */
+  mostrarTour: boolean;
 }
 
 export function SimulacaoShell(props: SimulacaoShellProps) {
@@ -57,14 +60,16 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
         description="Compare cenários lado a lado ou analise um único cenário. Visão anual — expanda um sócio para ver por trimestre."
         actions={
           <div className="flex items-center gap-2">
-            <DrawerCenarios
-              cenarios={props.cenarios}
-              premissas={props.premissas}
-              aId={aId}
-              bId={bId}
-              podeMutar={props.podeMutar}
-              defaultOpen={props.drawerAberto}
-            />
+            <span data-tour="cenarios">
+              <DrawerCenarios
+                cenarios={props.cenarios}
+                premissas={props.premissas}
+                aId={aId}
+                bId={bId}
+                podeMutar={props.podeMutar}
+                defaultOpen={props.drawerAberto}
+              />
+            </span>
             <Button asChild variant="outline" size="sm">
               <Link href={apresentarHref}>
                 <Eye className="h-3.5 w-3.5" /> Apresentar
@@ -77,7 +82,9 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
                 </a>
               </Button>
             )}
-            <AjudaDrawer iconOnly />
+            <span data-tour="ajuda">
+              <AjudaDrawer iconOnly />
+            </span>
           </div>
         }
       />
@@ -143,6 +150,7 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           })()}
         />
       )}
+      <TourOnboarding mostrar={props.mostrarTour} />
     </main>
   );
 }

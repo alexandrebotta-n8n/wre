@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
-import { getModoNome } from "@/lib/preferencias";
+import { getModoNome, getTourVisto } from "@/lib/preferencias";
 import { SimulacaoShell } from "@/components/simulacao/shell";
 import type { CenarioModelo, CenarioStatus } from "@/components/simulacao/types";
 
@@ -19,6 +19,7 @@ export default async function SimulacaoPage({
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
   const modoNome = await getModoNome();
+  const tourVisto = await getTourVisto();
 
   const [todosCenarios, premissas, areas] = await Promise.all([
     prisma.cenario.findMany({
@@ -86,6 +87,7 @@ export default async function SimulacaoPage({
       ehSocioRestrito={escopo.ehSocioRestrito}
       modoNome={modoNome}
       drawerAberto={sp.drawer === "1"}
+      mostrarTour={!tourVisto}
     />
   );
 }

@@ -26,3 +26,19 @@ export async function setModoNome(modo: ModoNome): Promise<void> {
   // É só preferência de exibição (modo iniciais vs. completo) — não sensível.
   c.set(COOKIE, modo, cookieOptions({ httpOnly: false, maxAge: 60 * 60 * 24 * 365 }));
 }
+
+// ============================================================================
+// Tour de boas-vindas da Simulação — mostrado na 1ª visita
+// ============================================================================
+
+const COOKIE_TOUR = "wre.simulacao.tour-visto";
+
+export async function getTourVisto(): Promise<boolean> {
+  const c = await cookies();
+  return c.get(COOKIE_TOUR)?.value === "1";
+}
+
+export async function marcarTourVisto(): Promise<void> {
+  const c = await cookies();
+  c.set(COOKIE_TOUR, "1", cookieOptions({ httpOnly: false, maxAge: 60 * 60 * 24 * 365 }));
+}
