@@ -123,8 +123,9 @@ A página principal é **`/simulacao`** — combina lista de cenários + compara
 
 | Rota | Propósito |
 |---|---|
-| `/simulacao?a=&b=&periodoId=` | **Página única.** 2 colunas (A | B) com painéis de parâmetros editáveis (com tooltips e chips do valor calculado), stepper, KPIs, tabela alinhada por sócio com Δ — **clicar no sócio expande o waterfall** com a composição passo a passo (trace). Botão "📖 Explicar" gera narrativa textual do cenário. Drawer lateral = lista de cenários filtrada. |
+| `/simulacao?a=&b=&periodoId=` | **Página única.** 2 colunas (A | B) com painéis de parâmetros editáveis (tooltips + chips do valor calculado), stepper, KPIs, tabela alinhada por sócio com Δ — **clicar no sócio expande o waterfall** (trace passo-a-passo). Botões no header de cada coluna: "📊 Insumos" (Sheet com LL/funding por unidade · templates otimista/pessimista/crise · stress-test ±10/20% · validação contra histórico · preview de impacto) e "📖 Explicar" (narrativa textual). Drawer lateral = lista de cenários filtrada. |
 | `/socios` | Base — sócios e líderes ativos. |
+| `/resultados` | **CRUD dos LL e Funding Variável** por período × unidade (defaults oficiais que alimentam todas as simulações). ADMIN/CONSULTOR. Tabela editável inline + botão "+ Novo período". Cada cenário pode sobrescrever esses valores no painel "📊 Insumos" da Simulação. |
 | `/politica` | **Hub navegável** da Política DSF: cards por tema agrupados em 4 áreas (Fundamentos · Trilha societária · Modelo econômico · Ciclo de vida) + busca + atalhos para o documento integral. Acesso a todos autenticados, **inclusive sócios restritos**. |
 | `/politica/[tema]` | Páginas de tema (12: princípios, categorias-socio, progressao-vesting, lideres-unidade, ingresso-lateral, governanca, blocos, pool-unidade, pesos-perfil-area, permanencia-saida, expansao, disposicoes-finais). Cada uma tem resumo executivo + visual (diagrama/matriz/tabela) + exemplo prático com link para Simulação + texto integral colapsável (cláusula + anexo) + cross-links "Veja também". |
 | `/politica/buscar?q=` | Resultados da busca client/server-side sobre todo o conteúdo (títulos·resumos·corpo) com snippets destacados. |

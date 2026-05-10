@@ -60,7 +60,41 @@ function classificacoesParaSocioInput(
   }));
 }
 
-async function carregarResultados(periodoId: string): Promise<ResultadoUnidade[]> {
+/**
+ * Aplica override por unidade aos resultados base.
+ * `override` é `{ [unidadeId]: { lucroLiquido?, fundingVariavel? } }`.
+ * Para mapear unidadeId → unidadeCodigo, recebemos o map de auxílio.
+ */
+function aplicarOverrideResultados(
+  base: ResultadoUnidade[],
+  override: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> | null,
+  unidadeCodigoPorId: Map<string, string>,
+): ResultadoUnidade[] {
+  if (!override) return base;
+  // Inverte: codigo → id (para matchar)
+  const idPorCodigo = new Map<string, string>();
+  for (const [id, codigo] of unidadeCodigoPorId) idPorCodigo.set(codigo, id);
+  return base.map((r) => {
+    const id = idPorCodigo.get(r.unidadeCodigo);
+    if (!id) return r;
+    const ov = override[id];
+    if (!ov) return r;
+    return {
+      ...r,
+      lucroLiquido: ov.lucroLiquido ?? r.lucroLiquido,
+      fundingVariavel: ov.fundingVariavel ?? r.fundingVariavel,
+    };
+  });
+}
+
+async function carregarResultados(
+  periodoId: string,
+  resultadosOverride?: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> | null,
+): Promise<ResultadoUnidade[]> {
+  // Mapa auxiliar: unidadeId → codigo, usado pra aplicar override
+  const todasUnidades = await prisma.unidade.findMany({ select: { id: true, codigo: true }, take: 50 });
+  const unidadeCodigoPorId = new Map(todasUnidades.map((u) => [u.id, u.codigo] as const));
+
   // 1. Tenta carregar Resultado direto do período pedido.
   const direto = await prisma.resultadoPeriodo.findMany({
     where: { periodoId },
@@ -68,12 +102,13 @@ async function carregarResultados(periodoId: string): Promise<ResultadoUnidade[]
     take: 50,
   });
   if (direto.length > 0) {
-    return direto.map((r) => ({
+    const base = direto.map((r) => ({
       unidadeCodigo: r.unidade.codigo,
       isMatriz: r.unidade.isMatriz,
       lucroLiquido: r.lucroLiquido,
       fundingVariavel: r.fundingVariavel ?? undefined,
     }));
+    return aplicarOverrideResultados(base, resultadosOverride ?? null, unidadeCodigoPorId);
   }
 
   // 2. Se for período ANUAL sem Resultado próprio, derivar somando os
@@ -114,7 +149,8 @@ async function carregarResultados(periodoId: string): Promise<ResultadoUnidade[]
     }
     porUnidade.set(k, cur);
   }
-  return Array.from(porUnidade.values());
+  const agregado = Array.from(porUnidade.values());
+  return aplicarOverrideResultados(agregado, resultadosOverride ?? null, unidadeCodigoPorId);
 }
 
 function periodoToInput(p: { tipo: string; trimestre: number | null; rotulo: string }): PeriodoInput {
@@ -159,7 +195,10 @@ export async function calcularCenario(args: {
   if (!periodo) throw new ApiError("Período não encontrado", 404);
 
   const tabelaSalarial = await carregarTabelaSalarial();
-  const resultados = await carregarResultados(args.periodoId);
+  const resultadosOverride = (cenario.resultadosOverride ?? null) as
+    | Record<string, { lucroLiquido?: number; fundingVariavel?: number }>
+    | null;
+  const resultados = await carregarResultados(args.periodoId, resultadosOverride);
   if (resultados.length === 0) {
     throw new ApiError(`Nenhum ResultadoPeriodo para período ${periodo.rotulo}`, 400);
   }
@@ -497,6 +536,50 @@ export async function salvarOverrideComoPremissa(args: {
   });
 
   return { premissaId: novaPremissa.id };
+}
+
+// ============================================================================
+// Override de resultados (LL/funding por unidade) — edição inline na simulação
+// ============================================================================
+
+/**
+ * Persiste o override dos LL/funding por unidade. Marca dirty.
+ * Passar `null` ou `{}` limpa o override (volta a usar ResultadoPeriodo oficial).
+ */
+export async function atualizarResultadosOverride(args: {
+  cenarioId: string;
+  resultadosOverride: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> | null;
+}): Promise<void> {
+  const cenario = await prisma.cenario.findUnique({
+    where: { id: args.cenarioId },
+    select: { status: true },
+  });
+  if (!cenario) throw new ApiError("Cenário não encontrado", 404);
+  if (cenario.status !== "DRAFT") {
+    throw new ApiError("Apenas cenários em rascunho podem ter insumos editados", 409);
+  }
+
+  // Normaliza: se objeto vazio ou todas entradas vazias, salva null
+  const ov = args.resultadosOverride;
+  let final: Record<string, unknown> | null = null;
+  if (ov && Object.keys(ov).length > 0) {
+    const limpo: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> = {};
+    for (const [id, v] of Object.entries(ov)) {
+      if (v == null) continue;
+      const tem = v.lucroLiquido != null || v.fundingVariavel != null;
+      if (tem) limpo[id] = v;
+    }
+    final = Object.keys(limpo).length > 0 ? limpo : null;
+  }
+
+  await prisma.cenario.update({
+    where: { id: args.cenarioId },
+    data: {
+      resultadosOverride: final as never,
+      parametrosDirty: true,
+      versao: { increment: 1 },
+    },
+  });
 }
 
 function defaultPublico(s: { isFundador: boolean; cargo: string }, modelo: "ATUAL" | "NOVO"): Publico {

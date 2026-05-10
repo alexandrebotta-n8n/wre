@@ -37,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         { href: "/simulacao", label: "Simulação" },
         { href: "/socios", label: "Sócios" },
         { href: "/politica", label: "Política" },
+        ...(!escopo.ehSocioRestrito ? [{ href: "/resultados", label: "Resultados" }] : []),
         ...(!escopo.ehSocioRestrito ? [{ href: "/premissas", label: "Premissas" }] : []),
         ...(session.user.roles.includes("ADMIN") ? [{ href: "/usuarios", label: "Usuários" }] : []),
       ]

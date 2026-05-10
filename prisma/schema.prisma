@@ -306,8 +306,15 @@ model Cenario {
   // Permite mexer nos blocos/pool/chave dentro da simulação sem afetar
   // outros cenários que compartilham a mesma Premissa.
   parametrosOverride Json?
-  // Marca quando o override foi alterado mas o cenário ainda não foi
-  // recalculado. UI mostra ponto vermelho e destaca botão "Recalcular".
+  // Override dos LL/funding por unidade (apenas para este cenário).
+  // Formato: { "<unidadeId>": { lucroLiquido?: number, fundingVariavel?: number } }
+  // Quando definido para uma unidade, prevalece sobre o ResultadoPeriodo oficial
+  // ao chamar carregarResultados. Permite simular "what-if" (ex: -20% LL Sul)
+  // sem alterar os números oficiais de /resultados.
+  resultadosOverride Json?
+  // Marca quando o override (parâmetros OU resultados) foi alterado mas o
+  // cenário ainda não foi recalculado. UI mostra ponto vermelho e destaca
+  // botão "Recalcular".
   parametrosDirty    Boolean       @default(false)
   // Optimistic locking: incrementa em cada update de DRAFT.
   versao          Int            @default(1)

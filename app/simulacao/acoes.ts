@@ -16,7 +16,9 @@ import {
   criarCenarioComDefaults,
   atualizarParametrosOverride,
   salvarOverrideComoPremissa,
+  atualizarResultadosOverride,
 } from "@/lib/cenario-service";
+import { ResultadosOverrideSchema } from "@/lib/schemas/resultados";
 import type { Publico } from "@/lib/domain/dsf";
 
 function rev() {
@@ -311,6 +313,44 @@ export async function atualizarOverrideAction(formData: FormData) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao salvar parâmetros";
     await flashError(msg);
+  }
+  rev();
+}
+
+// ============================================================================
+// Override de resultados (LL/funding por unidade)
+// ============================================================================
+
+export async function atualizarInsumosOverrideAction(formData: FormData) {
+  const session = await auth();
+  const escopo = escopoDe(session?.user as SessionUser | undefined);
+  if (!escopo.podeMutar) {
+    await flashError("Sem permissão para alterar insumos.");
+    return;
+  }
+  const cenarioId = String(formData.get("cenarioId"));
+  const overrideJson = String(formData.get("override") ?? "");
+  let override: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> | null;
+  try {
+    const parsed = overrideJson ? JSON.parse(overrideJson) : null;
+    override = parsed ? ResultadosOverrideSchema.parse(parsed) : null;
+  } catch (e) {
+    await flashError(`Insumos inválidos: ${e instanceof Error ? e.message : "JSON malformado"}`);
+    return;
+  }
+  try {
+    await atualizarResultadosOverride({ cenarioId, resultadosOverride: override });
+    await logAudit({
+      usuarioId: session?.user?.id,
+      acao: "cenario.insumos.atualizar",
+      recurso: `Cenario:${cenarioId}`,
+      meta: { unidades: override ? Object.keys(override) : ["limpou-override"] },
+    });
+    await flashSuccess(
+      override ? "Insumos atualizados — recalcule para ver o impacto." : "Insumos resetados ao default.",
+    );
+  } catch (e) {
+    await flashError(e instanceof Error ? e.message : "Falha ao salvar insumos");
   }
   rev();
 }

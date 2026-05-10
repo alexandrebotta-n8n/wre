@@ -16,9 +16,12 @@ import { SalvarPremissaDialog } from "./salvar-premissa-dialog";
 import { MenuCenario, type CenarioStatus as CenarioStatusType } from "./menu-cenario";
 import { ExplicacaoDialog } from "./explicacao-dialog";
 import { gerarNarrativa } from "@/lib/explicacao/narrativa";
+import { InsumosSheet, type InsumosUnidadeBase } from "@/components/insumos/insumos-sheet";
+import { prisma } from "@/lib/prisma";
+import { carregarHistoricoUnidades } from "@/lib/insumos/historico";
 import type { CenarioCompleto, AreaOption } from "./types";
 
-export function ColunaCenario({
+export async function ColunaCenario({
   slot,
   cenario,
   outroCenarioId,
@@ -113,6 +116,19 @@ export function ColunaCenario({
     (cenario.parametrosOverride as Record<string, unknown> | null) ??
     (cenario.premissa.parametros as Record<string, unknown>);
 
+  // Insumos override do cenário (LL/funding por unidade)
+  const resOverride = (cenario.resultadosOverride ?? null) as
+    | Record<string, { lucroLiquido?: number; fundingVariavel?: number }>
+    | null;
+  const temInsumoOverride = !!resOverride && Object.keys(resOverride).length > 0;
+
+  // Carrega LL/funding default + histórico — só se for editável (ADMIN/CONSULTOR
+  // em cenário DRAFT). Soma trimestres do ano para visão anual única.
+  const unidadesParaSheet: InsumosUnidadeBase[] = editavel
+    ? await carregarInsumosDoAno(cenario.ano, resOverride)
+    : [];
+  const periodoRotulo = `${cenario.ano} (anual)`;
+
   return (
     <Card className="flex flex-col">
       {/* Header */}
@@ -126,8 +142,13 @@ export function ColunaCenario({
               <ModeloBadge modelo={cenario.modelo} />
               <StatusBadge status={cenario.status} />
               {dirty && (
-                <Badge variant="warning" size="sm" title="Parâmetros alterados — recalcule">
+                <Badge variant="warning" size="sm" title="Parâmetros ou insumos alterados — recalcule">
                   ● alterado
+                </Badge>
+              )}
+              {temInsumoOverride && (
+                <Badge variant="info" size="sm" title="Cenário usa insumos customizados">
+                  insumos custom
                 </Badge>
               )}
             </div>
@@ -145,6 +166,15 @@ export function ColunaCenario({
             </CardDescription>
           </div>
           <div className="flex items-center gap-1">
+            {editavel && unidadesParaSheet.length > 0 && (
+              <InsumosSheet
+                cenarioId={cenario.id}
+                cenarioNome={cenario.nome}
+                periodoRotulo={periodoRotulo}
+                totalAtual={totalPacote}
+                unidades={unidadesParaSheet}
+              />
+            )}
             {jaCalculou && (
               <ExplicacaoDialog
                 cenarioNome={cenario.nome}
@@ -346,3 +376,65 @@ function Kpi({
     </div>
   );
 }
+
+// ============================================================================
+// Insumos do ano (LL/funding agregados dos 4 trimestres)
+// ============================================================================
+
+async function carregarInsumosDoAno(
+  ano: number,
+  override: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> | null,
+): Promise<InsumosUnidadeBase[]> {
+  const trimestres = await prisma.periodo.findMany({
+    where: { tipo: "TRIMESTRE", ano },
+    take: 4,
+  });
+  const trimIds = trimestres.map((t) => t.id);
+  const [unidades, resultados, historico] = await Promise.all([
+    prisma.unidade.findMany({
+      where: { ativa: true },
+      orderBy: [{ isMatriz: "desc" }, { codigo: "asc" }],
+      take: 50,
+    }),
+    trimIds.length > 0
+      ? prisma.resultadoPeriodo.findMany({
+          where: { periodoId: { in: trimIds } },
+          take: 200,
+        })
+      : Promise.resolve([]),
+    carregarHistoricoUnidades({ limite: 8 }),
+  ]);
+
+  // Agrega LL/funding dos 4 trimestres por unidade (visão anual)
+  const llPorUn = new Map<string, number>();
+  const fvPorUn = new Map<string, number | null>();
+  for (const r of resultados) {
+    llPorUn.set(r.unidadeId, (llPorUn.get(r.unidadeId) ?? 0) + r.lucroLiquido);
+    if (r.fundingVariavel != null) {
+      fvPorUn.set(r.unidadeId, (fvPorUn.get(r.unidadeId) ?? 0) + r.fundingVariavel);
+    }
+  }
+  const histPorUn = new Map(historico.map((h) => [h.unidadeId, h] as const));
+
+  return unidades.map((u) => {
+    const h = histPorUn.get(u.id);
+    return {
+      unidadeId: u.id,
+      unidadeCodigo: u.codigo,
+      unidadeNome: u.nome,
+      isMatriz: u.isMatriz,
+      llDefault: llPorUn.get(u.id) ?? 0,
+      fundingDefault: fvPorUn.get(u.id) ?? null,
+      llOverride: override?.[u.id]?.lucroLiquido,
+      fundingOverride: override?.[u.id]?.fundingVariavel,
+      hist: {
+        llMedia: h?.llMedia ?? 0,
+        llMin: h?.llMin ?? 0,
+        llMax: h?.llMax ?? 0,
+        amostras: h?.amostras ?? 0,
+        ultimoPeriodo: h?.ultimoPeriodo ?? null,
+      },
+    };
+  });
+}
+

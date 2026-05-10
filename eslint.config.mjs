@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "prisma/migrations/**",
     "lib/generated/**",
+    ".claude/**",
   ]),
   // Regra custom: prisma.<model>.findMany() sem `take` é proibido.
   // Sem upper bound um findMany pode trazer 100k+ linhas e estourar memória.
