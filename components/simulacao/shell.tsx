@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ColunaCenario } from "./coluna-cenario";
 import { ColunaEmpty } from "./coluna-empty";
 import { DrawerCenarios } from "./drawer-cenarios";
+import { AjudaDrawer } from "./ajuda-drawer";
 import { TabelaComparativa } from "./tabela-comparativa";
 import type {
   CenarioListItem,
@@ -76,6 +77,7 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
                 </a>
               </Button>
             )}
+            <AjudaDrawer iconOnly />
           </div>
         }
       />
