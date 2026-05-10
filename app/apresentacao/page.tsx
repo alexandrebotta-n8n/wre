@@ -160,8 +160,15 @@ export default async function ApresentacaoPage({
   // Slide final — fonte de dados
   slides.push(<SlideFonte key="fim" periodo={periodo.rotulo} />);
 
+  // Voltar reabre /simulacao mantendo A/B/período — fluxo natural pós-apresentação.
+  const voltarSp = new URLSearchParams();
+  voltarSp.set("a", cA.id);
+  if (cB) voltarSp.set("b", cB.id);
+  voltarSp.set("periodoId", periodo.id);
+  const voltarHref = `/simulacao?${voltarSp.toString()}`;
+
   return (
-    <Deck totalSlides={slides.length} voltarHref={cB ? "/cenarios/comparar" : `/cenarios/${cA.id}`}>
+    <Deck totalSlides={slides.length} voltarHref={voltarHref}>
       {slides}
     </Deck>
   );
@@ -437,8 +444,14 @@ async function SeletorApresentacao({ escopo }: { escopo: boolean }) {
   return (
     <main className="mx-auto max-w-3xl px-4 sm:px-6 py-8 space-y-6">
       <PageHeader
+        breadcrumb={[{ label: "Simulação", href: "/simulacao" }, { label: "Apresentação" }]}
         title="Modo apresentação"
         description="Selecione 1 cenário (apresentação simples) ou 2 (comparativo) e o período."
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/simulacao">← Voltar à Simulação</Link>
+          </Button>
+        }
       />
 
       <Card>

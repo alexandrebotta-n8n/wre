@@ -106,7 +106,15 @@ export function ColunaCenario({
             </div>
             <CardTitle className="mt-2 text-base truncate">{cenario.nome}</CardTitle>
             <CardDescription>
-              baseada em <strong>{cenario.premissa.nome}</strong> · ano {cenario.ano} · v{cenario.versao}
+              baseada em{" "}
+              <Link
+                href={`/premissas/${cenario.premissa.id}`}
+                className="font-medium text-peri-700 hover:text-peri-900 hover:underline"
+                title="Abrir editor da premissa-template"
+              >
+                {cenario.premissa.nome}
+              </Link>{" "}
+              · ano {cenario.ano} · v{cenario.versao}
             </CardDescription>
           </div>
           <Button asChild variant="ghost" size="sm">

@@ -106,7 +106,7 @@ export default async function PremissaEdit({
   const { id } = await params;
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (escopo.ehSocioRestrito) notFound();
+  if (escopo.ehSocioRestrito) redirect("/simulacao");
   const p = await prisma.premissa.findUnique({ where: { id } });
   if (!p) notFound();
   const params_ = p.parametros as Record<string, unknown>;

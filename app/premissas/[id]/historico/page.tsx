@@ -44,7 +44,7 @@ export default async function HistoricoPage({
   const { id } = await params;
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (escopo.ehSocioRestrito) notFound();
+  if (escopo.ehSocioRestrito) redirect("/simulacao");
 
   const premissa = await prisma.premissa.findUnique({
     where: { id },

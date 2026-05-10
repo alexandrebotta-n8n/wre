@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { Plus, Settings2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { dataHora } from "@/lib/format";
@@ -64,7 +64,9 @@ async function criarAction(formData: FormData) {
 export default async function PremissasPage() {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (escopo.ehSocioRestrito) notFound();
+  // Sócio restrito não tem acesso a premissas — redireciona pra simulação
+  // (UX melhor que um 404 mudo).
+  if (escopo.ehSocioRestrito) redirect("/simulacao");
 
   const premissas = await prisma.premissa.findMany({
     orderBy: [{ atualizadoEm: "desc" }],
@@ -126,22 +128,37 @@ export default async function PremissasPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {premissas.map((p) => (
             <Card key={p.id} className="hover:border-peri-400 transition-colors">
-              <Link href={`/premissas/${p.id}`} className="block p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peri-400 rounded-lg">
+              <div className="p-5">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-semibold text-navy-900 truncate">{p.nome}</h2>
+                  <Link
+                    href={`/premissas/${p.id}`}
+                    className="font-semibold text-navy-900 hover:text-peri-700 hover:underline truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-peri-400 rounded"
+                  >
+                    {p.nome}
+                  </Link>
                   <ModeloBadge modelo={p.modelo} />
                 </div>
                 {p.descricao && <p className="text-sm text-neutral-600 mt-1.5 line-clamp-2">{p.descricao}</p>}
                 <div className="mt-3">
                   <PremissaChips modelo={p.modelo} parametros={p.parametros as Record<string, unknown>} />
                 </div>
-                <div className="text-xs text-neutral-500 mt-3 flex items-center justify-between gap-2 flex-wrap">
-                  <span>
-                    v{p.versao} · {p._count.cenarios} cenário(s) usando · atualizada em {dataHora(p.atualizadoEm)}
-                  </span>
-                  <span className="text-peri-700">Editar →</span>
+                <div className="text-xs text-neutral-500 mt-3">
+                  v{p.versao} · {p._count.cenarios} cenário(s) usando · atualizada em {dataHora(p.atualizadoEm)}
                 </div>
-              </Link>
+                <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center gap-2 flex-wrap">
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/premissas/${p.id}`}>Editar template</Link>
+                  </Button>
+                  {escopo.podeMutar && (
+                    <Button asChild variant="ghost" size="sm">
+                      <Link href={`/simulacao?drawer=1`}>Usar em novo cenário</Link>
+                    </Button>
+                  )}
+                  <Button asChild variant="ghost" size="sm" className="ml-auto">
+                    <Link href={`/premissas/${p.id}/historico`}>Histórico</Link>
+                  </Button>
+                </div>
+              </div>
             </Card>
           ))}
         </div>
