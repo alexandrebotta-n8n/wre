@@ -19,6 +19,7 @@ import { Badge, ModeloBadge, StatusBadge } from "@/components/ui/badge";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { criarCenarioAction } from "@/app/simulacao/acoes";
 import { MenuCenario } from "./menu-cenario";
+import { AjudaDrawer } from "./ajuda-drawer";
 import type { CenarioListItem, PremissaOption } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -90,9 +91,12 @@ export function DrawerCenarios({
                 Clique em &ldquo;Abrir como A&rdquo; ou &ldquo;B&rdquo; para colocar na coluna correspondente.
               </DialogDescription>
             </div>
-            <DialogClose className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-neutral-100" aria-label="Fechar">
-              <X className="h-4 w-4" />
-            </DialogClose>
+            <div className="flex items-center gap-1">
+              <AjudaDrawer iconOnly secaoInicial="cenarios" triggerVariant="ghost" />
+              <DialogClose className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-neutral-100" aria-label="Fechar">
+                <X className="h-4 w-4" />
+              </DialogClose>
+            </div>
           </div>
 
           {/* Filtros */}

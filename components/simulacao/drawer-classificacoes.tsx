@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { atualizarClassificacoesAction } from "@/app/simulacao/acoes";
+import { AjudaDrawer } from "./ajuda-drawer";
 import type { Publico } from "@/lib/domain/dsf";
 
 const PUBLICOS: Publico[] = [
@@ -119,6 +120,7 @@ export function DrawerClassificacoes({
             >
               Salvar tudo
             </Button>
+            <AjudaDrawer iconOnly secaoInicial="classificar" triggerVariant="ghost" />
             <DialogClose className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-neutral-100" aria-label="Fechar">
               <X className="h-4 w-4" />
             </DialogClose>

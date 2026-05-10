@@ -80,16 +80,26 @@ export async function ColunaCenario({
     ? "4 trimestres ok"
     : `${trimsCalculados.size}/4 trimestres`;
   const steps: Step[] = [
-    { label: "Classificar", description: `${cenario.classificacoes.length} sócios`, state: "done" },
+    {
+      label: "Classificar",
+      description: `${cenario.classificacoes.length} sócios`,
+      state: "done",
+      tooltip:
+        "Define cada sócio: público (SC, SServiço, Líder), % de quotas, peso no Bloco B e originação esperada. Base do cálculo.",
+    },
     {
       label: "Calcular",
       description: calcDescricao,
       state: cobertura4Trims && !dirty ? "done" : "current",
+      tooltip:
+        "Roda o engine DSF nos 4 trimestres do ano com os parâmetros atuais (override ou premissa) e gera o pacote de cada sócio.",
     },
     {
       label: "Revisar",
       description: errosCount > 0 ? `${errosCount} erro(s)` : "alertas ok",
       state: cobertura4Trims ? (errosCount > 0 ? "current" : "done") : "pending",
+      tooltip:
+        "Confere alertas e valores. Erros [ERROR] bloqueiam Publicar; warnings só avisam.",
     },
     {
       label: "Publicar",
@@ -100,6 +110,8 @@ export async function ColunaCenario({
           : cobertura4Trims && errosCount === 0
           ? "current"
           : "pending",
+      tooltip:
+        "Congela o cenário como snapshot imutável (APPLIED). Outros APPLIED do mesmo modelo+ano são arquivados automaticamente.",
     },
   ];
 

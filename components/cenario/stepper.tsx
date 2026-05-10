@@ -1,12 +1,15 @@
 import * as React from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export interface Step {
   label: string;
   description?: string;
   /** done | current | pending | locked */
   state: "done" | "current" | "pending" | "locked";
+  /** Texto exibido no hover — explica o propósito da etapa. */
+  tooltip?: string;
 }
 
 export function Stepper({ steps }: { steps: Step[] }) {
@@ -15,39 +18,48 @@ export function Stepper({ steps }: { steps: Step[] }) {
       {steps.map((s, i) => {
         const isLast = i === steps.length - 1;
         const numero = i + 1;
+        const interno = (
+          <div className="flex items-center gap-2 min-w-0 cursor-help">
+            <span
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                s.state === "done" && "bg-mint-500 text-white",
+                s.state === "current" && "bg-peri-600 text-white ring-4 ring-peri-200",
+                s.state === "pending" && "bg-neutral-200 text-neutral-600",
+                s.state === "locked" && "bg-neutral-100 text-neutral-400",
+              )}
+              aria-hidden
+            >
+              {s.state === "done" ? <Check className="h-3.5 w-3.5" /> : numero}
+            </span>
+            <div className="min-w-0">
+              <div
+                className={cn(
+                  "text-sm font-medium truncate",
+                  s.state === "current"
+                    ? "text-navy-900"
+                    : s.state === "done"
+                    ? "text-neutral-700"
+                    : "text-neutral-500",
+                )}
+              >
+                {s.label}
+              </div>
+              {s.description && (
+                <div className="text-xs text-neutral-500 truncate">{s.description}</div>
+              )}
+            </div>
+          </div>
+        );
         return (
           <li key={s.label} className="flex items-center flex-1 min-w-[140px]">
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                  s.state === "done" && "bg-mint-500 text-white",
-                  s.state === "current" && "bg-peri-600 text-white ring-4 ring-peri-200",
-                  s.state === "pending" && "bg-neutral-200 text-neutral-600",
-                  s.state === "locked" && "bg-neutral-100 text-neutral-400",
-                )}
-                aria-hidden
-              >
-                {s.state === "done" ? <Check className="h-3.5 w-3.5" /> : numero}
-              </span>
-              <div className="min-w-0">
-                <div
-                  className={cn(
-                    "text-sm font-medium truncate",
-                    s.state === "current"
-                      ? "text-navy-900"
-                      : s.state === "done"
-                      ? "text-neutral-700"
-                      : "text-neutral-500",
-                  )}
-                >
-                  {s.label}
-                </div>
-                {s.description && (
-                  <div className="text-xs text-neutral-500 truncate">{s.description}</div>
-                )}
-              </div>
-            </div>
+            {s.tooltip ? (
+              <Tooltip content={s.tooltip} side="top">
+                {interno}
+              </Tooltip>
+            ) : (
+              interno
+            )}
             {!isLast && (
               <div
                 className={cn(
