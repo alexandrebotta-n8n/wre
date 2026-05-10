@@ -125,8 +125,17 @@ A página principal é **`/simulacao`** — combina lista de cenários + compara
 |---|---|
 | `/simulacao?a=&b=&periodoId=` | **Página única.** 2 colunas (A | B) com painéis de parâmetros editáveis (com tooltips e chips do valor calculado), stepper, KPIs, tabela alinhada por sócio com Δ — **clicar no sócio expande o waterfall** com a composição passo a passo (trace). Botão "📖 Explicar" gera narrativa textual do cenário. Drawer lateral = lista de cenários filtrada. |
 | `/socios` | Base — sócios e líderes ativos. |
-| `/politica` | Política de Partnership DSF + Relatório Técnico (TOC + tabs + .docx download). Acesso a todos autenticados, **inclusive sócios restritos**. |
-| `/como-funciona` | Página explicativa do fluxo de cálculo (LL → RDA → Blocos A/B/C) + glossário. Linkada via "como cheguei aqui?" em cada drill-down. |
+| `/politica` | **Hub navegável** da Política DSF: cards por tema agrupados em 4 áreas (Fundamentos · Trilha societária · Modelo econômico · Ciclo de vida) + busca + atalhos para o documento integral. Acesso a todos autenticados, **inclusive sócios restritos**. |
+| `/politica/[tema]` | Páginas de tema (12: princípios, categorias-socio, progressao-vesting, lideres-unidade, ingresso-lateral, governanca, blocos, pool-unidade, pesos-perfil-area, permanencia-saida, expansao, disposicoes-finais). Cada uma tem resumo executivo + visual (diagrama/matriz/tabela) + exemplo prático com link para Simulação + texto integral colapsável (cláusula + anexo) + cross-links "Veja também". |
+| `/politica/buscar?q=` | Resultados da busca client/server-side sobre todo o conteúdo (títulos·resumos·corpo) com snippets destacados. |
+| `/politica/documento-completo` | Texto integral da Política com TOC sticky lateral (era o `/politica` da Fase 1). |
+| `/politica/relatorio-tecnico` | Texto integral do Relatório Técnico WRE com TOC sticky. |
+| `/como-funciona` | **Hub** de explicação do cálculo. 4 cards: Modelo NOVO · Modelo ATUAL · 8 Etapas · Glossário. |
+| `/como-funciona/modelo-novo` | Detalhe do modelo NOVO (RDA → Blocos A/B/C). |
+| `/como-funciona/modelo-atual` | Detalhe do modelo ATUAL (baseline 1T2026). |
+| `/como-funciona/etapas` | Índice das 8 etapas em ordem de apuração. |
+| `/como-funciona/etapas/[n]` | Detalhe de cada etapa: fórmula, descrição, exemplo numérico, link para a cláusula correspondente. |
+| `/como-funciona/glossario` | Glossário de termos com cross-links para temas da Política. |
 | `/premissas` | Catálogo de templates (params iniciais para novos cenários). Mostra count "N cenários usando". |
 | `/premissas/[id]` | Editor da premissa-template + histórico de versões. |
 | `/usuarios` | ADMIN — gestão de acessos. |

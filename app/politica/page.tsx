@@ -1,5 +1,5 @@
-// Página /politica — leitura da Política de Partnership DSF + Relatório técnico.
-// Acessível a todos autenticados (inclusive sócios restritos).
+// Hub /politica — entrada principal da Política DSF.
+// Cards visuais agrupados em 4 áreas + busca + atalhos para texto integral.
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Download, FileText, BookOpen } from "lucide-react";
@@ -8,131 +8,94 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { POLITICA_MD } from "./conteudo/politica";
-import { RELATORIO_MD } from "./conteudo/relatorio";
-import { MarkdownContent, extractToc } from "./markdown";
+import { TemaCard } from "./componentes/tema-card";
+import { BuscaPolitica } from "./componentes/busca-politica";
+import { temasPorGrupo, GRUPOS } from "./conteudo/temas";
 
 export const metadata = { title: "Política DSF — WRE Simulador" };
 
-export default async function PoliticaPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ doc?: string }>;
-}) {
+export default async function PoliticaHub() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const sp = await searchParams;
-  const ativa = sp.doc === "relatorio" ? "relatorio" : "politica";
-
-  const md = ativa === "relatorio" ? RELATORIO_MD : POLITICA_MD;
-  const toc = extractToc(md, 1); // só headings de nível 1 (CLÁUSULA / ANEXO / numeração principal)
-
-  const arquivoDownload =
-    ativa === "relatorio"
-      ? "/docs/relatorio-revisao-tecnica-v8.docx"
-      : "/docs/politica-partnership-dsf.docx";
+  const grupos = temasPorGrupo();
+  const ordemGrupos: (keyof typeof GRUPOS)[] = ["fundamentos", "trilha", "modelo-economico", "ciclo-vida"];
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6 space-y-5">
+    <main className="mx-auto max-w-[1300px] px-4 sm:px-6 py-6 space-y-6">
       <PageHeader
-        breadcrumb={[{ label: "Início", href: "/simulacao" }, { label: "Política DSF" }]}
-        title="Política de Partnership DSF"
-        description="Documento estruturante do sistema de partnership, governança e modelo econômico — uso interno DSF."
+        breadcrumb={[{ label: "Início", href: "/simulacao" }, { label: "Política" }]}
+        title="Política DSF"
+        description="Sistema de partnership, governança e modelo econômico — navegue por tema, busque por palavra ou abra o documento integral."
         meta={
           <>
             <Badge variant="success" size="sm">vigente</Badge>
             <span className="text-neutral-500">·</span>
-            <span>Versão consolidada · confidencial</span>
+            <span>Versão consolidada · uso interno DSF</span>
           </>
         }
-        actions={
-          <Button asChild variant="outline" size="sm">
-            <a href={arquivoDownload} download>
-              <Download className="h-3.5 w-3.5" /> Baixar .docx
-            </a>
-          </Button>
-        }
+        actions={<BuscaPolitica />}
       />
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-neutral-200">
-        <TabLink ativo={ativa === "politica"} href="/politica" icon={<BookOpen className="h-3.5 w-3.5" />}>
-          Política de Partnership
-        </TabLink>
-        <TabLink ativo={ativa === "relatorio"} href="/politica?doc=relatorio" icon={<FileText className="h-3.5 w-3.5" />}>
-          Relatório de Revisão Técnica
-        </TabLink>
-        <span className="ml-auto text-xs text-neutral-500 pb-1.5 hidden md:block">
-          Dúvidas sobre como o modelo é aplicado nos cálculos? Veja{" "}
-          <Link href="/como-funciona" className="text-peri-700 hover:underline font-medium">
-            Como funciona
-          </Link>
-          .
-        </span>
-      </div>
+      {/* Atalhos para conteúdo integral */}
+      <Card className="p-4 bg-neutral-50/60">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-neutral-500 mr-2">
+            Atalhos
+          </span>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/politica/documento-completo">
+              <BookOpen className="h-3.5 w-3.5" /> Documento completo
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/politica/relatorio-tecnico">
+              <FileText className="h-3.5 w-3.5" /> Relatório técnico WRE
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <a href="/docs/politica-partnership-dsf.docx" download>
+              <Download className="h-3.5 w-3.5" /> Política (.docx)
+            </a>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <a href="/docs/relatorio-revisao-tecnica-v8.docx" download>
+              <Download className="h-3.5 w-3.5" /> Relatório (.docx)
+            </a>
+          </Button>
+        </div>
+      </Card>
 
-      {/* Layout: TOC + Conteúdo */}
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-        {/* TOC sticky em desktop */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-4">
-            <Card className="p-3">
-              <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-500 mb-2">
-                Sumário
-              </div>
-              <nav>
-                <ol className="space-y-1 text-xs">
-                  {toc.map((entry) => (
-                    <li key={entry.id}>
-                      <a
-                        href={`#${entry.id}`}
-                        className="block px-2 py-1 rounded text-neutral-700 hover:bg-peri-50 hover:text-peri-800 transition-colors leading-snug"
-                      >
-                        {entry.titulo}
-                      </a>
-                    </li>
-                  ))}
-                </ol>
-              </nav>
-            </Card>
+      {/* Grupos de temas */}
+      {ordemGrupos.map((g) => (
+        <section key={g} className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-navy-900">{GRUPOS[g].titulo}</h2>
+            <p className="text-sm text-neutral-600">{GRUPOS[g].descricao}</p>
           </div>
-        </aside>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {grupos[g].map((t) => (
+              <TemaCard key={t.slug} tema={t} />
+            ))}
+          </div>
+        </section>
+      ))}
 
-        {/* Conteúdo */}
-        <article className="min-w-0">
-          <Card className="px-6 py-6 lg:px-10 lg:py-8">
-            <MarkdownContent md={md} />
-          </Card>
-        </article>
-      </div>
+      {/* Rodapé com link para Como funciona */}
+      <Card className="p-5 bg-peri-50/40 border-peri-200">
+        <div className="flex items-start gap-4 flex-wrap">
+          <div className="flex-1 min-w-[220px]">
+            <h3 className="font-semibold text-navy-900">Como o modelo se traduz em números?</h3>
+            <p className="text-sm text-neutral-700 mt-1">
+              A página <strong>Como funciona</strong> mostra o fluxo completo do cálculo (do LL Matriz até o
+              pacote de cada sócio) com diagramas, fórmulas e glossário.
+            </p>
+          </div>
+          <Button asChild variant="primary" size="sm">
+            <Link href="/como-funciona">Como funciona →</Link>
+          </Button>
+        </div>
+      </Card>
     </main>
-  );
-}
-
-function TabLink({
-  href,
-  ativo,
-  icon,
-  children,
-}: {
-  href: string;
-  ativo: boolean;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={
-        "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors " +
-        (ativo
-          ? "border-peri-600 text-peri-800"
-          : "border-transparent text-neutral-600 hover:text-navy-900 hover:border-neutral-300")
-      }
-    >
-      {icon}
-      {children}
-    </Link>
   );
 }
