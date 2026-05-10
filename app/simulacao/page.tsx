@@ -64,10 +64,11 @@ export default async function SimulacaoPage({
   }));
 
   // Defaults inteligentes quando nada selecionado:
-  // A = última APPLIED NOVO (fallback DRAFT NOVO)
-  // B = última APPLIED ATUAL (fallback DRAFT ATUAL)
-  const aId = sp.a ?? defaultPara(todosCenarios, "NOVO");
-  const bId = sp.b ?? defaultPara(todosCenarios, "ATUAL");
+  // A = ATUAL (baseline — sistema de remuneração vigente)
+  // B = NOVO  (proposta — Política DSF v1)
+  // Esta ordem é o padrão de leitura: "do que temos hoje, pra onde vamos".
+  const aId = sp.a ?? defaultPara(todosCenarios, "ATUAL");
+  const bId = sp.b ?? defaultPara(todosCenarios, "NOVO");
   // Default de período: prioriza ANUAL com dados (visão consolidada que
   // os sócios deliberam). Fallback: 1º período qualquer com dados.
   const periodoId =

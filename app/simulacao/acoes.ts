@@ -54,7 +54,20 @@ export async function criarCenarioAction(formData: FormData) {
       recurso: `Cenario:${c.id}`,
       meta: { nome, ano, modelo, slot },
     });
-    await flashSuccess(`Cenário "${nome}" criado e aberto na coluna ${slot.toUpperCase()}.`);
+
+    // Auto-calcular se houver período com dados — UX fluida: 1 clique
+    // do empty state já entrega cenário calculado, pronto pra comparar.
+    let mensagem = `Cenário "${nome}" criado e aberto na coluna ${slot.toUpperCase()}.`;
+    if (periodoId) {
+      try {
+        await calcularCenario({ cenarioId: c.id, periodoId });
+        mensagem = `Cenário "${nome}" criado e calculado. Veja a comparação.`;
+      } catch {
+        // Falha no cálculo automático não bloqueia — usuário vê cenário sem
+        // valores e pode clicar "Calcular" manualmente. Mensagem normal.
+      }
+    }
+    await flashSuccess(mensagem);
     const params = new URLSearchParams();
     if (slot === "a") {
       params.set("a", c.id);

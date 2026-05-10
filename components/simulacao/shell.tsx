@@ -44,6 +44,11 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
   const bId = props.cenarioB?.id ?? "";
   const periodoId = props.periodoIdSelecionado;
 
+  // A=ATUAL (baseline), B=NOVO (proposta) — ordem de leitura natural.
+  // Se a coluna está vazia, sugerimos criar com a premissa default daquele modelo.
+  const premissaDefaultAtual = props.premissas.find((p) => p.modelo === "ATUAL");
+  const premissaDefaultNovo = props.premissas.find((p) => p.modelo === "NOVO");
+
   const apresentarHref =
     aId && periodoId
       ? `/apresentacao?a=${aId}${bId ? `&b=${bId}` : ""}&periodoId=${periodoId}`
@@ -107,7 +112,15 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             modoNome={props.modoNome}
           />
         ) : (
-          <ColunaEmpty slot="a" outroCenarioId={bId} periodoId={periodoId} />
+          <ColunaEmpty
+            slot="a"
+            outroCenarioId={bId}
+            periodoId={periodoId}
+            modeloSugerido="ATUAL"
+            premissaDefaultId={premissaDefaultAtual?.id}
+            premissaDefaultNome={premissaDefaultAtual?.nome}
+            podeMutar={props.podeMutar && !props.ehSocioRestrito}
+          />
         )}
         {props.cenarioB ? (
           <ColunaCenario
@@ -120,7 +133,15 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             modoNome={props.modoNome}
           />
         ) : (
-          <ColunaEmpty slot="b" outroCenarioId={aId} periodoId={periodoId} />
+          <ColunaEmpty
+            slot="b"
+            outroCenarioId={aId}
+            periodoId={periodoId}
+            modeloSugerido="NOVO"
+            premissaDefaultId={premissaDefaultNovo?.id}
+            premissaDefaultNome={premissaDefaultNovo?.nome}
+            podeMutar={props.podeMutar && !props.ehSocioRestrito}
+          />
         )}
       </div>
 
