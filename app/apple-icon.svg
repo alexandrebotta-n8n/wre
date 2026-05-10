@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Apple touch icon — versão maior do mesmo design, com mais respiro. -->
+  <rect width="180" height="180" rx="36" fill="#000087"/>
+  <path
+    d="M30 50 L60 130 L90 80 L120 130 L150 50"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <rect x="34" y="148" width="112" height="10" rx="5" fill="#2effa0"/>
+  <rect x="34" y="160" width="112" height="6" rx="3" fill="#7280f0"/>
+</svg>
