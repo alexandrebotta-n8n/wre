@@ -44,11 +44,23 @@ export default async function SimulacaoPage({
       : Promise.resolve([]),
   ]);
 
+  // Anos que têm pelo menos um trimestre com dados — usado para marcar
+  // o período ANUAL como "calculável" (cenario-service deriva o anual
+  // somando os trimestres disponíveis automaticamente).
+  const anosComTriDados = new Set(
+    periodosRaw
+      .filter((p) => p.tipo === "TRIMESTRE" && p._count.resultados > 0)
+      .map((p) => p.ano),
+  );
+
   const periodos = periodosRaw.map((p) => ({
     id: p.id,
     rotulo: p.rotulo,
     tipo: p.tipo as "TRIMESTRE" | "ANO",
-    temDados: p._count.resultados > 0,
+    // ANO sem Resultado próprio mas com trimestres do mesmo ano = calculável.
+    temDados:
+      p._count.resultados > 0 ||
+      (p.tipo === "ANO" && anosComTriDados.has(p.ano)),
   }));
 
   // Defaults inteligentes quando nada selecionado:
@@ -56,7 +68,14 @@ export default async function SimulacaoPage({
   // B = última APPLIED ATUAL (fallback DRAFT ATUAL)
   const aId = sp.a ?? defaultPara(todosCenarios, "NOVO");
   const bId = sp.b ?? defaultPara(todosCenarios, "ATUAL");
-  const periodoId = sp.periodoId ?? periodos.find((p) => p.temDados)?.id ?? periodos[0]?.id ?? "";
+  // Default de período: prioriza ANUAL com dados (visão consolidada que
+  // os sócios deliberam). Fallback: 1º período qualquer com dados.
+  const periodoId =
+    sp.periodoId ??
+    periodos.find((p) => p.tipo === "ANO" && p.temDados)?.id ??
+    periodos.find((p) => p.temDados)?.id ??
+    periodos[0]?.id ??
+    "";
 
   const filtroSocio = escopo.ehSocioRestrito
     ? { socioId: escopo.socioIdEscopo ?? "__nada__" }
