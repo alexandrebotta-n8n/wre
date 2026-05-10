@@ -16,7 +16,14 @@ import { PremissaChips } from "@/components/premissa/chips";
 import { atualizarOverrideAction } from "@/app/simulacao/acoes";
 import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { AreaOption } from "./types";
+
+const TOL = 0.001;
+
+function aproxIgual(soma: number, alvo: number): boolean {
+  return Math.abs(soma - alvo) <= TOL;
+}
 
 export function PainelParametros({
   cenarioId,
@@ -155,6 +162,18 @@ function FormParamsAtual({
           reservaPercentual: Number(fd.get("reservaPercentual")),
           reservaViraPremio: fd.get("reservaViraPremio") === "on",
         };
+        // Validação client-side antes do server (evita form.reset confuso).
+        const erros: string[] = [];
+        if (override.proLaboreMensal < 0) erros.push("Pró-labore não pode ser negativo");
+        if (override.reservaPercentual < 0 || override.reservaPercentual > 1) {
+          erros.push(`Reserva (%) deve estar entre 0 e 1 (atual: ${override.reservaPercentual})`);
+        }
+        if (!override.unidadeFundadores) erros.push("Unidade fundadores não pode ser vazia");
+        if (!override.unidadeMatriz) erros.push("Unidade matriz não pode ser vazia");
+        if (erros.length > 0) {
+          toast.error(erros.join(" · "), { duration: 6000 });
+          return;
+        }
         const fd2 = new FormData();
         fd2.set("cenarioId", cenarioId);
         fd2.set("override", JSON.stringify(override));
@@ -244,22 +263,68 @@ function FormParamsNovo({
         const mixIncremental = Number(fd.get("mixIncremental") ?? 0);
         const distribuicao = String(fd.get("distribuicaoBlocoB") ?? "UNIFORME");
 
+        const blocoA = Number(fd.get("percentualBlocoA"));
+        const blocoB = Number(fd.get("percentualBlocoB"));
+        const blocoC = Number(fd.get("percentualBlocoC"));
+        const poolSoc = Number(fd.get("poolSociedade"));
+        const poolLid = Number(fd.get("poolLider"));
+        const poolEq = Number(fd.get("poolEquipeReserva"));
+        const chvOrig = Number(fd.get("chaveOriginacao"));
+        const chvExec = Number(fd.get("chaveExecucao"));
+        const chvGes = Number(fd.get("chaveGestaoCP"));
+        const fxOrigMin = Number(fd.get("faixaOrigMin"));
+        const fxOrigMax = Number(fd.get("faixaOrigMax"));
+        const fxExecMin = Number(fd.get("faixaExecMin"));
+        const fxExecMax = Number(fd.get("faixaExecMax"));
+        const fxGesMin = Number(fd.get("faixaGestaoMin"));
+        const fxGesMax = Number(fd.get("faixaGestaoMax"));
+
+        // Validação client-side: as mesmas regras do schema do servidor.
+        // Falhar aqui é melhor UX que ver o flashError genérico depois do
+        // submit (que ainda gera form.reset e parece "voltar pro default").
+        const erros: string[] = [];
+        if (!aproxIgual(blocoA + blocoB + blocoC, 1)) {
+          erros.push(`Blocos A+B+C devem somar 1.00 (atual: ${(blocoA + blocoB + blocoC).toFixed(2)})`);
+        }
+        if (!aproxIgual(poolSoc + poolLid + poolEq, 1)) {
+          erros.push(`Pool de unidade deve somar 1.00 (atual: ${(poolSoc + poolLid + poolEq).toFixed(2)})`);
+        }
+        if (!aproxIgual(chvOrig + chvExec + chvGes, 1)) {
+          erros.push(`Chave-padrão interunidades deve somar 1.00 (atual: ${(chvOrig + chvExec + chvGes).toFixed(2)})`);
+        }
+        if (fxOrigMin > fxOrigMax) erros.push("Faixa originação: min > max");
+        if (fxExecMin > fxExecMax) erros.push("Faixa execução: min > max");
+        if (fxGesMin > fxGesMax) erros.push("Faixa gestão: min > max");
+        if (Object.keys(pesosOrganico).length > 0) {
+          if (!aproxIgual(mixOrganico + mixIncremental, 1)) {
+            erros.push(`Mix Orgânico + Incremental deve somar 1.00 (atual: ${(mixOrganico + mixIncremental).toFixed(2)})`);
+          }
+          const sOrg = Object.values(pesosOrganico).reduce((a, v) => a + v, 0);
+          const sInc = Object.values(pesosIncremental).reduce((a, v) => a + v, 0);
+          if (!aproxIgual(sOrg, 1)) erros.push(`Pesos orgânicos por área devem somar 1.00 (atual: ${sOrg.toFixed(2)})`);
+          if (!aproxIgual(sInc, 1)) erros.push(`Pesos incrementais por área devem somar 1.00 (atual: ${sInc.toFixed(2)})`);
+        }
+        if (erros.length > 0) {
+          toast.error(erros.join(" · "), { duration: 6000 });
+          return;
+        }
+
         const override: Record<string, unknown> = {
-          percentualBlocoA: Number(fd.get("percentualBlocoA")),
-          percentualBlocoB: Number(fd.get("percentualBlocoB")),
-          percentualBlocoC: Number(fd.get("percentualBlocoC")),
-          poolSociedade: Number(fd.get("poolSociedade")),
-          poolLider: Number(fd.get("poolLider")),
-          poolEquipeReserva: Number(fd.get("poolEquipeReserva")),
-          chaveOriginacao: Number(fd.get("chaveOriginacao")),
-          chaveExecucao: Number(fd.get("chaveExecucao")),
-          chaveGestaoCP: Number(fd.get("chaveGestaoCP")),
-          faixaOrigMin: Number(fd.get("faixaOrigMin")),
-          faixaOrigMax: Number(fd.get("faixaOrigMax")),
-          faixaExecMin: Number(fd.get("faixaExecMin")),
-          faixaExecMax: Number(fd.get("faixaExecMax")),
-          faixaGestaoMin: Number(fd.get("faixaGestaoMin")),
-          faixaGestaoMax: Number(fd.get("faixaGestaoMax")),
+          percentualBlocoA: blocoA,
+          percentualBlocoB: blocoB,
+          percentualBlocoC: blocoC,
+          poolSociedade: poolSoc,
+          poolLider: poolLid,
+          poolEquipeReserva: poolEq,
+          chaveOriginacao: chvOrig,
+          chaveExecucao: chvExec,
+          chaveGestaoCP: chvGes,
+          faixaOrigMin: fxOrigMin,
+          faixaOrigMax: fxOrigMax,
+          faixaExecMin: fxExecMin,
+          faixaExecMax: fxExecMax,
+          faixaGestaoMin: fxGesMin,
+          faixaGestaoMax: fxGesMax,
           proRataMinMeses: Number(fd.get("proRataMinMeses")),
           distribuicaoBlocoB: distribuicao,
         };
@@ -405,7 +470,12 @@ function Grupo({
           />
         </button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="px-2 pt-2 pb-3">{children}</CollapsibleContent>
+      {/* forceMount: mantém os inputs no DOM mesmo quando fechado, para que o
+          FormData do submit carregue todos os parâmetros (e não só os do grupo
+          aberto). Sem isso, campos colapsados viram 0 e o schema rejeita. */}
+      <CollapsibleContent forceMount className="px-2 pt-2 pb-3 data-[state=closed]:hidden">
+        {children}
+      </CollapsibleContent>
     </Collapsible>
   );
 }
