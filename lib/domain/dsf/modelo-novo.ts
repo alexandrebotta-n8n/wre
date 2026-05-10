@@ -43,20 +43,44 @@ export interface InputModeloNovo {
   premissas: PremissasModeloNovo;
 }
 
+// Elegibilidade conforme matriz oficial Política DSF v1 (mecanismo × categoria):
+//
+//                       SCap  SCapGes SCapLid SServ SServEstr LiderNE
+//   Pró-labore            D     D       D       D     D         N/A
+//   Bloco A               D     D       D       N/A   N/A       N/A
+//   Bloco B               D     D       D       D     D         N/A
+//   Bloco C               Excepcional p/ todas
+//   Rem. Administração    N/A   D       Cond    D     Cond      N/A
+//   Pool Unidade (30%)    N/A   N/A     D       N/A   N/A       D
+//   Créditos O/E/G        Cumulativo p/ todas
+//
+// (D = Default, Cond = Condicionado, N/A = Não aplicável)
+// "Condicionado" é codificado como "tem nivelCargo+faixaSalarial cadastrados".
 const PUBLICOS_CAPITAL: Publico[] = [
   "SOCIO_CAPITAL",
   "SOCIO_CAPITAL_GESTOR",
   "SOCIO_CAPITAL_LIDER_UNIDADE",
 ];
+// Bloco B: 5 categorias (todas exceto Líder Non-Equity).
 const PUBLICOS_BLOCO_B: Publico[] = [
   ...PUBLICOS_CAPITAL,
   "SOCIO_SERVICOS",
   "SOCIO_SERVICOS_ESTRATEGICO",
-  "LIDER_UNIDADE_NON_EQUITY",
 ];
-// Categorias da Política DSF v1 que recebem pró-labore. Legado/transição
-// (LIDER_TECNICO, FUNDADOR) não recebem — esses são tratados pelo modelo ATUAL.
+// Pró-labore: mesmas 5 categorias. Líder Non-Equity NÃO recebe.
 const PUBLICOS_PRO_LABORE: Publico[] = [...PUBLICOS_BLOCO_B];
+// Remuneração de Administração: 4 categorias.
+//   Default: SOCIO_CAPITAL_GESTOR, SOCIO_SERVICOS
+//   Condicionado: SOCIO_CAPITAL_LIDER_UNIDADE, SOCIO_SERVICOS_ESTRATEGICO
+// O engine aplica em qualquer um dos 4 desde que tenha nivelCargo+faixaSalarial
+// cadastrados — para os 2 "Default", o cadastro espera-se sempre presente;
+// para os 2 "Condicionado", só vem preenchido quando há cargo formal de admin.
+const PUBLICOS_REM_ADMIN: Publico[] = [
+  "SOCIO_CAPITAL_GESTOR",
+  "SOCIO_CAPITAL_LIDER_UNIDADE",
+  "SOCIO_SERVICOS",
+  "SOCIO_SERVICOS_ESTRATEGICO",
+];
 
 export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const { periodo, socios, resultados, premissas } = input;
@@ -64,11 +88,15 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const unidades = resultados.filter((r) => !r.isMatriz);
   const llMatriz = matriz?.lucroLiquido ?? 0;
 
-  // Etapa 3 — Remuneração de Administração (calculada antes; é custo)
+  // Etapa 3 — Remuneração de Administração (calculada antes; é custo).
+  // Aplica às 4 categorias da matriz oficial (Default + Condicionado).
+  // Default vs Condicionado fica codificado pela presença de nivelCargo+faixaSalarial:
+  // Capital Gestor e Sócio Serviços conceitualmente sempre têm; Capital Líder e
+  // Serviços Estratégico só recebem se o usuário cadastrar cargo formal.
   let totalAdmin = 0;
   const adminPorSocio = new Map<string, number>();
   for (const s of socios) {
-    if (s.publico === "SOCIO_CAPITAL_GESTOR" && s.nivelCargo && s.faixaSalarial) {
+    if (PUBLICOS_REM_ADMIN.includes(s.publico) && s.nivelCargo && s.faixaSalarial) {
       const mensal = premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0;
       const valor = mensal * periodo.meses;
       adminPorSocio.set(s.id, valor);

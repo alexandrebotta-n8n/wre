@@ -60,6 +60,31 @@ const TERMOS: Termo[] = [
     refs: [{ href: "/resultados?tab=originacao", label: "/resultados → Individuais" }],
   },
   {
+    termo: "Default (matriz)",
+    def: "Status na matriz Mecanismo × Categoria: o sócio daquela categoria recebe esse mecanismo automaticamente, sem condição adicional. Ex.: Sócio de Capital recebe Bloco A por Default.",
+    refs: [{ href: "/politica/categorias-socio", label: "Matriz oficial" }],
+  },
+  {
+    termo: "Não aplicável (N/A)",
+    def: "Status na matriz: a categoria nunca recebe esse mecanismo, independentemente de cadastro ou cenário. Ex.: Líder Non-Equity não recebe Pró-labore nem Bloco B.",
+    refs: [{ href: "/politica/categorias-socio", label: "Matriz oficial" }],
+  },
+  {
+    termo: "Excepcional (matriz)",
+    def: "Status na matriz: aplicação não é automática — depende de decisão discricionária do Comitê. É o status do Bloco C para todas as 6 categorias (reserva estratégica retida).",
+    refs: [{ href: "/politica/expansao", label: "Bloco C / reserva" }],
+  },
+  {
+    termo: "Condicionado (matriz)",
+    def: "Status na matriz: o sócio só recebe esse mecanismo se uma condição específica for atendida. No engine, traduz-se em ‘ter nivelCargo + faixaSalarial cadastrados’. Aplica-se à Remuneração de Administração para Capital Líder e Serviços Estratégico.",
+    refs: [{ href: "/politica/categorias-socio", label: "Matriz oficial" }],
+  },
+  {
+    termo: "Cumulativo (matriz)",
+    def: "Status na matriz: o mecanismo se aplica sempre que o sócio gerar o fato gerador, somando-se aos demais componentes do pacote. É o status dos Créditos de Originação, Execução e Gestão para todas as 6 categorias.",
+    refs: [{ href: "/resultados?tab=originacao", label: "Originação" }],
+  },
+  {
     termo: "Pool S/L/E",
     def: "Pool de unidade: Sociedade (50%) / Líder (30%) / Equipe-Reserva (20%) — aplicado sobre o LL local de cada unidade não-matriz.",
     refs: [{ href: "/politica/pool-unidade", label: "Cláusula 10 (Pool)" }, { href: "/politica/lideres-unidade", label: "Líderes" }],

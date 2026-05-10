@@ -88,40 +88,85 @@ function CardsPrincipios() {
 }
 
 // =====================================================================
-// 2. Categorias × direitos — matriz
+// 2. Categorias × mecanismos — matriz oficial Política DSF v1
 // =====================================================================
+// Reflete a tabela vinculante: 6 categorias × 7 mecanismos econômicos.
+// Estados: D (Default), N (Não aplicável), Exc (Excepcional),
+// Cond (Condicionado), Cum (Cumulativo).
+type Estado = "D" | "N" | "Exc" | "Cond" | "Cum";
+
 function MatrizCategorias() {
-  const cols = ["Capital", "Voto", "Bloco A (45%)", "Bloco B (35%)", "Pool unidade", "Haveres"];
-  const rows: Array<{ label: string; vals: ("sim" | "nao" | "talvez" | "func")[]; nota?: string }> = [
-    { label: "Sócio de Capital", vals: ["sim", "sim", "sim", "sim", "func", "sim"] },
-    { label: "Sócio Capital — Gestor", vals: ["sim", "sim", "sim", "sim", "func", "sim"], nota: "Recebe também rem. de admin" },
-    { label: "Sócio Capital — Líder de Unidade", vals: ["sim", "sim", "sim", "sim", "sim", "sim"] },
-    { label: "Sócio de Serviços (Non-Equity)", vals: ["nao", "nao", "nao", "talvez", "nao", "nao"] },
-    { label: "Sócio Serviços Estratégico", vals: ["nao", "nao", "nao", "talvez", "talvez", "nao"] },
-    { label: "Líder de Unidade Non-Equity", vals: ["nao", "nao", "nao", "talvez", "sim", "nao"] },
-    { label: "Em progressão (vesting)", vals: ["talvez", "talvez", "talvez", "sim", "func", "talvez"], nota: "Conforme parcela vestida" },
+  const cols = [
+    "Pró-labore",
+    "Bloco A",
+    "Bloco B",
+    "Bloco C",
+    "Rem. Adm.",
+    "Pool 30%",
+    "Créditos O/E/G",
   ];
-  const sym = (v: string) =>
-    v === "sim" ? (
-      <span className="inline-flex h-5 w-5 rounded-full bg-mint-100 text-mint-800 items-center justify-center text-xs font-bold">✓</span>
-    ) : v === "nao" ? (
-      <span className="inline-flex h-5 w-5 rounded-full bg-red-100 text-red-700 items-center justify-center text-xs">×</span>
-    ) : v === "talvez" ? (
-      <span className="inline-flex h-5 px-2 rounded-full bg-amber-100 text-amber-800 items-center justify-center text-[10px] font-medium">cond.</span>
-    ) : (
-      <span className="inline-flex h-5 px-2 rounded-full bg-peri-100 text-peri-800 items-center justify-center text-[10px] font-medium">conf.</span>
+  const rows: Array<{ label: string; sub?: string; vals: Estado[] }> = [
+    {
+      label: "Sócio de Capital",
+      vals:    ["D",       "D",       "D",       "Exc",     "N",       "N",       "Cum"],
+    },
+    {
+      label: "Sócio Capital — Gestor",
+      sub: "+ rem. administração",
+      vals:    ["D",       "D",       "D",       "Exc",     "D",       "N",       "Cum"],
+    },
+    {
+      label: "Sócio Capital — Líder de Unidade",
+      sub: "+ pool 30% local",
+      vals:    ["D",       "D",       "D",       "Exc",     "Cond",    "D",       "Cum"],
+    },
+    {
+      label: "Sócio de Serviços (Non-Equity)",
+      vals:    ["D",       "N",       "D",       "Exc",     "D",       "N",       "Cum"],
+    },
+    {
+      label: "Sócio de Serviços Estratégico",
+      vals:    ["D",       "N",       "D",       "Exc",     "Cond",    "N",       "Cum"],
+    },
+    {
+      label: "Líder de Unidade Non-Equity",
+      sub: "só pool + créditos",
+      vals:    ["N",       "N",       "N",       "Exc",     "N",       "D",       "Cum"],
+    },
+  ];
+
+  const sym = (v: Estado) => {
+    const map: Record<Estado, { bg: string; tx: string; label: string; title: string }> = {
+      D:    { bg: "bg-mint-100",   tx: "text-mint-800",   label: "✓",    title: "Default — aplica automaticamente" },
+      N:    { bg: "bg-neutral-100", tx: "text-neutral-500", label: "—",    title: "Não aplicável — categoria não recebe" },
+      Exc:  { bg: "bg-amber-100",  tx: "text-amber-800",  label: "exc.", title: "Excepcional — depende do Comitê" },
+      Cond: { bg: "bg-amber-50",   tx: "text-amber-700",  label: "cond.", title: "Condicionado — só se cargo formal" },
+      Cum:  { bg: "bg-peri-100",   tx: "text-peri-800",   label: "∑",    title: "Cumulativo — soma aos demais" },
+    };
+    const c = map[v];
+    return (
+      <span
+        className={`inline-flex min-w-[1.25rem] h-5 px-1.5 rounded-full ${c.bg} ${c.tx} items-center justify-center text-[10px] font-medium`}
+        title={c.title}
+      >
+        {c.label}
+      </span>
     );
+  };
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr>
-            <th className="text-left px-3 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900">
+            <th className="text-left px-3 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 sticky left-0 bg-white z-10 min-w-[200px]">
               Categoria
             </th>
             {cols.map((c) => (
-              <th key={c} className="px-3 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center whitespace-nowrap">
+              <th
+                key={c}
+                className="px-2 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center whitespace-nowrap"
+              >
                 {c}
               </th>
             ))}
@@ -130,12 +175,12 @@ function MatrizCategorias() {
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} className="even:bg-neutral-50/40 hover:bg-peri-50/30 transition-colors">
-              <td className="px-3 py-2 border-b border-neutral-100 align-top">
+              <td className="px-3 py-2 border-b border-neutral-100 align-top sticky left-0 bg-inherit">
                 <div className="font-medium text-navy-900">{r.label}</div>
-                {r.nota && <div className="text-[10px] text-neutral-500 mt-0.5">{r.nota}</div>}
+                {r.sub && <div className="text-[10px] text-neutral-500 mt-0.5">{r.sub}</div>}
               </td>
               {r.vals.map((v, j) => (
-                <td key={j} className="px-3 py-2 border-b border-neutral-100 text-center">
+                <td key={j} className="px-2 py-2 border-b border-neutral-100 text-center">
                   {sym(v)}
                 </td>
               ))}
@@ -143,11 +188,12 @@ function MatrizCategorias() {
           ))}
         </tbody>
       </table>
-      <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-neutral-600">
-        <span className="inline-flex items-center gap-1">{sym("sim")} sim</span>
-        <span className="inline-flex items-center gap-1">{sym("nao")} não</span>
-        <span className="inline-flex items-center gap-1">{sym("talvez")} condicional</span>
-        <span className="inline-flex items-center gap-1">{sym("func")} conforme função</span>
+      <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-neutral-700">
+        <span className="inline-flex items-center gap-1">{sym("D")} Default — aplica automaticamente</span>
+        <span className="inline-flex items-center gap-1">{sym("N")} Não aplicável</span>
+        <span className="inline-flex items-center gap-1">{sym("Exc")} Excepcional (Comitê)</span>
+        <span className="inline-flex items-center gap-1">{sym("Cond")} Condicionado (cargo formal)</span>
+        <span className="inline-flex items-center gap-1">{sym("Cum")} Cumulativo (soma)</span>
       </div>
     </div>
   );

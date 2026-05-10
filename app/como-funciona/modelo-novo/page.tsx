@@ -47,36 +47,47 @@ export default async function ModeloNovoPage() {
 
       <Card className="p-6">
         <h2 className="text-lg font-semibold text-navy-900 mb-3">
-          Os 5 componentes da remuneração de um Sócio de Capital
+          Quem recebe o quê — resumo por categoria
         </h2>
         <p className="text-sm text-neutral-600 mb-4">
-          No Modelo NOVO, o pacote de cada Sócio de Capital é composto por:
+          A Política DSF v1 define 6 categorias e 7 mecanismos econômicos. Cada categoria tem
+          combinação distinta de aplicabilidade. Visão sintética:
         </p>
-        <ol className="space-y-2 text-sm text-neutral-800 leading-relaxed list-decimal list-inside">
-          <li>
-            <strong className="text-navy-900">Pró-labore</strong> — pagamento mensal fixo configurável na premissa
-            (<code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">proLaboreMensal</code>).
-          </li>
-          <li>
-            <strong className="text-navy-900">Bloco A — Retirada de Capital</strong> — proporcional às quotas, sobre o RDA.
-          </li>
-          <li>
-            <strong className="text-navy-900">Bloco B — Bônus de Performance</strong> — 4 modos (uniforme, peso individual, originação, por área).
-          </li>
-          <li>
-            <strong className="text-navy-900">Comissão de Originação</strong> — taxa configurável aplicada à receita
-            originada pelo sócio (cadastrada em <Link href="/resultados" className="text-peri-700 hover:underline">/resultados → Individuais</Link>).
-          </li>
-          <li>
-            <strong className="text-navy-900">Bloco C — Bônus Extraordinário</strong> — retido como reserva estratégica;
-            distribuição discricionária do Comitê.
-          </li>
-        </ol>
-        <div className="mt-4 p-3 bg-neutral-50 rounded text-xs text-neutral-700 leading-relaxed">
-          <strong className="text-navy-900">Capital Gestor</strong> recebe os 5 acima <strong>+ Remuneração de Administração</strong> pela tabela salarial (nível × faixa).
-          <br />
-          <strong className="text-navy-900">Capital Líder de Unidade / Líder Non-Equity</strong> recebem ainda{" "}
-          <strong>30% do LL da unidade</strong> que gerenciam (pool de líder).
+        <div className="overflow-x-auto -mx-2">
+          <table className="w-full text-xs border-collapse">
+            <thead className="bg-neutral-50">
+              <tr>
+                <th className="text-left px-3 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 sticky left-0 bg-neutral-50">
+                  Categoria
+                </th>
+                <th className="px-2 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center">Pró-labore</th>
+                <th className="px-2 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center">Bloco A</th>
+                <th className="px-2 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center">Bloco B</th>
+                <th className="px-2 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center">Rem. Adm.</th>
+                <th className="px-2 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center">Pool 30%</th>
+                <th className="px-2 py-2 border-b-2 border-neutral-200 font-semibold text-navy-900 text-center">Comissão Orig.</th>
+              </tr>
+            </thead>
+            <tbody className="text-neutral-800">
+              <Row label="Sócio de Capital" cells={["✓","✓","✓","—","—","∑"]} />
+              <Row label="Sócio Capital — Gestor" cells={["✓","✓","✓","✓","—","∑"]} />
+              <Row label="Sócio Capital — Líder de Unidade" cells={["✓","✓","✓","cond.","✓","∑"]} />
+              <Row label="Sócio de Serviços" cells={["✓","—","✓","✓","—","∑"]} />
+              <Row label="Sócio de Serviços Estratégico" cells={["✓","—","✓","cond.","—","∑"]} />
+              <Row label="Líder de Unidade Non-Equity" cells={["—","—","—","—","✓","∑"]} />
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-neutral-700">
+          <span><strong className="text-mint-700">✓</strong> Default · aplica automaticamente</span>
+          <span><strong className="text-neutral-500">—</strong> Não aplicável</span>
+          <span><strong className="text-amber-700">cond.</strong> Condicionado · só com cargo formal</span>
+          <span><strong className="text-peri-700">∑</strong> Cumulativo · soma quando há fato gerador</span>
+        </div>
+        <div className="mt-3 p-3 bg-neutral-50 rounded text-xs text-neutral-700 leading-relaxed">
+          <strong className="text-navy-900">Bloco C (20%)</strong> aparece como Excepcional para todas as 6 categorias —
+          retido como reserva estratégica, distribuição discricionária do Comitê, sem cálculo automático no engine.
+          Veja a <Link href="/politica/categorias-socio" className="text-peri-700 hover:underline">matriz oficial completa</Link> na Política.
         </div>
       </Card>
 
@@ -149,6 +160,28 @@ function Conector({ label }: { label: string }) {
       <span className="text-[11px] text-neutral-500 uppercase tracking-wider font-medium">{label}</span>
       <div className="h-4 w-px bg-neutral-300" />
     </div>
+  );
+}
+
+function Row({ label, cells }: { label: string; cells: string[] }) {
+  const cell = (v: string) => {
+    if (v === "✓") return <span className="text-mint-700 font-bold">✓</span>;
+    if (v === "—") return <span className="text-neutral-400">—</span>;
+    if (v === "cond.") return <span className="text-amber-700 text-[10px] font-medium">cond.</span>;
+    if (v === "∑") return <span className="text-peri-700 font-bold">∑</span>;
+    return v;
+  };
+  return (
+    <tr className="even:bg-neutral-50/40">
+      <td className="px-3 py-2 border-b border-neutral-100 font-medium text-navy-900 sticky left-0 bg-inherit">
+        {label}
+      </td>
+      {cells.map((c, i) => (
+        <td key={i} className="px-2 py-2 border-b border-neutral-100 text-center">
+          {cell(c)}
+        </td>
+      ))}
+    </tr>
   );
 }
 

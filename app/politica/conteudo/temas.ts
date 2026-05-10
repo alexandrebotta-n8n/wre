@@ -122,9 +122,9 @@ export const TEMAS: TemaPolitica[] = [
     titulo: "Categorias de sócio",
     resumoCurto: "Sócios de Capital, Sócios de Serviços e classes intermediárias.",
     resumoExecutivo: [
-      "A estrutura societária é organizada em trilhas: Sócios de Capital (Equity), Sócios de Serviços (Non-Equity), líderes estratégicos de unidade, ingressantes laterais e profissionais em progressão.",
-      "A distinção entre as categorias considera participação no capital, natureza da função, grau de risco assumido, participação na governança e nos resultados, e papel estratégico na plataforma.",
-      "Sócios de Serviços ostentam o título de Sócio sem participação no capital social — recebem por desempenho via Bloco B e/ou pools de unidade, mas não acessam Bloco A nem têm direito automático a haveres societários.",
+      "A estrutura societária é organizada em 6 categorias: Sócio de Capital, Sócio de Capital Gestor, Sócio de Capital Líder de Unidade, Sócio de Serviços, Sócio de Serviços Estratégico e Líder de Unidade Non-Equity.",
+      "Cada categoria tem combinação distinta de mecanismos econômicos. A matriz vinculante define para cada par (mecanismo, categoria) o status Default (aplica automaticamente), Não aplicável, Excepcional (decisão do Comitê), Condicionado (cargo formal) ou Cumulativo (soma sempre).",
+      "Resumindo: Bloco A só vai para as 3 variantes de Capital; Pró-labore e Bloco B vão para todas exceto Líder Non-Equity; Pool 30% vai apenas para os 2 tipos de líder de unidade; Rem. de Administração tem 4 elegíveis (2 Default + 2 Condicionados); Bloco C é Excepcional para todas; Créditos de Originação/Execução/Gestão são Cumulativos para todas.",
     ],
     grupo: "fundamentos",
     icone: "users",
