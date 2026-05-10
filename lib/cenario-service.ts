@@ -19,6 +19,7 @@ import type {
   Cenario, ClassificacaoSocio, Socio, Unidade,
 } from "@prisma/client";
 import { ApiError } from "@/lib/api/handler";
+import { ParamsAtualSchema, ParamsNovoSchema } from "@/lib/schemas/premissa";
 
 // Constrói a TabelaSalarial a partir das linhas no DB
 export async function carregarTabelaSalarial(): Promise<TabelaSalarial> {
@@ -164,9 +165,16 @@ export async function calcularCenario(args: {
   }
   const socios = classificacoesParaSocioInput(cenario.classificacoes);
 
+  // Override de parâmetros do cenário tem prioridade sobre os da Premissa.
+  // Permite editar Blocos/Pool/Chave/etc inline na simulação sem afetar
+  // outros cenários que compartilham a mesma Premissa-template.
+  const paramsBase = cenario.premissa.parametros as Record<string, unknown>;
+  const paramsOverride = (cenario.parametrosOverride ?? null) as Record<string, unknown> | null;
+  const paramsEfetivos = paramsOverride ?? paramsBase;
+
   let resultado: ResultadoSimulacao;
   if (cenario.modelo === "ATUAL") {
-    const params = cenario.premissa.parametros as Record<string, unknown>;
+    const params = paramsEfetivos;
     const premissas: PremissasModeloAtual = {
       proLaboreMensal: Number(params.proLaboreMensal ?? 5000),
       unidadeFundadores: String(params.unidadeFundadores ?? "BG"),
@@ -183,7 +191,7 @@ export async function calcularCenario(args: {
       premissas,
     });
   } else {
-    const params = cenario.premissa.parametros as Record<string, unknown>;
+    const params = paramsEfetivos;
     const premissas: PremissasModeloNovo = {
       percentualBlocoA: Number(params.percentualBlocoA ?? 0.45),
       percentualBlocoB: Number(params.percentualBlocoB ?? 0.35),
@@ -214,6 +222,11 @@ export async function calcularCenario(args: {
   }
 
   // Persiste RemuneracaoCalculada (upsert por cenário+sócio+período)
+  // + reset do dirty flag (override está sincronizado com o cálculo).
+  await prisma.cenario.update({
+    where: { id: args.cenarioId },
+    data: { parametrosDirty: false },
+  });
   await prisma.$transaction(
     resultado.pacotes.map((p) =>
       prisma.remuneracaoCalculada.upsert({
@@ -306,6 +319,87 @@ export async function criarCenarioComDefaults(args: {
     },
   });
   return cenario;
+}
+
+// ============================================================================
+// Override de parâmetros — edição inline na simulação
+// ============================================================================
+
+/**
+ * Persiste o override de parâmetros do cenário sem recalcular.
+ * Marca como dirty (UI mostra ponto vermelho + botão Recalcular destacado).
+ * Valida o JSON pelo schema do modelo correspondente.
+ */
+export async function atualizarParametrosOverride(args: {
+  cenarioId: string;
+  parametrosOverride: Record<string, unknown> | null;
+}): Promise<void> {
+  const cenario = await prisma.cenario.findUnique({
+    where: { id: args.cenarioId },
+    select: { status: true, modelo: true },
+  });
+  if (!cenario) throw new ApiError("Cenário não encontrado", 404);
+  if (cenario.status !== "DRAFT") {
+    throw new ApiError("Apenas cenários em rascunho podem ser editados", 409);
+  }
+
+  // Valida override pelo schema do modelo (rejeita Blocos que não somam 1, etc).
+  if (args.parametrosOverride !== null) {
+    const schema = cenario.modelo === "ATUAL" ? ParamsAtualSchema : ParamsNovoSchema;
+    schema.parse(args.parametrosOverride);
+  }
+
+  await prisma.cenario.update({
+    where: { id: args.cenarioId },
+    data: {
+      parametrosOverride: (args.parametrosOverride ?? null) as never,
+      parametrosDirty: true,
+      versao: { increment: 1 },
+    },
+  });
+}
+
+/**
+ * Salva o override atual como uma nova Premissa no catálogo, vincula o
+ * cenário a ela e limpa o override. Útil quando o usuário gosta dos
+ * parâmetros e quer reutilizar em outros cenários.
+ */
+export async function salvarOverrideComoPremissa(args: {
+  cenarioId: string;
+  nome: string;
+  descricao?: string;
+}): Promise<{ premissaId: string }> {
+  const cenario = await prisma.cenario.findUnique({
+    where: { id: args.cenarioId },
+    select: { modelo: true, parametrosOverride: true, premissaId: true },
+  });
+  if (!cenario) throw new ApiError("Cenário não encontrado", 404);
+  if (!cenario.parametrosOverride) {
+    throw new ApiError("Cenário não tem parâmetros customizados — nada para salvar", 400);
+  }
+
+  const novaPremissa = await prisma.$transaction(async (tx) => {
+    const p = await tx.premissa.create({
+      data: {
+        nome: args.nome,
+        descricao: args.descricao,
+        modelo: cenario.modelo,
+        parametros: cenario.parametrosOverride as never,
+      },
+    });
+    await tx.cenario.update({
+      where: { id: args.cenarioId },
+      data: {
+        premissaId: p.id,
+        parametrosOverride: null as never,
+        // Não marca dirty — premissa.parametros == override antigo,
+        // engine produzirá mesmo resultado.
+      },
+    });
+    return p;
+  });
+
+  return { premissaId: novaPremissa.id };
 }
 
 function defaultPublico(s: { isFundador: boolean; cargo: string }, modelo: "ATUAL" | "NOVO"): Publico {

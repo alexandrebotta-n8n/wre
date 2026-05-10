@@ -117,10 +117,25 @@ Implementado em `lib/domain/dsf/regras-sobreposicao.ts` — gera alertas:
 
 ## 3. Arquitetura em camadas
 
+### Rotas (UI)
+
+A página principal é **`/simulacao`** — combina lista de cenários + comparação A×B + edição de parâmetros + classificações + apresentação. Substitui as antigas `/cenarios`, `/cenarios/[id]`, `/cenarios/comparar` (que viraram redirects 308).
+
+| Rota | Propósito |
+|---|---|
+| `/simulacao?a=&b=&periodoId=` | **Página única.** 2 colunas (A | B) com painéis de parâmetros editáveis, stepper, KPIs, tabela alinhada por sócio com Δ. Drawer lateral = lista de cenários filtrada. |
+| `/socios` | Base — sócios e líderes ativos. |
+| `/premissas` | Catálogo de templates (params iniciais para novos cenários). Mostra count "N cenários usando". |
+| `/premissas/[id]` | Editor da premissa-template + histórico de versões. |
+| `/usuarios` | ADMIN — gestão de acessos. |
+| `/perfil/senha` | Troca de senha (forçada quando provisória). |
+| `/apresentacao?a=&b=&periodoId=` | Modo slide deck (acessado via botão "▶ Apresentar" da Simulação). |
+
 ```
 app/                  Next.js App Router (UI + route handlers)
   api/                Route handlers (validados com Zod, autenticados)
-  (rotas de UI)/      Páginas server-side por feature
+  simulacao/          Página única (page + acoes Server Actions)
+  (rotas de UI)/      Outras páginas server-side por feature
 
 lib/
   domain/             Lógica pura — testável SEM Prisma, SEM Next, SEM rede
@@ -158,6 +173,7 @@ Veja `prisma/schema.prisma`. Princípios:
 - **State machine de cenário** — `DRAFT → APPLIED → ARCHIVED`. Apenas 1 APPLIED por `(modeloRegra, ano)`.
 - **Optimistic locking** — `Cenario.versao` incrementa em cada update; cliente envia versão esperada.
 - **Premissas como dado** — `Premissa` é template reutilizável (pesos PE, % Blocos, pool, faixas). Adicionar/mudar premissa **não requer código**.
+- **Override por cenário** — `Cenario.parametrosOverride: Json?` permite ajustar parâmetros (Blocos, Pool, Chave, etc) **dentro da simulação** sem afetar a `Premissa` compartilhada nem outros cenários. `Cenario.parametrosDirty: Boolean` marca quando o override foi alterado mas o cenário ainda não foi recalculado (UI mostra ponto vermelho + destaca botão Recalcular). `calcularCenario` lê `override ?? premissa.parametros`. Botão "Salvar como nova premissa" promove o override no catálogo.
 - **Histórico por cenário** — `ClassificacaoSocio` permite reenquadrar sócio em cada cenário sem perder histórico.
 - **Calculados são derivados, não fonte de verdade** — `RemuneracaoCalculada` pode ser recomputada a partir de Cenário + Premissa + Resultados; é cache materializado.
 

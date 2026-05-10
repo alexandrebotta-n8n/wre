@@ -301,6 +301,14 @@ model Cenario {
   // Snapshot imutável quando APPLIED: { sócios, classificações, resultados,
   // premissas, regras }. Nunca mutar.
   snapshot        Json?
+  // Override dos parâmetros da Premissa (apenas para este cenário).
+  // Se null → usa premissa.parametros. Se setado → engine usa este valor.
+  // Permite mexer nos blocos/pool/chave dentro da simulação sem afetar
+  // outros cenários que compartilham a mesma Premissa.
+  parametrosOverride Json?
+  // Marca quando o override foi alterado mas o cenário ainda não foi
+  // recalculado. UI mostra ponto vermelho e destaca botão "Recalcular".
+  parametrosDirty    Boolean       @default(false)
   // Optimistic locking: incrementa em cada update de DRAFT.
   versao          Int            @default(1)
   criadoPorId     String?

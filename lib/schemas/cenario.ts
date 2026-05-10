@@ -57,3 +57,11 @@ export const CalcularCenarioSchema = z.object({
   periodoId: z.string().min(1),
 });
 export type CalcularCenarioInput = z.infer<typeof CalcularCenarioSchema>;
+
+// Override de parâmetros — JSON livre, validado pelo schema correto do modelo
+// (ParamsAtualSchema | ParamsNovoSchema) dentro do serviço, conforme o
+// `Cenario.modelo`. Aqui só garantimos que é um objeto.
+export const AtualizarOverrideSchema = z.object({
+  parametrosOverride: z.record(z.string(), z.unknown()).nullable(),
+});
+export type AtualizarOverrideInput = z.infer<typeof AtualizarOverrideSchema>;

@@ -34,9 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const navItems = session?.user
     ? [
-        { href: "/cenarios", label: "Cenários" },
-        { href: "/cenarios/comparar", label: "Comparar" },
-        { href: "/apresentacao", label: "Apresentar" },
+        { href: "/simulacao", label: "Simulação" },
         { href: "/socios", label: "Sócios" },
         ...(!escopo.ehSocioRestrito ? [{ href: "/premissas", label: "Premissas" }] : []),
         ...(session.user.roles.includes("ADMIN") ? [{ href: "/usuarios", label: "Usuários" }] : []),

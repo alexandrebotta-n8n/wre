@@ -68,6 +68,7 @@ export default async function PremissasPage() {
 
   const premissas = await prisma.premissa.findMany({
     orderBy: [{ atualizadoEm: "desc" }],
+    include: { _count: { select: { cenarios: true } } },
     take: 100,
   });
 
@@ -134,8 +135,10 @@ export default async function PremissasPage() {
                 <div className="mt-3">
                   <PremissaChips modelo={p.modelo} parametros={p.parametros as Record<string, unknown>} />
                 </div>
-                <div className="text-xs text-neutral-500 mt-3 flex items-center justify-between">
-                  <span>v{p.versao} · atualizada em {dataHora(p.atualizadoEm)}</span>
+                <div className="text-xs text-neutral-500 mt-3 flex items-center justify-between gap-2 flex-wrap">
+                  <span>
+                    v{p.versao} · {p._count.cenarios} cenário(s) usando · atualizada em {dataHora(p.atualizadoEm)}
+                  </span>
                   <span className="text-peri-700">Editar →</span>
                 </div>
               </Link>
