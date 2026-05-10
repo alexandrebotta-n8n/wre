@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge, ModeloBadge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Tooltip } from "@/components/ui/tooltip";
 import { brl } from "@/lib/format";
 import { Stepper, type Step } from "@/components/cenario/stepper";
 import { calcularAction, publicarAction } from "@/app/simulacao/acoes";
@@ -213,15 +214,26 @@ export function ColunaCenario({
             <form action={calcularAction}>
               <input type="hidden" name="cenarioId" value={cenario.id} />
               <input type="hidden" name="periodoId" value={periodoId} />
-              <Button
-                type="submit"
-                variant={dirty ? "primary" : "secondary"}
-                size="sm"
-                disabled={!periodoId}
+              <Tooltip
+                side="top"
+                content={
+                  !periodoId
+                    ? "Selecione um período no topo para calcular."
+                    : jaCalculou
+                    ? "Roda o engine DSF com os parâmetros atuais (override ou premissa) e regrava os pacotes por sócio para o período selecionado."
+                    : "Roda o engine DSF pela primeira vez: calcula os pacotes por sócio para o período selecionado usando os parâmetros do cenário."
+                }
               >
-                <RotateCcw className="h-3.5 w-3.5" />
-                {jaCalculou ? "Recalcular" : "Calcular"}
-              </Button>
+                <Button
+                  type="submit"
+                  variant={dirty ? "primary" : "secondary"}
+                  size="sm"
+                  disabled={!periodoId}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  {jaCalculou ? "Recalcular" : "Calcular"}
+                </Button>
+              </Tooltip>
             </form>
             <DrawerClassificacoes
               cenarioId={cenario.id}
@@ -243,9 +255,20 @@ export function ColunaCenario({
         {editavel && jaCalculou && (
           <ConfirmDialog
             trigger={
-              <Button variant="primary" size="sm" disabled={!podePublicar}>
-                <FileCheck2 className="h-3.5 w-3.5" /> Publicar
-              </Button>
+              <Tooltip
+                side="top"
+                content={
+                  !jaCalculou
+                    ? "Calcule pelo menos uma vez antes de publicar."
+                    : errosCount > 0
+                    ? `Resolva os ${errosCount} alerta(s) ERROR antes de publicar.`
+                    : "Congela o cenário como snapshot imutável (status APPLIED). Outros cenários publicados do mesmo modelo+ano serão arquivados automaticamente."
+                }
+              >
+                <Button variant="primary" size="sm" disabled={!podePublicar}>
+                  <FileCheck2 className="h-3.5 w-3.5" /> Publicar
+                </Button>
+              </Tooltip>
             }
             title="Publicar este cenário?"
             description={

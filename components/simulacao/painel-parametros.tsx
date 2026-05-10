@@ -200,7 +200,12 @@ function FormParamsAtual({
         <span>Reserva vira prêmio uniforme</span>
       </label>
       <div className="flex justify-end pt-1">
-        <Button type="submit" variant="subtle" size="sm">Aplicar parâmetros</Button>
+        <Tooltip
+          side="top"
+          content="Salva os valores acima como override do cenário. Não roda o cálculo — clique em Recalcular depois para gerar os pacotes por sócio."
+        >
+          <Button type="submit" variant="subtle" size="sm">Aplicar parâmetros</Button>
+        </Tooltip>
       </div>
     </form>
   );
@@ -359,7 +364,12 @@ function FormParamsNovo({
       </Grupo>
 
       <div className="flex justify-end pt-1">
-        <Button type="submit" variant="subtle" size="sm">Aplicar parâmetros</Button>
+        <Tooltip
+          side="top"
+          content="Salva os valores acima como override do cenário. Não roda o cálculo — clique em Recalcular depois para gerar os pacotes por sócio."
+        >
+          <Button type="submit" variant="subtle" size="sm">Aplicar parâmetros</Button>
+        </Tooltip>
       </div>
     </form>
   );
