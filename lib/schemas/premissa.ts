@@ -8,7 +8,7 @@ export const ParamsAtualSchema = z.object({
   reservaPercentual: z.number().min(0).max(1),
   reservaViraPremio: z.boolean(),
   publicosElegiveisPremio: z.array(z.string()).optional(),
-});
+}).strict();
 export type ParamsAtualInput = z.infer<typeof ParamsAtualSchema>;
 
 export const DistribuicaoBlocoBEnum = z.enum(["UNIFORME", "PESO_INDIVIDUAL", "ORIGINACAO", "POR_AREA"]);
@@ -18,7 +18,7 @@ export const PesosPorAreaSchema = z.object({
   mixIncremental: z.number().min(0).max(1),
   pesosOrganico: z.record(z.string(), z.number().min(0).max(1)),
   pesosIncremental: z.record(z.string(), z.number().min(0).max(1)),
-}).optional();
+}).strict().optional();
 
 const TOL = 0.001; // tolerância para somatórios
 
@@ -42,6 +42,7 @@ export const ParamsNovoSchema = z.object({
   distribuicaoBlocoB: DistribuicaoBlocoBEnum.default("UNIFORME"),
   pesosPorArea: PesosPorAreaSchema,
 })
+  .strict()
   .refine(
     (p) => Math.abs(p.percentualBlocoA + p.percentualBlocoB + p.percentualBlocoC - 1) <= TOL,
     { message: "Blocos A + B + C devem somar 1.0", path: ["percentualBlocoA"] },
@@ -87,12 +88,12 @@ export const CriarPremissaSchema = z.object({
   descricao: z.string().max(500).optional(),
   modelo: z.enum(["ATUAL", "NOVO"]),
   parametros: z.union([ParamsAtualSchema, ParamsNovoSchema]),
-});
+}).strict();
 export type CriarPremissaInput = z.infer<typeof CriarPremissaSchema>;
 
 export const AtualizarPremissaSchema = z.object({
   nome: z.string().min(1).max(120).optional(),
   descricao: z.string().max(500).nullable().optional(),
   parametros: z.union([ParamsAtualSchema, ParamsNovoSchema]).optional(),
-});
+}).strict();
 export type AtualizarPremissaInput = z.infer<typeof AtualizarPremissaSchema>;

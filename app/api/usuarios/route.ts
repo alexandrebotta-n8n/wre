@@ -4,13 +4,34 @@ import { CriarUsuarioSchema } from "@/lib/schemas/usuario";
 import { criarUsuarioComSenha } from "@/lib/usuario-service";
 import { logAudit } from "@/lib/audit";
 
-export async function GET() {
+// Campos seguros para retornar — nunca inclui senhaHash. Usado em GET/POST.
+const USUARIO_SELECT = {
+  id: true,
+  email: true,
+  nome: true,
+  roles: true,
+  ativo: true,
+  socioId: true,
+  senhaProvisoria: true,
+  ultimoLogin: true,
+  criadoEm: true,
+  socio: { select: { nome: true } },
+} as const;
+
+export async function GET(req: Request) {
   return withAuth(async () => {
-    return prisma.usuario.findMany({
+    const url = new URL(req.url);
+    const take = Math.min(Number(url.searchParams.get("take") ?? 50), 100);
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const usuarios = await prisma.usuario.findMany({
       orderBy: [{ ativo: "desc" }, { criadoEm: "desc" }],
-      include: { socio: { select: { nome: true } } },
-      take: 200,
+      select: USUARIO_SELECT,
+      take: take + 1, // pega 1 a mais para detectar próxima página
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
+    const hasMore = usuarios.length > take;
+    const items = hasMore ? usuarios.slice(0, take) : usuarios;
+    return { items, nextCursor: hasMore ? items[items.length - 1]?.id : null };
   }, { roles: ["ADMIN"] });
 }
 
@@ -29,11 +50,18 @@ export async function POST(req: Request) {
     await logAudit({
       usuarioId: session.id,
       acao: "usuario.criar",
+      // Sem email/PII no audit meta — só id + roles (email já está em recurso
+      // implícito via id; se precisar, busca-se via JOIN). Reduz exposição
+      // se logs vazarem.
       recurso: `Usuario:${usuario.id}`,
-      meta: { email: usuario.email, roles: usuario.roles },
+      meta: { roles: usuario.roles },
     });
-    // CUIDADO: senha em texto plano está apenas nesta resposta. Admin
-    // deve comunicar ao usuário e fechar a tela.
+    // CUIDADO: senha em texto plano está apenas nesta resposta.
+    // - Header `no-store`: impede cache em proxy/CDN/WAF e no histórico.
+    // - Senha NUNCA entra em audit nem em log do servidor.
+    // - UI deve exibir 1x em modal e auto-clear ao fechar (já implementado
+    //   via `setSenhaGerada` cookie + SenhaGeradaDialog quando o fluxo é
+    //   pela página; via API direta, cliente é responsável por descartar).
     return Response.json({ usuario, senhaProvisoria: senhaProvisoriaPlano }, { status: 201 });
-  }, { roles: ["ADMIN"] });
+  }, { roles: ["ADMIN"], noStore: true });
 }

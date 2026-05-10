@@ -16,6 +16,17 @@ import { registrarLoginEvent, loginEstaBloqueado } from "@/lib/auth/events";
 import { authConfig } from "@/auth.config";
 import type { UsuarioRole } from "@prisma/client";
 
+// Extrai IP e User-Agent do Request passado pelo Auth.js v5 ao authorize.
+// IP real está em x-forwarded-for (primeiro hop) — Vercel/proxies prepend.
+// Best-effort: ausência não impede login, só piora a auditoria.
+function clientHints(req: Request | undefined): { ip?: string; userAgent?: string } {
+  if (!req) return {};
+  const xff = req.headers.get("x-forwarded-for");
+  const ip = xff?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || undefined;
+  const userAgent = req.headers.get("user-agent") || undefined;
+  return { ip, userAgent };
+}
+
 declare module "next-auth" {
   interface Session {
     user: {
@@ -51,39 +62,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "E-mail", type: "email" },
         password: { label: "Senha", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const email = String(credentials?.email ?? "").toLowerCase().trim();
         const senha = String(credentials?.password ?? "");
+        const { ip, userAgent } = clientHints(req as Request | undefined);
         if (!email || !senha) {
-          await registrarLoginEvent({ email: email || "?", sucesso: false, motivo: "sem-email" });
+          await registrarLoginEvent({ email: email || "?", sucesso: false, motivo: "sem-email", ip, userAgent });
           return null;
         }
-        // Rate limit: 10 falhas em 5min bloqueiam o email.
-        // Bloqueio expira automaticamente quando as falhas saem da janela.
-        if (await loginEstaBloqueado(email)) {
-          await registrarLoginEvent({ email, sucesso: false, motivo: "rate-limit" });
+        // Rate limit: 10 falhas/5min por email + 30 falhas/5min por IP
+        // (anti password-spray). Fail-closed se DB cai (ver events.ts).
+        if (await loginEstaBloqueado(email, ip)) {
+          await registrarLoginEvent({ email, sucesso: false, motivo: "rate-limit", ip, userAgent });
           return null;
         }
         const u = await prisma.usuario.findUnique({ where: { email } });
         if (!u) {
-          await registrarLoginEvent({ email, sucesso: false, motivo: "email-nao-cadastrado" });
+          await registrarLoginEvent({ email, sucesso: false, motivo: "email-nao-cadastrado", ip, userAgent });
           return null;
         }
         if (!u.ativo) {
-          await registrarLoginEvent({ email, usuarioId: u.id, sucesso: false, motivo: "usuario-inativo" });
+          await registrarLoginEvent({ email, usuarioId: u.id, sucesso: false, motivo: "usuario-inativo", ip, userAgent });
           return null;
         }
         if (!u.senhaHash) {
-          await registrarLoginEvent({ email, usuarioId: u.id, sucesso: false, motivo: "sem-senha" });
+          await registrarLoginEvent({ email, usuarioId: u.id, sucesso: false, motivo: "sem-senha", ip, userAgent });
           return null;
         }
+        // bcrypt.compare é constant-time — protege contra timing attacks.
         const ok = await bcrypt.compare(senha, u.senhaHash);
         if (!ok) {
-          await registrarLoginEvent({ email, usuarioId: u.id, sucesso: false, motivo: "senha-invalida" });
+          await registrarLoginEvent({ email, usuarioId: u.id, sucesso: false, motivo: "senha-invalida", ip, userAgent });
           return null;
         }
         await prisma.usuario.update({ where: { id: u.id }, data: { ultimoLogin: new Date() } });
-        await registrarLoginEvent({ email, usuarioId: u.id, sucesso: true, motivo: "ok" });
+        await registrarLoginEvent({ email, usuarioId: u.id, sucesso: true, motivo: "ok", ip, userAgent });
         return { id: u.id, email: u.email, name: u.nome ?? undefined, image: u.imagem ?? undefined };
       },
     }),

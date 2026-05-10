@@ -85,6 +85,20 @@ function normalizar(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+// O snippet é renderizado via dangerouslySetInnerHTML em
+// app/politica/buscar/page.tsx para mostrar o highlight <mark>. Isso obriga
+// escapar TUDO que vem de `corpo` antes — defense-in-depth: hoje `corpo` é
+// estático (lib/politica/conteudo), mas se algum dia virar user-input
+// (busca em comentário/descrição), a saída continua segura.
+function escaparHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function snippetDe(corpo: string, termoNormalizado: string, termoOriginal: string): string {
   if (!corpo) return "";
   const corpoNorm = normalizar(corpo);
@@ -95,9 +109,13 @@ function snippetDe(corpo: string, termoNormalizado: string, termoOriginal: strin
   let trecho = corpo.slice(inicio, fim).replace(/\s+/g, " ").trim();
   if (inicio > 0) trecho = "…" + trecho;
   if (fim < corpo.length) trecho = trecho + "…";
-  // Highlight (case-insensitive)
-  const re = new RegExp(`(${termoOriginal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
-  return trecho.replace(re, "<mark>$1</mark>");
+  // 1. Escape integral
+  const escapado = escaparHtml(trecho);
+  // 2. Highlight (case-insensitive) sobre o texto JÁ escapado. Mantém a
+  // capitalização original do match e re-escapa por garantia.
+  const termoEscapadoRegex = termoOriginal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${termoEscapadoRegex})`, "gi");
+  return escapado.replace(re, (m) => `<mark>${escaparHtml(m)}</mark>`);
 }
 
 export function buscar(termo: string, limite = 20): ResultadoBusca[] {

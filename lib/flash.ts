@@ -8,6 +8,7 @@
 //   2. Layout root renderiza `<FlashConsumer />` (client) que lê o cookie
 //      via API route, dispara `toast(...)` da Sonner e remove o cookie.
 import { cookies } from "next/headers";
+import { cookieOptions } from "@/lib/cookies";
 
 export type FlashType = "success" | "error" | "info" | "warning";
 
@@ -23,12 +24,8 @@ const COOKIE = "wre.flash";
 /** Server-side: grava a mensagem no cookie. Use em Server Actions. */
 export async function flash(msg: FlashMessage): Promise<void> {
   const c = await cookies();
-  c.set(COOKIE, JSON.stringify(msg), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 30, // 30s — só precisa sobreviver o redirect
-  });
+  c.set(COOKIE, JSON.stringify(msg), cookieOptions({ maxAge: 30 }));
+  // 30s — só precisa sobreviver o redirect
 }
 
 export const flashSuccess = (message: string, payload?: Record<string, string>) =>

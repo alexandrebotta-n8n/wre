@@ -13,16 +13,28 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Aplica `Cache-Control: no-store, private` em uma Response. Use em endpoints
+ * que retornam dados sensíveis (senhas provisórias, listas de usuários) para
+ * impedir caching em proxies/CDN/WAF intermediários e no histórico do browser.
+ */
+export function noStore(res: Response): Response {
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  res.headers.set("Pragma", "no-cache");
+  return res;
+}
+
 export async function withAuth<T>(
   handler: (session: Awaited<ReturnType<typeof requireSession>>) => Promise<T>,
-  options?: { roles?: UsuarioRole[] },
+  options?: { roles?: UsuarioRole[]; noStore?: boolean },
 ): Promise<Response> {
   try {
     const session = options?.roles
       ? await requireRole(...options.roles)
       : await requireSession();
     const result = await handler(session);
-    return result instanceof Response ? result : Response.json(result);
+    const res = result instanceof Response ? result : Response.json(result);
+    return options?.noStore ? noStore(res) : res;
   } catch (e) {
     if (e instanceof AuthError) return e.toResponse();
     if (e instanceof ApiError) return e.toResponse();

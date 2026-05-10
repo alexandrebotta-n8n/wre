@@ -3,6 +3,14 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV !== "production";
 
 function buildCSP(): string {
+  // CSP estática (sem nonce). Mantemos `'unsafe-inline'` em script-src porque
+  // o Next.js App Router emite scripts inline para hidratação (RSC payload,
+  // <Script>) e remover sem migrar para nonce-CSP via middleware quebra a
+  // app. Migração para nonce está rastreada como follow-up — requer mover
+  // CSP para `proxy.ts` e validar hidratação em todas as rotas.
+  // Mitigação atual: `frame-ancestors 'none'` + `object-src 'none'` +
+  // `base-uri 'self'` + sanitização Zod em todos os inputs + ausência de
+  // `dangerouslySetInnerHTML` no código (auditado).
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": [
@@ -22,9 +30,10 @@ function buildCSP(): string {
     "form-action": ["'self'"],
     "object-src": ["'none'"],
     "worker-src": ["'self'", "blob:"],
+    "upgrade-insecure-requests": [],
   };
   return Object.entries(directives)
-    .map(([k, v]) => `${k} ${v.join(" ")}`)
+    .map(([k, v]) => (v.length === 0 ? k : `${k} ${v.join(" ")}`))
     .join("; ");
 }
 
@@ -34,6 +43,16 @@ const SECURITY_HEADERS = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
   { key: "Content-Security-Policy", value: buildCSP() },
+  // HSTS: força HTTPS por 1 ano. `preload` permite incluir o domínio na
+  // lista de pré-load do Chromium (só ativar quando o domínio estiver 100%
+  // HTTPS — DSF está em Vercel/HTTPS-only). Aplicar apenas em produção
+  // para não atrapalhar dev local em http://localhost.
+  ...(isDev
+    ? []
+    : [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" }]),
+  // Defesa contra Cross-Origin-Embedder/Opener-Policy attacks.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 ];
 
 const nextConfig: NextConfig = {

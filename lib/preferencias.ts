@@ -8,6 +8,7 @@
 // de sócios — confidencialidade é alta por contrato; cláusula 17.4 da
 // Política de Partnership DSF impõe sigilo de 5 anos).
 import { cookies } from "next/headers";
+import { cookieOptions } from "@/lib/cookies";
 
 export type ModoNome = "completo" | "iniciais";
 
@@ -21,10 +22,7 @@ export async function getModoNome(): Promise<ModoNome> {
 
 export async function setModoNome(modo: ModoNome): Promise<void> {
   const c = await cookies();
-  c.set(COOKIE, modo, {
-    httpOnly: false, // precisa ser legível pelo client se algum dia exibirmos toggle JS
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365, // 1 ano
-  });
+  // httpOnly:false porque a UI pode precisar ler para toggle client-side.
+  // É só preferência de exibição (modo iniciais vs. completo) — não sensível.
+  c.set(COOKIE, modo, cookieOptions({ httpOnly: false, maxAge: 60 * 60 * 24 * 365 }));
 }

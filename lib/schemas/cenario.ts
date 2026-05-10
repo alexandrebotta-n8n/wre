@@ -36,10 +36,10 @@ export const CriarCenarioSchema = z.object({
         originacaoEsperada: z.number().min(0).default(0),
         nivelCargoOverride: NivelCargoEnum.nullable().optional(),
         faixaSalarialOverride: FaixaSalarialEnum.nullable().optional(),
-      }),
+      }).strict(),
     )
     .optional(),
-});
+}).strict();
 export type CriarCenarioInput = z.infer<typeof CriarCenarioSchema>;
 
 export const AtualizarClassificacaoSchema = z.object({
@@ -50,12 +50,12 @@ export const AtualizarClassificacaoSchema = z.object({
   originacaoEsperada: z.number().min(0),
   nivelCargoOverride: NivelCargoEnum.nullable().optional(),
   faixaSalarialOverride: FaixaSalarialEnum.nullable().optional(),
-});
+}).strict();
 export type AtualizarClassificacaoInput = z.infer<typeof AtualizarClassificacaoSchema>;
 
 export const CalcularCenarioSchema = z.object({
   periodoId: z.string().min(1),
-});
+}).strict();
 export type CalcularCenarioInput = z.infer<typeof CalcularCenarioSchema>;
 
 // Override de parâmetros — JSON livre, validado pelo schema correto do modelo
@@ -63,5 +63,5 @@ export type CalcularCenarioInput = z.infer<typeof CalcularCenarioSchema>;
 // `Cenario.modelo`. Aqui só garantimos que é um objeto.
 export const AtualizarOverrideSchema = z.object({
   parametrosOverride: z.record(z.string(), z.unknown()).nullable(),
-});
+}).strict();
 export type AtualizarOverrideInput = z.infer<typeof AtualizarOverrideSchema>;
