@@ -141,6 +141,66 @@ export async function publicarAction(formData: FormData) {
 }
 
 // ============================================================================
+// Arquivar / Excluir cenário
+// ============================================================================
+
+export async function arquivarCenarioAction(formData: FormData) {
+  const session = await auth();
+  const escopo = escopoDe(session?.user as SessionUser | undefined);
+  if (!escopo.podeMutar) return;
+  const cenarioId = String(formData.get("cenarioId"));
+  const c = await prisma.cenario.findUnique({ where: { id: cenarioId }, select: { status: true, nome: true } });
+  if (!c) return;
+  if (c.status === "ARCHIVED") {
+    await flashError("Cenário já está arquivado.");
+    return;
+  }
+  await prisma.cenario.update({
+    where: { id: cenarioId },
+    data: { status: "ARCHIVED" },
+  });
+  await logAudit({
+    usuarioId: session?.user?.id,
+    acao: "cenario.arquivar",
+    recurso: `Cenario:${cenarioId}`,
+    meta: { statusAnterior: c.status },
+  });
+  await flashSuccess(`Cenário "${c.nome}" arquivado.`);
+  rev();
+}
+
+export async function excluirCenarioAction(formData: FormData) {
+  const session = await auth();
+  const escopo = escopoDe(session?.user as SessionUser | undefined);
+  if (!escopo.podeMutar) return;
+  const cenarioId = String(formData.get("cenarioId"));
+  const c = await prisma.cenario.findUnique({
+    where: { id: cenarioId },
+    select: { status: true, nome: true },
+  });
+  if (!c) return;
+  // Política: APPLIED nunca pode ser deletado (snapshot é registro formal
+  // de deliberação dos sócios). Apenas DRAFT ou ARCHIVED.
+  if (c.status === "APPLIED") {
+    await flashError(
+      "Cenário publicado não pode ser excluído (registro formal). Arquive primeiro.",
+    );
+    return;
+  }
+  // Cascade já configurado em schema.prisma — apaga ClassificacaoSocio +
+  // RemuneracaoCalculada automaticamente.
+  await prisma.cenario.delete({ where: { id: cenarioId } });
+  await logAudit({
+    usuarioId: session?.user?.id,
+    acao: "cenario.excluir",
+    recurso: `Cenario:${cenarioId}`,
+    meta: { nome: c.nome, status: c.status },
+  });
+  await flashSuccess(`Cenário "${c.nome}" excluído.`);
+  redirect("/simulacao");
+}
+
+// ============================================================================
 // Override de parâmetros
 // ============================================================================
 

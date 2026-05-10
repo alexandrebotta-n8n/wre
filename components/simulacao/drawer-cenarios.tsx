@@ -18,6 +18,7 @@ import { Field } from "@/components/ui/field";
 import { Badge, ModeloBadge, StatusBadge } from "@/components/ui/badge";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { criarCenarioAction } from "@/app/simulacao/acoes";
+import { MenuCenario } from "./menu-cenario";
 import type { CenarioListItem, PremissaOption } from "./types";
 import { cn } from "@/lib/utils";
 
@@ -167,7 +168,7 @@ export function DrawerCenarios({
                       <StatusBadge status={c.status} />
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5">
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                     {isA ? (
                       <Badge variant="info" size="sm">aberto em A</Badge>
                     ) : (
@@ -181,6 +182,15 @@ export function DrawerCenarios({
                       <Button size="sm" variant="ghost" onClick={() => abrirEm("b", c.id)}>
                         Abrir como B
                       </Button>
+                    )}
+                    {podeMutar && (
+                      <div className="ml-auto">
+                        <MenuCenario
+                          cenarioId={c.id}
+                          cenarioNome={c.nome}
+                          status={c.status}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>

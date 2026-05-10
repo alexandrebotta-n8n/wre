@@ -12,6 +12,7 @@ import { calcularAction, publicarAction } from "@/app/simulacao/acoes";
 import { PainelParametros } from "./painel-parametros";
 import { DrawerClassificacoes } from "./drawer-classificacoes";
 import { SalvarPremissaDialog } from "./salvar-premissa-dialog";
+import { MenuCenario, type CenarioStatus as CenarioStatusType } from "./menu-cenario";
 import type { CenarioCompleto, AreaOption } from "./types";
 
 export function ColunaCenario({
@@ -117,11 +118,20 @@ export function ColunaCenario({
               · ano {cenario.ano} · v{cenario.versao}
             </CardDescription>
           </div>
-          <Button asChild variant="ghost" size="sm">
-            <Link href={trocarHref}>
-              <Replace className="h-3.5 w-3.5" /> Trocar
-            </Link>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button asChild variant="ghost" size="sm">
+              <Link href={trocarHref}>
+                <Replace className="h-3.5 w-3.5" /> Trocar
+              </Link>
+            </Button>
+            {podeMutar && (
+              <MenuCenario
+                cenarioId={cenario.id}
+                cenarioNome={cenario.nome}
+                status={cenario.status as CenarioStatusType}
+              />
+            )}
+          </div>
         </div>
 
         {/* KPIs */}
