@@ -15,6 +15,7 @@ import { DrawerClassificacoes } from "./drawer-classificacoes";
 import { SalvarPremissaDialog } from "./salvar-premissa-dialog";
 import { MenuCenario, type CenarioStatus as CenarioStatusType } from "./menu-cenario";
 import { ExplicacaoDialog } from "./explicacao-dialog";
+import { KpiAlertasButton } from "./kpi-alertas-button";
 import { gerarNarrativa } from "@/lib/explicacao/narrativa";
 import { InsumosSheet, type InsumosUnidadeBase } from "@/components/insumos/insumos-sheet";
 import { prisma } from "@/lib/prisma";
@@ -246,14 +247,29 @@ export async function ColunaCenario({
         <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-neutral-100">
           <Kpi label="Total anual" valor={jaCalculou ? brl(totalPacote, true) : "—"} />
           <Kpi label="Sócios" valor={String(sociosUnicos.size)} />
-          <Kpi
-            label="Alertas"
+          <KpiAlertasButton
             valor={
               errosCount === 0 && warnsCount === 0
                 ? "✓"
                 : `${errosCount > 0 ? errosCount + "✗" : ""} ${warnsCount > 0 ? warnsCount + "⚠" : ""}`.trim()
             }
             cor={errosCount > 0 ? "red" : warnsCount > 0 ? "amber" : "green"}
+            cenarioNome={cenario.nome}
+            totalCount={errosCount + warnsCount}
+            alertasPorSocio={(() => {
+              const map = new Map<string, { socioNome: string; alertas: string[] }>();
+              for (const r of cenario.remuneracoes) {
+                const al = (r.alertas as string[] | null) ?? [];
+                if (al.length === 0) continue;
+                const cur = map.get(r.socioId);
+                if (cur) {
+                  cur.alertas.push(...al);
+                } else {
+                  map.set(r.socioId, { socioNome: r.socio.nome, alertas: [...al] });
+                }
+              }
+              return [...map.values()];
+            })()}
           />
         </div>
       </CardHeader>
