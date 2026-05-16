@@ -27,7 +27,13 @@ async function signOutAction() {
   "use server";
   // signOut + redirectTo gera response inesperado no client de server action
   // (Auth.js v5 beta + Next 16). Separar é o padrão estável.
-  await signOut({ redirect: false });
+  try {
+    await signOut({ redirect: false });
+  } catch (e) {
+    // signOut pode lançar em edge cases do Auth.js beta. Não-fatal: o redirect
+    // ao /login força nova autenticação independentemente.
+    console.error("[signOutAction] signOut falhou (não-fatal):", e);
+  }
   redirect("/login");
 }
 
