@@ -60,18 +60,14 @@ async function main() {
     return;
   }
 
-  const draftsParaRecalcular = cenarios.filter(
-    (c) => c.status === "DRAFT" && c._count.remuneracoes > 0,
-  );
-  const draftsSemCalculo = cenarios.filter(
-    (c) => c.status === "DRAFT" && c._count.remuneracoes === 0,
-  );
+  // Todo DRAFT é alvo — recalcula independente de ter cálculo prévio
+  // (necessário pós-migrations que zeram RemuneracaoCalculada).
+  const draftsParaRecalcular = cenarios.filter((c) => c.status === "DRAFT");
   const applied = cenarios.filter((c) => c.status === "APPLIED");
   const archived = cenarios.filter((c) => c.status === "ARCHIVED");
 
   console.log(`Encontrados ${cenarios.length} cenário(s):`);
-  console.log(`  ${draftsParaRecalcular.length} DRAFT com cálculo prévio (alvos do recálculo)`);
-  console.log(`  ${draftsSemCalculo.length} DRAFT sem cálculo (ignorados)`);
+  console.log(`  ${draftsParaRecalcular.length} DRAFT (alvos do recálculo)`);
   console.log(`  ${applied.length} APPLIED (snapshot imutável — ignorados)`);
   console.log(`  ${archived.length} ARCHIVED (ignorados)`);
   console.log("");
