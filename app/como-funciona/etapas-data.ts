@@ -57,9 +57,9 @@ export const ETAPAS: EtapaInfo[] = [
     modelo: "NOVO",
     formula: "LL_matriz − admin (1 + 2 + 3)",
     descricao:
-      "Lucro líquido da matriz, deduzidos pró-labore, gestão e funding fundadores. É a base de cálculo dos blocos A/B/C.",
-    exemploNumeros: "LL R$ 3.500.000 − admin R$ 1.272.000",
-    exemploResultado: "RDA R$ 2.228.000",
+      "Lucro líquido da matriz, deduzidos pró-labore, gestão e discricionário dos fundadores. É a base de cálculo dos blocos A/B/C.",
+    exemploNumeros: "LL R$ 3.500.000 − admin R$ 1.272.000 − discricionário fund. R$ 200.000",
+    exemploResultado: "RDA R$ 2.028.000",
     veja: "/politica/blocos",
   },
   {
@@ -67,11 +67,11 @@ export const ETAPAS: EtapaInfo[] = [
     slug: "bloco-a",
     titulo: "Bloco A — Parcela Institucional (45%)",
     modelo: "NOVO",
-    formula: "RDA × 45% × (quota_socio / Σquotas_PUBLICOS_CAPITAL)",
+    formula: "RDA × 45% × (quota_socio / Σ quotas_NÃO_fundadores)",
     descricao:
-      "Distribuição proporcional às quotas. Apenas Sócios de Capital. Retorno pelo risco do equity e participação no núcleo permanente.",
-    exemploNumeros: "RDA R$ 2,228M × 45% / 100 quotas × 12 quotas (sócio X)",
-    exemploResultado: "Sócio X: R$ 120.312",
+      "Distribuição proporcional às quotas, apenas para Sócios de Capital NÃO-fundadores. Fundadores recebem o valor discricionário em etapa separada (abatido do LL antes do RDA) e ficam fora do Bloco A.",
+    exemploNumeros: "RDA R$ 2,028M × 45% / 70 quotas (sem fundadores) × 12 quotas (sócio X)",
+    exemploResultado: "Sócio X: R$ 156.420",
     veja: "/politica/blocos",
   },
   {

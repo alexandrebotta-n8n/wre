@@ -43,6 +43,11 @@ export interface SocioInput {
   // Permite definição case-a-case sem afetar a premissa.
   proLaboreMensalOverride?: number;
   remuneracaoGestaoMensalOverride?: number;
+  // Valor discricionário em BRL pago a sócios fundadores no modelo NOVO.
+  // Abatido do LL antes do cálculo do RDA. Fundadores com valor > 0 não
+  // recebem Bloco A. No modelo ATUAL é ignorado (lá fundadores recebem
+  // funding × quotas via outra etapa). undefined ou 0 = sem discricionário.
+  valorDiscricionario?: number;
 }
 
 export interface ResultadoUnidade {

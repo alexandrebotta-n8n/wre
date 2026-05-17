@@ -49,6 +49,10 @@ export interface ClassificacaoItem {
   percentualQuotas: number;
   pesoBlocoB: number | null;
   originacaoEsperada: number;
+  /** Vem do sócio, não da classificação — usado para condicionar o campo discricionário. */
+  isFundador: boolean;
+  /** Valor discricionário em BRL (modelo NOVO) — só aplicável quando isFundador=true. */
+  valorDiscricionario: number | null;
 }
 
 export function DrawerClassificacoes({
@@ -80,6 +84,7 @@ export function DrawerClassificacoes({
         pesoBlocoB: c.pesoBlocoB,
         originacaoEsperada: c.originacaoEsperada,
         percentualQuotas: c.percentualQuotas,
+        valorDiscricionario: c.valorDiscricionario,
       };
     });
     const fd = new FormData();
@@ -136,6 +141,12 @@ export function DrawerClassificacoes({
                 <th className="text-right px-3 py-2 font-medium">Quota %</th>
                 <th className="text-right px-3 py-2 font-medium">Peso B</th>
                 <th className="text-right px-3 py-2 font-medium">Originação (R$/ano)</th>
+                <th
+                  className="text-right px-3 py-2 font-medium"
+                  title="Valor discricionário em BRL pago ao fundador no modelo NOVO. Abatido do LL antes do RDA; fundador não recebe Bloco A."
+                >
+                  Discricionário (R$)
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -189,6 +200,27 @@ export function DrawerClassificacoes({
                         placeholder="0"
                         className="h-8 text-right text-xs tabular-nums w-[120px]"
                       />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      {c.isFundador ? (
+                        <Input
+                          type="number"
+                          step="10000"
+                          min="0"
+                          defaultValue={cur.valorDiscricionario ?? ""}
+                          onChange={(e) =>
+                            setCampo(
+                              c.id,
+                              "valorDiscricionario",
+                              e.target.value === "" ? null : Number(e.target.value),
+                            )
+                          }
+                          placeholder="0"
+                          className="h-8 text-right text-xs tabular-nums w-[120px]"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-neutral-400">—</span>
+                      )}
                     </td>
                   </tr>
                 );

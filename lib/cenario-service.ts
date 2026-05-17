@@ -66,6 +66,7 @@ function classificacoesParaSocioInput(
     // Overrides individuais do cadastro do Sócio (case-a-case).
     proLaboreMensalOverride: c.socio.proLaboreMensal ?? undefined,
     remuneracaoGestaoMensalOverride: c.socio.remuneracaoGestaoMensal ?? undefined,
+    valorDiscricionario: c.valorDiscricionario ?? undefined,
   }));
 }
 

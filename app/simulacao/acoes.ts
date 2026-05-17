@@ -341,6 +341,7 @@ export async function atualizarClassificacoesAction(formData: FormData) {
     pesoBlocoB?: number | null;
     originacaoEsperada?: number;
     percentualQuotas?: number;
+    valorDiscricionario?: number | null;
   }>;
   try {
     classificacoes = JSON.parse(classificacoesJson);
@@ -366,6 +367,7 @@ export async function atualizarClassificacoesAction(formData: FormData) {
             ...(c.pesoBlocoB !== undefined ? { pesoBlocoB: c.pesoBlocoB } : {}),
             ...(c.originacaoEsperada !== undefined ? { originacaoEsperada: c.originacaoEsperada } : {}),
             ...(c.percentualQuotas !== undefined ? { percentualQuotas: c.percentualQuotas } : {}),
+            ...(c.valorDiscricionario !== undefined ? { valorDiscricionario: c.valorDiscricionario } : {}),
           },
         }),
       ),

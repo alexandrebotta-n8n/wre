@@ -288,6 +288,8 @@ export function ColunaCenario({
                 percentualQuotas: c.percentualQuotas,
                 pesoBlocoB: c.pesoBlocoB,
                 originacaoEsperada: c.originacaoEsperada,
+                isFundador: c.socio.isFundador,
+                valorDiscricionario: c.valorDiscricionario,
               }))}
             />
             {cenario.parametrosOverride && (
