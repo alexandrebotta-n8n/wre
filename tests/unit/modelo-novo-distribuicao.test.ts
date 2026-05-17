@@ -156,3 +156,84 @@ describe("Modelo NOVO — distribuição POR_AREA (planilha 1T2026)", () => {
     expect(r.pacotes[0].blocoB).toBe(0);
   });
 });
+
+// ============================================================================
+// Regra: Fundadores recebem valor discricionário (BRL por sócio) abatido do LL
+// antes do RDA; Bloco A é distribuído apenas entre não-fundadores.
+// ============================================================================
+describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", () => {
+  // 1 fundador (s1) + 2 não-fundadores capital (s2, s3).
+  const sociosComFundador: SocioInput[] = [
+    { id: "s1", nome: "Fundador", cargo: "Fundador", publico: "SOCIO_CAPITAL",
+      percentualQuotas: 0.40, originacaoEsperadaAnual: 0, isFundador: true },
+    { id: "s2", nome: "Capital Maior", cargo: "Sócio", publico: "SOCIO_CAPITAL",
+      percentualQuotas: 0.20, originacaoEsperadaAnual: 0, isFundador: false },
+    { id: "s3", nome: "Capital Menor", cargo: "Sócio", publico: "SOCIO_CAPITAL",
+      percentualQuotas: 0.10, originacaoEsperadaAnual: 0, isFundador: false },
+  ];
+
+  it("fundador com valorDiscricionario recebe o valor e fica fora do Bloco A", () => {
+    const V = 100_000;
+    const sociosV = sociosComFundador.map((s) =>
+      s.id === "s1" ? { ...s, valorDiscricionario: V } : s,
+    );
+    const r = calcularModeloNovo({
+      periodo, socios: sociosV, resultados: baseResultados,
+      premissas: { ...basePremissas, distribuicaoBlocoB: "UNIFORME" },
+    });
+    const fund = r.pacotes.find((p) => p.socioId === "s1")!;
+    const s2 = r.pacotes.find((p) => p.socioId === "s2")!;
+    const s3 = r.pacotes.find((p) => p.socioId === "s3")!;
+    // Fundador: recebe V em remuneracaoFundador, zero de Bloco A.
+    expect(fund.remuneracaoFundador).toBeCloseTo(V, 1);
+    expect(fund.blocoA).toBe(0);
+    // RDA ajustado = LL − admin (0) − V = 1.000.000 − 100.000 = 900.000.
+    // Bloco A = 900.000 × 0.45 = 405.000. Soma de quotas (não-fund) = 0.30.
+    // s2: 405.000 × (0.20 / 0.30) = 270.000
+    // s3: 405.000 × (0.10 / 0.30) = 135.000
+    expect(s2.blocoA).toBeCloseTo(270_000, 1);
+    expect(s3.blocoA).toBeCloseTo(135_000, 1);
+    // Soma do Bloco A = 45% do RDA ajustado.
+    expect(s2.blocoA + s3.blocoA).toBeCloseTo(405_000, 1);
+    // Trace do fundador contém a etapa de remuneração de fundador; trace do não-fundador, o Bloco A.
+    expect(fund.trace.find((t) => t.etapa === "3.fundador")?.valor).toBeCloseTo(V, 1);
+    expect(s2.trace.find((t) => t.etapa === "8.bloco-A")?.valor).toBeCloseTo(270_000, 1);
+  });
+
+  it("sem discricionário (V=0), fundador continua fora do Bloco A (mudança intencional)", () => {
+    const r = calcularModeloNovo({
+      periodo, socios: sociosComFundador, resultados: baseResultados,
+      premissas: { ...basePremissas, distribuicaoBlocoB: "UNIFORME" },
+    });
+    const fund = r.pacotes.find((p) => p.socioId === "s1")!;
+    const s2 = r.pacotes.find((p) => p.socioId === "s2")!;
+    const s3 = r.pacotes.find((p) => p.socioId === "s3")!;
+    // Fundador: nada de fundador (V=0) e nada de Bloco A.
+    expect(fund.remuneracaoFundador).toBe(0);
+    expect(fund.blocoA).toBe(0);
+    // RDA = LL (sem admin) = 1.000.000; Bloco A = 450.000 distribuído entre s2 e s3.
+    // s2: 450.000 × (0.20/0.30) = 300.000; s3: 150.000.
+    expect(s2.blocoA).toBeCloseTo(300_000, 1);
+    expect(s3.blocoA).toBeCloseTo(150_000, 1);
+  });
+
+  it("fundadores não aparecem na base de quotas do Bloco A", () => {
+    // 2 fundadores + 1 não-fundador. Sem discricionário: fundadores zerados,
+    // não-fundador absorve 100% do Bloco A.
+    const socios2: SocioInput[] = [
+      { id: "f1", nome: "Fund 1", cargo: "Fundador", publico: "SOCIO_CAPITAL",
+        percentualQuotas: 0.50, originacaoEsperadaAnual: 0, isFundador: true },
+      { id: "f2", nome: "Fund 2", cargo: "Fundador", publico: "SOCIO_CAPITAL",
+        percentualQuotas: 0.30, originacaoEsperadaAnual: 0, isFundador: true },
+      { id: "n1", nome: "Não-fund", cargo: "Sócio", publico: "SOCIO_CAPITAL",
+        percentualQuotas: 0.20, originacaoEsperadaAnual: 0, isFundador: false },
+    ];
+    const r = calcularModeloNovo({
+      periodo, socios: socios2, resultados: baseResultados,
+      premissas: { ...basePremissas, distribuicaoBlocoB: "UNIFORME" },
+    });
+    const n1 = r.pacotes.find((p) => p.socioId === "n1")!;
+    // Bloco A = 1.000.000 × 0.45 = 450.000; n1 sozinho na base → recebe tudo.
+    expect(n1.blocoA).toBeCloseTo(450_000, 1);
+  });
+});

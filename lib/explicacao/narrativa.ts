@@ -58,18 +58,29 @@ export function gerarNarrativa(input: NarrativaInput): string[] {
     const blocoA = somas["bloco-A"] ?? 0;
     const blocoB = somas["bloco-B"] ?? 0;
     const blocoC = somas["bloco-C"] ?? 0;
-    const admin = (somas["pro-labore"] ?? 0) + (somas["admin"] ?? 0) + (somas["fundador"] ?? 0);
+    const remFundador = somas["fundador"] ?? 0;
+    const admin = (somas["pro-labore"] ?? 0) + (somas["admin"] ?? 0);
     const rda = blocoA + blocoB + blocoC;
+    const nFundadoresPagos = remuneracoes.filter(
+      (r) => r.socio.isFundador && r.total > 0,
+    ).length;
     if (rda > 0) {
       const partes: string[] = [];
+      const detalheAdmin =
+        remFundador > 0
+          ? `administração **${brl(admin)}** (pró-labore + gestão) e remuneração aos fundadores **${brl(remFundador)}** (funding anual + discricionário, abatidos do LL antes do RDA)`
+          : `**${brl(admin)}** para administração (pró-labore + gestão)`;
+      partes.push(`Após reservar ${detalheAdmin}, o RDA disponível foi de **${brl(rda)}**.`);
       partes.push(
-        `Após reservar **${brl(admin)}** para administração (pró-labore, gestão e funding fundadores), o RDA disponível foi de **${brl(rda)}**.`,
-      );
-      partes.push(
-        `Distribuição: **Bloco A (${pct(blocoA / rda)})** — ${brl(blocoA)} entre Sócios de Capital proporcional às quotas; ` +
+        `Distribuição: **Bloco A (${pct(blocoA / rda)})** — ${brl(blocoA)} entre Sócios de Capital **não-fundadores**, proporcional às quotas; ` +
           `**Bloco B (${pct(blocoB / rda)})** — ${brl(blocoB)} por desempenho; ` +
           `**Bloco C (${pct(blocoC / rda)})** — ${brl(blocoC)} retido como reserva estratégica.`,
       );
+      if (nFundadoresPagos > 0) {
+        partes.push(
+          `${nFundadoresPagos} fundador(es) receberam a remuneração de fundador (funding anual e/ou discricionário) em etapa separada e ficaram fora do Bloco A.`,
+        );
+      }
       paragrafos.push(partes.join(" "));
     }
   } else {

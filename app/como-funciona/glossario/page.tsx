@@ -26,7 +26,7 @@ const TERMOS: Termo[] = [
   },
   {
     termo: "Bloco A",
-    def: "Parcela Institucional (45% do RDA por padrão) — destinada exclusivamente a Sócios de Capital, proporcional às quotas.",
+    def: "Parcela Institucional (45% do RDA por padrão) — destinada a Sócios de Capital NÃO-fundadores, proporcional às quotas. Fundadores recebem o valor discricionário em etapa separada (abatido do LL antes do RDA) e ficam fora do Bloco A.",
     refs: [{ href: "/politica/blocos", label: "Política · Blocos" }],
   },
   {

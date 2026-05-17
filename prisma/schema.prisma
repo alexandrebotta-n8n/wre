@@ -219,16 +219,11 @@ model Socio {
 // ============================================================================
 
 // Configurações globais por ano — afetam todos os cenários DRAFT daquele ano.
-// Hoje guarda o funding arbitrário dos fundadores; pode crescer com outras
-// configs globais (ex: caps, ajustes setoriais) sem precisar migração nova.
+// Reservado para futuras configs globais (ex: caps, ajustes setoriais).
+// A remuneração dos fundadores agora é definida CASO A CASO em
+// ClassificacaoSocio.valorDiscricionario (BRL por sócio, por cenário).
 model ConfiguracaoAno {
   ano                  Int      @id
-  // Valor anual em BRL distribuído entre Socio.isFundador=true.
-  // Substitui o cálculo antigo "Σquotas_fund × fundingVariavel_BG".
-  // No engine ATUAL, é descontado do funding antes da distribuição residual.
-  // No engine NOVO, é descontado do LL antes de formar o RDA central.
-  // Se 0 (default), nenhum fundador recebe e o RDA/funding não é alterado.
-  fundingFundadoresAno Float    @default(0)
   atualizadoEm         DateTime @updatedAt
   atualizadoPorId      String?
 }
@@ -416,6 +411,12 @@ model ClassificacaoSocio {
   // Peso individual no Bloco B. null = 1.0 (peso default).
   // Usado quando Premissa.distribuicaoBlocoB = "PESO_INDIVIDUAL".
   pesoBlocoB            Float?
+  // Valor discricionário em BRL atribuído a sócios fundadores no modelo NOVO.
+  // Quando preenchido (>0) e o sócio é fundador: pago em etapa separada e
+  // abatido do LL Matriz antes do RDA. Fundadores não recebem Bloco A.
+  // No modelo ATUAL é ignorado (lá fundadores recebem via funding × quotas).
+  // null = 0 (sem discricionário, comportamento default).
+  valorDiscricionario   Float?
   // Overrides opcionais por cenário
   nivelCargoOverride    NivelCargo?
   faixaSalarialOverride FaixaSalarial?

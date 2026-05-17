@@ -97,7 +97,11 @@ export default async function ModeloNovoPage() {
           <li>
             <strong className="text-navy-900">Bloco A (45%)</strong> — segrega o retorno do capital do
             retorno da performance. Quem assume risco institucional (equity) recebe por isso
-            independentemente do desempenho do exercício, proporcional às quotas.
+            independentemente do desempenho do exercício, proporcional às quotas.{" "}
+            <span className="text-neutral-600">
+              Fundadores recebem o <strong>valor discricionário</strong> (BRL definido por cenário)
+              em etapa separada, abatido do LL antes do RDA, e <strong>não participam do Bloco A</strong>.
+            </span>
           </li>
           <li>
             <strong className="text-navy-900">Bloco B (35%)</strong> — premia o desempenho do exercício.
