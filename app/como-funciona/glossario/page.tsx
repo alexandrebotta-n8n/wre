@@ -41,8 +41,8 @@ const TERMOS: Termo[] = [
   },
   {
     termo: "Comissão de Originação",
-    def: "Componente individual do pacote NOVO: taxa configurável (taxaComissaoOriginacao na premissa) aplicada sobre a receita anual que cada sócio originou. Valores cadastrados em /resultados aba 'Individuais — Originação'; podem ser sobrescritos por cenário no sheet 'Originação' da Simulação.",
-    refs: [{ href: "/politica/categorias-socio", label: "Categorias e regras" }],
+    def: "Componente individual do pacote NOVO: taxa configurável (taxaComissaoOriginacao na premissa) aplicada sobre a receita anual que cada sócio originou. O valor 'originado' vem do cadastro permanente do sócio em /socios, campo 'Originação anual padrão'.",
+    refs: [{ href: "/socios", label: "/socios" }, { href: "/politica/categorias-socio", label: "Categorias e regras" }],
   },
   {
     termo: "Pró-labore (Política DSF v1)",
@@ -56,8 +56,8 @@ const TERMOS: Termo[] = [
   },
   {
     termo: "Variáveis globais (anuais)",
-    def: "Insumos editados no topo da /simulacao que afetam TODOS os cenários DRAFT do ano: LL DSF global, LL de cada unidade, funding variável dos fundadores e originação por sócio. Mudar qualquer um marca os DRAFTs como dirty e exige Recalcular.",
-    refs: [{ href: "/simulacao", label: "Painel /simulacao" }],
+    def: "Insumos editados no painel do topo de /simulacao que afetam TODOS os cenários DRAFT do ano: LL DSF global (matriz) e LL de cada unidade não-matriz. Originação e funding fundador foram movidos pro cadastro permanente do sócio (/socios). Mudar qualquer global marca os DRAFTs como dirty — recalcule cada um.",
+    refs: [{ href: "/simulacao", label: "Painel /simulacao" }, { href: "/socios", label: "/socios (originação e funding)" }],
   },
   {
     termo: "Default (matriz)",
@@ -82,7 +82,7 @@ const TERMOS: Termo[] = [
   {
     termo: "Cumulativo (matriz)",
     def: "Status na matriz: o mecanismo se aplica sempre que o sócio gerar o fato gerador, somando-se aos demais componentes do pacote. É o status dos Créditos de Originação, Execução e Gestão para todas as 6 categorias.",
-    refs: [{ href: "/resultados?tab=originacao", label: "Originação" }],
+    refs: [{ href: "/socios", label: "Originação por sócio" }],
   },
   {
     termo: "Pool S/L/E",
