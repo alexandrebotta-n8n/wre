@@ -4,8 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { signOut, auth } from "@/auth";
-import { escopoDe } from "@/lib/auth/escopo";
-import type { SessionUser } from "@/lib/auth/guards";
 import { getModoNome, setModoNome } from "@/lib/preferencias";
 import { Header } from "@/components/shell/header";
 import { FlashConsumer } from "@/components/shell/flash-consumer";
@@ -39,18 +37,19 @@ async function signOutAction() {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  const escopo = escopoDe(session?.user as SessionUser | undefined);
   const modoNome = await getModoNome();
 
+  // Nav top enxuto: só fluxo principal (Simulação + Política).
+  //   - Sócios e Premissas viraram atalhos na barra de Globais da /simulacao
+  //     (vivem junto ao contexto onde são usados).
+  //   - Usuários é admin-only e raríssimo — vive no dropdown do email.
   const navItems = session?.user
     ? [
         { href: "/simulacao", label: "Simulação" },
-        { href: "/socios", label: "Sócios" },
         { href: "/politica", label: "Política" },
-        ...(!escopo.ehSocioRestrito ? [{ href: "/premissas", label: "Premissas" }] : []),
-        ...(session.user.roles.includes("ADMIN") ? [{ href: "/usuarios", label: "Usuários" }] : []),
       ]
     : [];
+  const isAdmin = session?.user?.roles?.includes("ADMIN") ?? false;
 
   return (
     <html lang="pt-BR">
@@ -65,6 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Header
             email={session.user.email ?? ""}
             navItems={navItems}
+            isAdmin={isAdmin}
             modoNomeIniciais={modoNome === "iniciais"}
             alternarModoNomeAction={alternarModoNomeAction}
             signOutAction={signOutAction}

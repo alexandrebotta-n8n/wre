@@ -9,7 +9,8 @@
 import * as React from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Globe2, Check } from "lucide-react";
+import Link from "next/link";
+import { Save, Globe2, Check, Users, Settings } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -90,6 +91,26 @@ export function PainelGlobais({ ano, unidades, cenariosDraftDoAno }: PainelGloba
         ))}
 
         <div className="ml-auto inline-flex items-center gap-2">
+          {/* Atalhos pras telas de cadastro permanente — vivem aqui pra ficar
+              próximo ao contexto de uso (em vez de poluírem a nav top). */}
+          <div className="inline-flex items-center gap-0.5 pr-2 mr-1 border-r border-neutral-200">
+            <Link
+              href="/socios"
+              className="inline-flex items-center gap-1.5 text-xs text-neutral-700 hover:text-peri-700 hover:bg-peri-50 rounded px-2 py-1 transition-colors"
+              title="Cadastro permanente de sócios (originação, funding fundador, overrides)"
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Sócios</span>
+            </Link>
+            <Link
+              href="/premissas"
+              className="inline-flex items-center gap-1.5 text-xs text-neutral-700 hover:text-peri-700 hover:bg-peri-50 rounded px-2 py-1 transition-colors"
+              title="Premissas — templates de parâmetros por modelo (ATUAL/NOVO)"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Premissas</span>
+            </Link>
+          </div>
           {dirty && cenariosDraftDoAno > 0 && (
             <span className="text-[11px] text-amber-700 hidden md:inline">
               ⚠ {cenariosDraftDoAno} DRAFT(s) ficarão dirty

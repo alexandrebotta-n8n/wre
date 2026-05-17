@@ -2,7 +2,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Eye, EyeOff, Menu, ChevronDown, LogOut, KeyRound, X } from "lucide-react";
+import { Eye, EyeOff, Menu, ChevronDown, LogOut, KeyRound, Users, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -24,6 +24,8 @@ interface NavItem {
 export interface HeaderProps {
   email: string;
   navItems: NavItem[];
+  /** Se true, mostra item "Usuários" no dropdown do email + menu mobile. */
+  isAdmin: boolean;
   modoNomeIniciais: boolean;
   alternarModoNomeAction: () => void | Promise<void>;
   signOutAction: () => void | Promise<void>;
@@ -32,6 +34,7 @@ export interface HeaderProps {
 export function Header({
   email,
   navItems,
+  isAdmin,
   modoNomeIniciais,
   alternarModoNomeAction,
   signOutAction,
@@ -110,6 +113,14 @@ export function Header({
                   Trocar senha
                 </Link>
               </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link href="/usuarios" className="flex items-center gap-2 w-full">
+                    <Users className="h-3.5 w-3.5" />
+                    Usuários
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild destructive>
                 <form action={signOutAction} className="contents">
@@ -175,6 +186,16 @@ export function Header({
                     <KeyRound className="h-3.5 w-3.5" /> Trocar senha
                   </Link>
                 </DialogClose>
+                {isAdmin && (
+                  <DialogClose asChild>
+                    <Link
+                      href="/usuarios"
+                      className="px-3 py-2.5 rounded-md text-sm text-peri-100 hover:bg-navy-800 hover:text-white flex items-center gap-2"
+                    >
+                      <Users className="h-3.5 w-3.5" /> Usuários
+                    </Link>
+                  </DialogClose>
+                )}
                 <form action={signOutAction}>
                   <button
                     type="submit"
