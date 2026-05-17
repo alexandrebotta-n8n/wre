@@ -90,17 +90,17 @@ export default async function ComoFuncionaHub() {
             <Link href="/socios" className="text-peri-700 hover:underline font-medium">/socios</Link> — defina a <strong>Classificação (Política DSF v1)</strong> de cada sócio (uma das 6 categorias) e, para líderes, a unidade que gerenciam.
           </li>
           <li>
-            <Link href="/resultados" className="text-peri-700 hover:underline font-medium">/resultados</Link> — cadastre os insumos financeiros nas 3 abas:{" "}
-            <strong>DSF Global</strong> (matriz consolidada), <strong>Unidades</strong> (não-matriz) e{" "}
-            <strong>Individuais — Originação</strong> (receita originada por cada sócio).
-          </li>
-          <li>
             <Link href="/premissas" className="text-peri-700 hover:underline font-medium">/premissas</Link> — configure a premissa NOVA com{" "}
             <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">proLaboreMensal</code>,{" "}
             <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">taxaComissaoOriginacao</code> e os percentuais dos Blocos.
           </li>
           <li>
-            <Link href="/simulacao" className="text-peri-700 hover:underline font-medium">/simulacao</Link> — crie um Cenário NOVO; use os sheets <em>📊 Insumos</em> e <em>💰 Originação</em> para simular variações sem afetar os defaults oficiais.
+            <Link href="/simulacao" className="text-peri-700 hover:underline font-medium">/simulacao</Link> — no painel <em>Variáveis globais</em> (topo) edite{" "}
+            o <strong>LL DSF global</strong>, o <strong>LL de cada unidade</strong> e o{" "}
+            <strong>funding dos fundadores</strong>. No painel <em>Originação</em> defina o valor anual por sócio. Todos os cenários DRAFT do ano refletem essas variáveis ao recalcular.
+          </li>
+          <li>
+            Crie cenários A (ATUAL) e B (NOVO) lado a lado. Cada cenário tem sua premissa + parâmetros (Blocos %, pool, chave) editáveis inline.
           </li>
         </ol>
       </Card>

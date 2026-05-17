@@ -203,6 +203,21 @@ model Socio {
 // Períodos e Resultados financeiros (insumos da simulação)
 // ============================================================================
 
+// Configurações globais por ano — afetam todos os cenários DRAFT daquele ano.
+// Hoje guarda o funding arbitrário dos fundadores; pode crescer com outras
+// configs globais (ex: caps, ajustes setoriais) sem precisar migração nova.
+model ConfiguracaoAno {
+  ano                  Int      @id
+  // Valor anual em BRL distribuído entre Socio.isFundador=true.
+  // Substitui o cálculo antigo "Σquotas_fund × fundingVariavel_BG".
+  // No engine ATUAL, é descontado do funding antes da distribuição residual.
+  // No engine NOVO, é descontado do LL antes de formar o RDA central.
+  // Se 0 (default), nenhum fundador recebe e o RDA/funding não é alterado.
+  fundingFundadoresAno Float    @default(0)
+  atualizadoEm         DateTime @updatedAt
+  atualizadoPorId      String?
+}
+
 enum TipoPeriodo {
   TRIMESTRE
   ANO

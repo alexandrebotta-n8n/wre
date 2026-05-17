@@ -52,25 +52,14 @@ export interface TraceItem {
   valor?: number;
 }
 
-export type Trimestre = 1 | 2 | 3 | 4;
-
-export interface DetalheTrimestre {
-  total: number;
-  trace: TraceItem[];
-  alertas: string[];
-}
-
-/** Linha agregada da tabela comparativa — totais anuais com breakdown por trim. */
+/** Linha agregada da tabela comparativa — totais ANUAIS. */
 export interface LinhaComparativa {
   socioId: string;
   nome: string;
   isFundador: boolean;
-  /** Soma dos trimestres (anual). null se sócio não tem nenhuma remuneração no cenário. */
+  /** Total anual. null se sócio não tem nenhuma remuneração no cenário. */
   totalA: number | null;
   totalB: number | null;
   diff: number; // B − A; sinal positivo = ganhou no novo
   diffPct: number | null;
-  /** Detalhe por trimestre (1..4). Trimestres sem cálculo ficam ausentes. */
-  porTrimestreA: Partial<Record<Trimestre, DetalheTrimestre>>;
-  porTrimestreB: Partial<Record<Trimestre, DetalheTrimestre>>;
 }

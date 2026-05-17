@@ -3,7 +3,10 @@ import { z } from "zod";
 
 export const ParamsAtualSchema = z.object({
   proLaboreMensal: z.number().min(0),
-  unidadeFundadores: z.string().min(1),
+  // unidadeFundadores removido — fundadores agora usam ConfiguracaoAno.fundingFundadoresAno.
+  // Mantido como opcional aceito (mas ignorado pelo engine) para compatibilidade
+  // com premissas antigas em prod.
+  unidadeFundadores: z.string().min(1).optional(),
   unidadeMatriz: z.string().min(1),
   reservaPercentual: z.number().min(0).max(1),
   reservaViraPremio: z.boolean(),

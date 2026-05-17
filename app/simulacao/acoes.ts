@@ -11,15 +11,12 @@ import { flashError, flashSuccess } from "@/lib/flash";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 import {
-  calcularCenarioAnual,
+  calcularCenario,
   clonarCenarioComoRascunho,
   criarCenarioComDefaults,
   atualizarParametrosOverride,
   salvarOverrideComoPremissa,
-  atualizarResultadosOverride,
-  atualizarOriginacaoOverride,
 } from "@/lib/cenario-service";
-import { ResultadosOverrideSchema, OriginacaoOverrideSchema } from "@/lib/schemas/resultados";
 import type { Publico } from "@/lib/domain/dsf";
 
 function rev() {
@@ -65,17 +62,14 @@ export async function criarCenarioAction(formData: FormData) {
       meta: { nome, ano, modelo, slot },
     });
 
-    // Auto-calcular os 4 trimestres do ano — UX fluida: 1 clique do empty
-    // state já entrega cenário calculado. Trimestres sem ResultadoPeriodo
-    // são silenciosamente ignorados pelo serviço.
+    // Auto-calcular (anual) — UX fluida: 1 clique do empty state já entrega
+    // cenário calculado. Se não houver ResultadoPeriodo cadastrado, ignora.
     let mensagem = `Cenário "${nome}" criado e aberto na coluna ${slot.toUpperCase()}.`;
     try {
-      const r = await calcularCenarioAnual({ cenarioId: c.id });
-      if (r.trimestresOk.length > 0) {
-        mensagem = `Cenário "${nome}" criado e calculado. Veja a comparação.`;
-      }
+      await calcularCenario({ cenarioId: c.id });
+      mensagem = `Cenário "${nome}" criado e calculado. Veja a comparação.`;
     } catch {
-      // Falha no cálculo automático não bloqueia.
+      // Falha no cálculo automático não bloqueia (ex: ano sem ResultadoPeriodo).
     }
     await flashSuccess(mensagem);
     const params = new URLSearchParams();
@@ -100,22 +94,13 @@ export async function calcularAction(formData: FormData) {
   if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
   try {
-    const r = await calcularCenarioAnual({ cenarioId });
+    await calcularCenario({ cenarioId });
     await logAudit({
       usuarioId: session?.user?.id,
       acao: "cenario.calcular",
       recurso: `Cenario:${cenarioId}`,
-      meta: { trimestresOk: r.trimestresOk, trimestresSemDados: r.trimestresSemDados },
     });
-    if (r.trimestresOk.length === 0) {
-      await flashError("Nenhum trimestre tem ResultadoPeriodo importado — importe a DRE primeiro.");
-    } else if (r.trimestresSemDados.length > 0) {
-      await flashSuccess(
-        `Calculado ${r.trimestresOk.length} trimestre(s). Sem dados: ${r.trimestresSemDados.map((t) => t + "T").join(", ")}.`,
-      );
-    } else {
-      await flashSuccess("Pacotes recalculados (4 trimestres).");
-    }
+    await flashSuccess("Pacotes recalculados.");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao calcular";
     await flashError(`Falha ao calcular: ${msg}`);
@@ -129,21 +114,9 @@ export async function publicarAction(formData: FormData) {
   if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
 
-  // Auto-cálculo: se faltam trimestres (ou tem override dirty), roda os 4
-  // antes de publicar. Garante que o snapshot final reflita o estado atual.
-  let calcSummary = "";
+  // Auto-cálculo antes de publicar — garante snapshot atualizado.
   try {
-    const r = await calcularCenarioAnual({ cenarioId });
-    if (r.trimestresOk.length === 0) {
-      await flashError(
-        "Nenhum trimestre tem ResultadoPeriodo importado — importe a DRE antes de publicar.",
-      );
-      rev();
-      return;
-    }
-    if (r.trimestresSemDados.length > 0) {
-      calcSummary = ` (sem dados em ${r.trimestresSemDados.map((t) => t + "T").join(", ")})`;
-    }
+    await calcularCenario({ cenarioId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao calcular";
     await flashError(`Falha ao calcular antes de publicar: ${msg}`);
@@ -188,7 +161,7 @@ export async function publicarAction(formData: FormData) {
     recurso: `Cenario:${cenarioId}`,
     meta: { modelo: cenario.modelo, ano: cenario.ano },
   });
-  await flashSuccess(`Cenário publicado — cálculo congelado${calcSummary}.`);
+  await flashSuccess("Cenário publicado — cálculo congelado.");
   rev();
 }
 
@@ -321,82 +294,6 @@ export async function atualizarOverrideAction(formData: FormData) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao salvar parâmetros";
     await flashError(msg);
-  }
-  rev();
-}
-
-// ============================================================================
-// Override de resultados (LL/funding por unidade)
-// ============================================================================
-
-export async function atualizarInsumosOverrideAction(formData: FormData) {
-  const session = await auth();
-  const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) {
-    await flashError("Sem permissão para alterar insumos.");
-    return;
-  }
-  const cenarioId = String(formData.get("cenarioId"));
-  const overrideJson = String(formData.get("override") ?? "");
-  let override: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> | null;
-  try {
-    const parsed = overrideJson ? JSON.parse(overrideJson) : null;
-    override = parsed ? ResultadosOverrideSchema.parse(parsed) : null;
-  } catch (e) {
-    await flashError(`Insumos inválidos: ${e instanceof Error ? e.message : "JSON malformado"}`);
-    return;
-  }
-  try {
-    await atualizarResultadosOverride({ cenarioId, resultadosOverride: override });
-    await logAudit({
-      usuarioId: session?.user?.id,
-      acao: "cenario.insumos.atualizar",
-      recurso: `Cenario:${cenarioId}`,
-      meta: { unidades: override ? Object.keys(override) : ["limpou-override"] },
-    });
-    await flashSuccess(
-      override ? "Insumos atualizados — recalcule para ver o impacto." : "Insumos resetados ao default.",
-    );
-  } catch (e) {
-    await flashError(e instanceof Error ? e.message : "Falha ao salvar insumos");
-  }
-  rev();
-}
-
-// ============================================================================
-// Override de originação por sócio (anual)
-// ============================================================================
-
-export async function atualizarOriginacaoOverrideAction(formData: FormData) {
-  const session = await auth();
-  const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) {
-    await flashError("Sem permissão para alterar originação.");
-    return;
-  }
-  const cenarioId = String(formData.get("cenarioId"));
-  const overrideJson = String(formData.get("override") ?? "");
-  let override: Record<string, number> | null;
-  try {
-    const parsed = overrideJson ? JSON.parse(overrideJson) : null;
-    override = parsed ? OriginacaoOverrideSchema.parse(parsed) : null;
-  } catch (e) {
-    await flashError(`Originação inválida: ${e instanceof Error ? e.message : "JSON malformado"}`);
-    return;
-  }
-  try {
-    await atualizarOriginacaoOverride({ cenarioId, originacaoOverride: override });
-    await logAudit({
-      usuarioId: session?.user?.id,
-      acao: "cenario.originacao.atualizar",
-      recurso: `Cenario:${cenarioId}`,
-      meta: { socios: override ? Object.keys(override) : ["limpou-override"] },
-    });
-    await flashSuccess(
-      override ? "Originação atualizada — recalcule para ver o impacto." : "Originação resetada ao default.",
-    );
-  } catch (e) {
-    await flashError(e instanceof Error ? e.message : "Falha ao salvar originação");
   }
   rev();
 }

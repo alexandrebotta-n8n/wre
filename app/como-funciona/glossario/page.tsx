@@ -55,9 +55,9 @@ const TERMOS: Termo[] = [
     refs: [{ href: "/politica/categorias-socio", label: "6 Categorias" }],
   },
   {
-    termo: "Insumos individuais",
-    def: "Terceira camada de inputs (depois de DSF Global e Unidades): dados que variam por sócio dentro do período. Hoje contempla originação; futuramente pode incluir Bloco C nominativo e outros componentes.",
-    refs: [{ href: "/resultados?tab=originacao", label: "/resultados → Individuais" }],
+    termo: "Variáveis globais (anuais)",
+    def: "Insumos editados no topo da /simulacao que afetam TODOS os cenários DRAFT do ano: LL DSF global, LL de cada unidade, funding variável dos fundadores e originação por sócio. Mudar qualquer um marca os DRAFTs como dirty e exige Recalcular.",
+    refs: [{ href: "/simulacao", label: "Painel /simulacao" }],
   },
   {
     termo: "Default (matriz)",

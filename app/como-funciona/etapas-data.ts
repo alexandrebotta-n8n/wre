@@ -43,11 +43,11 @@ export const ETAPAS: EtapaInfo[] = [
     slug: "funding-fundadores",
     titulo: "Funding fundadores",
     modelo: "AMBOS",
-    formula: "quotas × funding_unidade_fundadores",
+    formula: "(quota_fund / Σquotas_fund) × fundingFundadoresAno",
     descricao:
-      "Devolução de capital aos fundadores conforme quotas, antes da distribuição residual. Trata o aporte histórico do fundo dos fundadores.",
-    exemploNumeros: "3 fundadores × 30 quotas × R$ 4.000",
-    exemploResultado: "R$ 360.000 ano",
+      "Valor arbitrário anual (configurado no painel Variáveis Globais da /simulacao) distribuído proporcionalmente entre os sócios fundadores (Socio.isFundador=true). Deduzido do LL antes do RDA no NOVO e do funding residual no ATUAL. Se 0, fundadores não recebem.",
+    exemploNumeros: "R$ 1.500.000 ÷ 3 fundadores com quotas 10/20/30%",
+    exemploResultado: "R$ 250k / 500k / 750k",
     veja: "/politica/categorias-socio",
   },
   {
@@ -105,7 +105,7 @@ export const ETAPAS: EtapaInfo[] = [
     modelo: "NOVO",
     formula: "originacaoAnualSocio × taxaComissaoOriginacao",
     descricao:
-      "Componente individual: cada sócio recebe um percentual sobre a receita que originou. O valor anual de originação por sócio é cadastrado na aba 'Individuais — Originação' de /resultados, e a taxa de comissão é configurada na Premissa NOVA (taxaComissaoOriginacao). Pode ser sobrescrito por cenário no sheet 'Originação'.",
+      "Componente individual: cada sócio recebe um percentual sobre a receita que originou. O valor anual de originação por sócio é cadastrado no painel 'Originação por sócio' (topo da /simulacao), e a taxa de comissão é configurada na Premissa NOVA (taxaComissaoOriginacao). Como é variável global, afeta todos os cenários DRAFT do ano.",
     exemploNumeros: "Sócio X originou R$ 800.000 × 5% taxa",
     exemploResultado: "Comissão R$ 40.000 ano",
     veja: "/politica/categorias-socio",

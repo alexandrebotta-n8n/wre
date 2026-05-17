@@ -1,6 +1,6 @@
 // Shell server component da página /simulacao.
-// Layout: Drawer (esquerda) + 2 colunas (A | B). Sem seletor de período —
-// cada cenário é do seu ano e a UI mostra anual com drill-down por trim.
+// Layout: painéis globais (topo) + 2 colunas (A | B) + drawer lateral.
+// Visão ANUAL única (sem drill-down trimestral).
 import Link from "next/link";
 import { Eye, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { DrawerCenarios } from "./drawer-cenarios";
 import { AjudaDrawer } from "./ajuda-drawer";
 import { TourOnboarding } from "./tour-onboarding";
 import { TabelaComparativa } from "./tabela-comparativa";
+import { PainelGlobais, type UnidadeGlobal } from "./painel-globais";
+import { PainelOriginacao, type SocioOriginacao } from "./painel-originacao";
 import type {
   CenarioListItem,
   CenarioCompleto,
@@ -32,6 +34,12 @@ export interface SimulacaoShellProps {
   drawerAberto: boolean;
   /** Se true, exibe o tour de boas-vindas (1ª visita). */
   mostrarTour: boolean;
+  /** Ano de referência para os painéis globais. */
+  ano: number;
+  unidadesGlobais: UnidadeGlobal[];
+  fundingFundadoresAtual: number;
+  sociosOriginacao: SocioOriginacao[];
+  cenariosDraftDoAno: number;
 }
 
 export function SimulacaoShell(props: SimulacaoShellProps) {
@@ -57,7 +65,7 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
     <main className="mx-auto max-w-[1600px] px-4 sm:px-6 py-6 space-y-5">
       <PageHeader
         title="Simulação"
-        description="Compare cenários lado a lado ou analise um único cenário. Visão anual — expanda um sócio para ver por trimestre."
+        description="Compare cenários lado a lado em base anual. Edite as variáveis globais no topo para refletir em todos os cenários."
         actions={
           <div className="flex items-center gap-2">
             <span data-tour="cenarios">
@@ -88,6 +96,23 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           </div>
         }
       />
+
+      {/* Painéis globais (só para editores) */}
+      {props.podeMutar && !props.ehSocioRestrito && (
+        <div className="space-y-3">
+          <PainelGlobais
+            ano={props.ano}
+            unidades={props.unidadesGlobais}
+            fundingFundadoresAtual={props.fundingFundadoresAtual}
+            cenariosDraftDoAno={props.cenariosDraftDoAno}
+          />
+          <PainelOriginacao
+            ano={props.ano}
+            socios={props.sociosOriginacao}
+            cenariosDraftDoAno={props.cenariosDraftDoAno}
+          />
+        </div>
+      )}
 
       {/* 2 colunas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

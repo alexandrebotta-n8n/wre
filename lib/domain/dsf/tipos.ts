@@ -78,8 +78,6 @@ export type TabelaSalarial = Record<NivelCargo, Record<FaixaSalarial, number>>;
 
 export interface PremissasModeloAtual {
   proLaboreMensal: number;
-  // Código da unidade que rateia para fundadores (planilha: "BG")
-  unidadeFundadores: string;
   // Código da unidade matriz consolidada (planilha: "DSF")
   unidadeMatriz: string;
   // Percentual da reserva sobre o funding residual da matriz (planilha: 0.05)
@@ -90,6 +88,10 @@ export interface PremissasModeloAtual {
   reservaViraPremio: boolean;
   // Públicos elegíveis ao prêmio de performance (default: capital + capital_gestor)
   publicosElegiveisPremio?: Publico[];
+  // Valor anual arbitrário (BRL) distribuído entre fundadores (isFundador=true).
+  // Substitui o cálculo antigo "Σquotas_fund × fundingVariavel_BG".
+  // Vem da ConfiguracaoAno do ano do cenário. Default 0 → fundadores não recebem.
+  fundingFundadoresAno: number;
   // Tabela de remuneração de gestão (mensal por nível × faixa)
   tabelaSalarial: TabelaSalarial;
 }
@@ -162,6 +164,11 @@ export interface PremissasModeloNovo {
   // sócio elegível. Default = 1 para todas. Permite favorecer/desfavorecer
   // categorias específicas (ex: SOCIO_SERVICOS_ESTRATEGICO = 1.2).
   pesoCategoria?: Partial<Record<Publico, number>>;
+
+  // Valor anual arbitrário (BRL) distribuído entre fundadores (isFundador=true).
+  // Deduzido do LL da matriz ANTES de formar o RDA central. Vem da ConfiguracaoAno
+  // do ano do cenário. Default 0 → fundadores não recebem e o RDA é preservado.
+  fundingFundadoresAno?: number;
 
   // Tabela salarial de gestão
   tabelaSalarial: TabelaSalarial;

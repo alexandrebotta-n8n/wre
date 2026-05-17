@@ -4,8 +4,11 @@
 // Resumo do fluxo:
 //   1. Pró-labore: 5000 × meses por sócio elegível
 //   2. Rem. Gestão: tabela[nivel][faixa] × meses
-//   3. Rem. Fundadores: quota × funding_unidade_fundadores (BG)
-//   4. Funding DSF residual = LL_matriz − Σ(rem.fundadores)
+//   3. Rem. Fundadores: distribuição PROPORCIONAL às quotas dos fundadores
+//      a partir de um valor anual arbitrário (premissas.fundingFundadoresAno —
+//      vindo da ConfiguracaoAno). Substitui o antigo cálculo
+//      "quota × funding_BG", que era acoplado ao LL de uma unidade específica.
+//   4. Funding DSF residual = LL_matriz − fundingFundadoresAno
 //   5. Reserva = funding_DSF × reservaPct
 //   6. Distribuição sócios não-fund = funding_DSF × (1 − reservaPct), rateada
 //      por (quota / Σquotas_nãoFund)
@@ -36,10 +39,10 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
   const { periodo, socios, resultados, premissas } = input;
 
   const matriz = resultados.find((r) => r.unidadeCodigo === premissas.unidadeMatriz);
-  const fundadoresUnid = resultados.find((r) => r.unidadeCodigo === premissas.unidadeFundadores);
   const llMatriz = matriz?.lucroLiquido ?? 0;
-  // Funding da unidade fundadores = fundingVariavel se fornecido, senão LL bruto
-  const fundingFundadoresUnid = fundadoresUnid?.fundingVariavel ?? fundadoresUnid?.lucroLiquido ?? 0;
+  // Funding dos fundadores agora é input arbitrário (ConfiguracaoAno),
+  // não mais derivado do LL de uma unidade específica.
+  const fundingFundadoresAno = Math.max(0, premissas.fundingFundadoresAno ?? 0);
 
   // ---------- Etapa 1: Pró-labore por sócio ----------
   const proLaborePorSocio = new Map<string, number>();
@@ -59,17 +62,22 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
   }
 
   // ---------- Etapa 3: Remuneração de fundadores ----------
-  // Cada fundador recebe quota × funding_unidade_fundadores (sem normalização).
+  // Distribui o valor anual arbitrário (fundingFundadoresAno) PROPORCIONALMENTE
+  // às quotas dos fundadores. Σ pacotes_fundadores = fundingFundadoresAno exato.
   const remFundadorPorSocio = new Map<string, number>();
+  const fundadores = socios.filter((s) => s.isFundador);
+  const somaQuotasFund = fundadores.reduce((acc, s) => acc + s.percentualQuotas, 0);
   let totalFundadores = 0;
-  for (const s of socios.filter((s) => s.isFundador)) {
-    const valor = s.percentualQuotas * fundingFundadoresUnid;
-    remFundadorPorSocio.set(s.id, valor);
-    totalFundadores += valor;
+  if (fundingFundadoresAno > 0 && somaQuotasFund > 0) {
+    for (const s of fundadores) {
+      const valor = (s.percentualQuotas / somaQuotasFund) * fundingFundadoresAno;
+      remFundadorPorSocio.set(s.id, valor);
+      totalFundadores += valor;
+    }
   }
 
   // ---------- Etapa 4: Funding DSF residual ----------
-  // Funding = LL_matriz − Σ(rem.fundadores). Não desconta pró-labore/gestão
+  // Funding = LL_matriz − fundingFundadoresAno. Não desconta pró-labore/gestão
   // pois já são despesas contabilizadas no LL.
   const fundingMatriz = matriz?.fundingVariavel ?? llMatriz - totalFundadores;
 
@@ -110,7 +118,7 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
 
     if (proLabore) trace.push({ etapa: "1.pro-labore", descricao: `${premissas.proLaboreMensal} × ${periodo.meses}m`, valor: proLabore });
     if (remGestao) trace.push({ etapa: "2.gestao", descricao: `${s.nivelCargo}/${s.faixaSalarial}`, valor: remGestao });
-    if (remFundador) trace.push({ etapa: "3.fundador", descricao: `${(s.percentualQuotas * 100).toFixed(4)}% × funding ${premissas.unidadeFundadores}`, valor: remFundador });
+    if (remFundador) trace.push({ etapa: "3.fundador", descricao: `${((s.percentualQuotas / somaQuotasFund) * 100).toFixed(2)}% × R$ ${fundingFundadoresAno.toLocaleString("pt-BR")} (funding fundadores)`, valor: remFundador });
     if (distSocio) trace.push({ etapa: "6.distribuicao", descricao: `${(s.percentualQuotas * 100).toFixed(4)}% / Σquotas × funding × ${(1 - premissas.reservaPercentual).toFixed(2)}`, valor: distSocio });
     if (premio) trace.push({ etapa: "7.premio", descricao: "reserva uniforme", valor: premio });
 
@@ -155,7 +163,7 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
     pacotes,
     totalDistribuido,
     totalReservaCentral: reservaCentral,
-    totalNaoAlocado: llMatriz + fundingFundadoresUnid - totalDistribuido - reservaCentral,
+    totalNaoAlocado: llMatriz - totalDistribuido - reservaCentral,
     alertasGlobais: [],
   };
 }

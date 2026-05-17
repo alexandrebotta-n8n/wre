@@ -13,7 +13,7 @@
 //   --only=<id>     recalcula apenas 1 cenário
 //   --include-applied  reabre APPLIED como rascunho antes de recalcular (PERIGOSO)
 import { prisma } from "../lib/prisma";
-import { calcularCenarioAnual } from "../lib/cenario-service";
+import { calcularCenario } from "../lib/cenario-service";
 
 interface Args {
   dryRun: boolean;
@@ -81,7 +81,7 @@ async function main() {
     return;
   }
 
-  const ok: Array<{ id: string; nome: string; trimsOk: number; trimsSemDados: number }> = [];
+  const ok: Array<{ id: string; nome: string }> = [];
   const erros: Array<{ id: string; nome: string; erro: string }> = [];
 
   for (const c of draftsParaRecalcular) {
@@ -91,18 +91,9 @@ async function main() {
       continue;
     }
     try {
-      const r = await calcularCenarioAnual({ cenarioId: c.id });
-      ok.push({
-        id: c.id,
-        nome: c.nome,
-        trimsOk: r.trimestresOk.length,
-        trimsSemDados: r.trimestresSemDados.length,
-      });
-      const msg =
-        r.trimestresSemDados.length > 0
-          ? `${r.trimestresOk.length}/4 trims (sem dados em ${r.trimestresSemDados.map((t) => t + "T").join(", ")})`
-          : `${r.trimestresOk.length}/4 trims`;
-      console.log(`  ✓ ${tag} → ${msg}`);
+      await calcularCenario({ cenarioId: c.id });
+      ok.push({ id: c.id, nome: c.nome });
+      console.log(`  ✓ ${tag} → ok (anual)`);
     } catch (e) {
       const erro = e instanceof Error ? e.message : String(e);
       erros.push({ id: c.id, nome: c.nome, erro });

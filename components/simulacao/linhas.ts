@@ -1,15 +1,8 @@
 // Construção das linhas comparativas alinhadas por sócio entre A e B.
-// Cada `cenario.remuneracoes` agora carrega 4 linhas por sócio (uma por
-// trimestre); aqui agregamos no anual e mantemos o breakdown por trimestre
-// para o drill-down.
+// Visão ANUAL única — agrega todas as linhas de RemuneracaoCalculada do
+// cenário (1 por sócio no novo sistema; pode ter até 4 em APPLIED antigos).
 import { nomeOuIniciais } from "@/lib/format";
-import type {
-  CenarioCompleto,
-  LinhaComparativa,
-  TraceItem,
-  Trimestre,
-  DetalheTrimestre,
-} from "./types";
+import type { CenarioCompleto, LinhaComparativa } from "./types";
 
 type RemuneracaoRow = NonNullable<CenarioCompleto>["remuneracoes"][number];
 
@@ -18,7 +11,6 @@ interface AggSocio {
   nome: string;
   isFundador: boolean;
   total: number;
-  porTrimestre: Partial<Record<Trimestre, DetalheTrimestre>>;
 }
 
 function agregar(rows: RemuneracaoRow[] | undefined): Map<string, AggSocio> {
@@ -32,19 +24,10 @@ function agregar(rows: RemuneracaoRow[] | undefined): Map<string, AggSocio> {
         nome: r.socio.nome,
         isFundador: r.socio.isFundador,
         total: 0,
-        porTrimestre: {},
       };
       map.set(r.socioId, agg);
     }
     agg.total += r.total;
-    const t = r.periodo.trimestre as Trimestre | null;
-    if (t && t >= 1 && t <= 4) {
-      agg.porTrimestre[t] = {
-        total: r.total,
-        trace: (r.trace as TraceItem[] | null) ?? [],
-        alertas: (r.alertas as string[] | null) ?? [],
-      };
-    }
   }
   return map;
 }
@@ -73,11 +56,8 @@ export function construirLinhasComparativas(
       totalB,
       diff,
       diffPct,
-      porTrimestreA: ra?.porTrimestre ?? {},
-      porTrimestreB: rb?.porTrimestre ?? {},
     };
   });
-  // Ordena por |diff| desc quando há 2 cenários; por valor único desc quando só um.
   const single = !a || !b;
   if (single) {
     linhas.sort((x, y) => Math.max(y.totalA ?? 0, y.totalB ?? 0) - Math.max(x.totalA ?? 0, x.totalB ?? 0));

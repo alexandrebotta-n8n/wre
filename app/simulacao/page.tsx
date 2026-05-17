@@ -1,7 +1,6 @@
 // Página única de simulação — substitui /cenarios + /cenarios/comparar.
-// Layout 2 colunas (A | B), drawer lateral, painéis editáveis inline.
-// Visão anual: cada cenário carrega remunerações de todos os trimestres
-// do seu ano; UI agrega no anual com drill-down por trimestre.
+// Layout: painéis globais no topo + 2 colunas (A | B) + drawer lateral.
+// Visão ANUAL única (cálculo trimestral foi removido).
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { escopoDe } from "@/lib/auth/escopo";
@@ -9,11 +8,13 @@ import type { SessionUser } from "@/lib/auth/guards";
 import { getModoNome, getTourVisto } from "@/lib/preferencias";
 import { SimulacaoShell } from "@/components/simulacao/shell";
 import type { CenarioModelo, CenarioStatus } from "@/components/simulacao/types";
+import type { UnidadeGlobal } from "@/components/simulacao/painel-globais";
+import type { SocioOriginacao } from "@/components/simulacao/painel-originacao";
 
 export default async function SimulacaoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ a?: string; b?: string; drawer?: string }>;
+  searchParams: Promise<{ a?: string; b?: string; drawer?: string; ano?: string }>;
 }) {
   const sp = await searchParams;
   const session = await auth();
@@ -25,8 +26,6 @@ export default async function SimulacaoPage({
     prisma.cenario.findMany({
       where: escopo.ehSocioRestrito ? { status: "APPLIED" } : {},
       orderBy: [{ criadoEm: "desc" }],
-      // select enxuto: drawer só precisa destes campos. Evita carregar
-      // parametrosOverride (jsonb pesado) para 100 cenários da lista lateral.
       select: {
         id: true,
         nome: true,
@@ -50,9 +49,6 @@ export default async function SimulacaoPage({
       : Promise.resolve([]),
   ]);
 
-  // Defaults inteligentes quando nada selecionado:
-  // A = ATUAL (baseline — sistema de remuneração vigente)
-  // B = NOVO  (proposta — Política DSF v1)
   const aId = sp.a ?? defaultPara(todosCenarios, "ATUAL");
   const bId = sp.b ?? defaultPara(todosCenarios, "NOVO");
 
@@ -64,6 +60,21 @@ export default async function SimulacaoPage({
     aId ? carregarCenarioCompleto(aId, filtroSocio) : null,
     bId ? carregarCenarioCompleto(bId, filtroSocio) : null,
   ]);
+
+  // Ano de referência: do cenário ativo (A > B > query param > ano atual).
+  const anoRef =
+    cenarioA?.ano ?? cenarioB?.ano ?? Number(sp.ano) ?? new Date().getFullYear();
+
+  // Painéis globais — só carrega se for editor.
+  const [unidadesGlobais, fundingFundadores, sociosOriginacao, draftsDoAno] =
+    escopo.podeMutar
+      ? await Promise.all([
+          carregarUnidadesGlobais(anoRef),
+          carregarFundingFundadores(anoRef),
+          carregarSociosComOriginacao(anoRef),
+          prisma.cenario.count({ where: { ano: anoRef, status: "DRAFT" } }),
+        ])
+      : [[] as UnidadeGlobal[], 0, [] as SocioOriginacao[], 0];
 
   return (
     <SimulacaoShell
@@ -88,6 +99,11 @@ export default async function SimulacaoPage({
       modoNome={modoNome}
       drawerAberto={sp.drawer === "1"}
       mostrarTour={!tourVisto}
+      ano={anoRef}
+      unidadesGlobais={unidadesGlobais}
+      fundingFundadoresAtual={fundingFundadores}
+      sociosOriginacao={sociosOriginacao}
+      cenariosDraftDoAno={draftsDoAno}
     />
   );
 }
@@ -107,8 +123,11 @@ async function carregarCenarioCompleto(
   cenarioId: string,
   filtroSocio: Record<string, unknown>,
 ) {
-  // Carrega remunerações de TODOS os trimestres do ano do cenário —
-  // a UI agrega no anual e permite drill-down por trimestre.
+  // Carrega remunerações ANUAIS (tipo=ANO). APPLIED antigos podem ter
+  // entries trimestrais — para esses, o filtro tipo=ANO retorna vazio e
+  // o componente cai num fallback (lê snapshot ou agrega trimestres antigos).
+  // No MVP, apenas filtramos por ano (sem restringir tipo) e somamos no client
+  // — funciona tanto para 1 entrada ANO quanto 4 entradas TRIMESTRE legadas.
   const meta = await prisma.cenario.findUnique({
     where: { id: cenarioId },
     select: { ano: true },
@@ -132,15 +151,81 @@ async function carregarCenarioCompleto(
       remuneracoes: {
         where: {
           ...filtroSocio,
-          periodo: { tipo: "TRIMESTRE", ano: meta.ano },
+          periodo: { ano: meta.ano },
         },
         include: {
           socio: { select: { id: true, nome: true, isFundador: true } },
           periodo: true,
         },
-        orderBy: [{ periodo: { trimestre: "asc" } }, { total: "desc" }],
+        orderBy: [{ total: "desc" }],
       },
     },
   });
   return c;
+}
+
+// ============================================================================
+// Carregamento dos insumos globais para os painéis
+// ============================================================================
+
+async function carregarUnidadesGlobais(ano: number): Promise<UnidadeGlobal[]> {
+  const [unidades, periodoAno] = await Promise.all([
+    prisma.unidade.findMany({
+      where: { ativa: true },
+      orderBy: [{ isMatriz: "desc" }, { codigo: "asc" }],
+      take: 50,
+    }),
+    prisma.periodo.findFirst({ where: { tipo: "ANO", ano }, select: { id: true } }),
+  ]);
+  const resultados = periodoAno
+    ? await prisma.resultadoPeriodo.findMany({
+        where: { periodoId: periodoAno.id },
+        take: 50,
+      })
+    : [];
+  const porUnId = new Map(resultados.map((r) => [r.unidadeId, r] as const));
+  return unidades.map((u) => {
+    const r = porUnId.get(u.id);
+    return {
+      unidadeId: u.id,
+      codigo: u.codigo,
+      nome: u.nome,
+      isMatriz: u.isMatriz,
+      llAtual: r?.lucroLiquido ?? 0,
+      fundingAtual: r?.fundingVariavel ?? null,
+    };
+  });
+}
+
+async function carregarFundingFundadores(ano: number): Promise<number> {
+  const c = await prisma.configuracaoAno.findUnique({
+    where: { ano },
+    select: { fundingFundadoresAno: true },
+  });
+  return c?.fundingFundadoresAno ?? 0;
+}
+
+async function carregarSociosComOriginacao(ano: number): Promise<SocioOriginacao[]> {
+  const [socios, periodoAno] = await Promise.all([
+    prisma.socio.findMany({
+      where: { ativo: true },
+      orderBy: [{ isFundador: "desc" }, { nome: "asc" }],
+      take: 200,
+      select: { id: true, nome: true, cargo: true },
+    }),
+    prisma.periodo.findFirst({ where: { tipo: "ANO", ano }, select: { id: true } }),
+  ]);
+  const linhas = periodoAno
+    ? await prisma.originacaoPeriodo.findMany({
+        where: { periodoId: periodoAno.id },
+        take: 500,
+      })
+    : [];
+  const porSocio = new Map(linhas.map((l) => [l.socioId, l.valor] as const));
+  return socios.map((s) => ({
+    socioId: s.id,
+    nome: s.nome,
+    cargo: s.cargo,
+    valorAtual: porSocio.get(s.id) ?? 0,
+  }));
 }

@@ -1,5 +1,7 @@
 // Server component: header da coluna + KPIs + stepper + painel de parâmetros
 // + ações (calcular, publicar, editar classificações).
+// Visão ANUAL única — sem stepper trimestral, sem botões de override de
+// insumos/originação (esses agora vivem nos painéis globais do topo).
 import Link from "next/link";
 import { Replace, RotateCcw, FileCheck2, ListTree } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,13 +19,9 @@ import { MenuCenario, type CenarioStatus as CenarioStatusType } from "./menu-cen
 import { ExplicacaoDialog } from "./explicacao-dialog";
 import { KpiAlertasButton } from "./kpi-alertas-button";
 import { gerarNarrativa } from "@/lib/explicacao/narrativa";
-import { InsumosSheet, type InsumosUnidadeBase } from "@/components/insumos/insumos-sheet";
-import { OriginacaoSheet, type OriginacaoSocioBase } from "@/components/insumos/originacao-sheet";
-import { prisma } from "@/lib/prisma";
-import { carregarHistoricoUnidades } from "@/lib/insumos/historico";
 import type { CenarioCompleto, AreaOption } from "./types";
 
-export async function ColunaCenario({
+export function ColunaCenario({
   slot,
   cenario,
   outroCenarioId,
@@ -38,25 +36,30 @@ export async function ColunaCenario({
   podeMutar: boolean;
   modoNome: "completo" | "iniciais";
 }) {
-  void modoNome; // pode ser usado em futuras adições
+  void modoNome;
   const isDraft = cenario.status === "DRAFT";
   const editavel = podeMutar && isDraft;
-  // Consolidado: 1 loop para somar total anual (Σ trimestres), contar
-  // erros/warns e agregar valoresPorEtapa.
+
+  // Consolidado: total anual + contagens de alertas + alertas por sócio + valoresPorEtapa
+  // (a partir do trace, agrupando por etapa sem o prefixo numérico).
   let totalPacote = 0;
   let errosCount = 0;
   let warnsCount = 0;
   const valoresPorEtapa: Record<string, number> = {};
   const sociosUnicos = new Set<string>();
-  const trimsCalculados = new Set<number>();
+  const alertasMap = new Map<string, { socioNome: string; alertas: string[] }>();
   for (const r of cenario.remuneracoes) {
     totalPacote += r.total;
     sociosUnicos.add(r.socioId);
-    if (r.periodo.trimestre) trimsCalculados.add(r.periodo.trimestre);
     const alertas = (r.alertas as string[] | null) ?? [];
     for (const a of alertas) {
       if (a.includes("[ERROR]")) errosCount++;
       else if (a.includes("[WARNING]")) warnsCount++;
+    }
+    if (alertas.length > 0) {
+      const cur = alertasMap.get(r.socioId) ?? { socioNome: r.socio.nome, alertas: [] };
+      cur.alertas.push(...alertas);
+      alertasMap.set(r.socioId, cur);
     }
     const trace = ((r as unknown as { trace?: Array<{ etapa: string; valor?: number }> }).trace) ?? [];
     for (const item of trace) {
@@ -66,42 +69,43 @@ export async function ColunaCenario({
       valoresPorEtapa[key] = (valoresPorEtapa[key] ?? 0) + item.valor;
     }
   }
+  const alertasPorSocio = Array.from(alertasMap.values());
+  const totalAlertas = errosCount + warnsCount;
+  const kpiValorAlertas =
+    totalAlertas === 0
+      ? "✓"
+      : `${errosCount > 0 ? errosCount + "✗" : ""} ${warnsCount > 0 ? warnsCount + "⚠" : ""}`.trim();
+  const kpiCorAlertas: "red" | "amber" | "green" =
+    errosCount > 0 ? "red" : warnsCount > 0 ? "amber" : "green";
   const jaCalculou = cenario.remuneracoes.length > 0;
-  const cobertura4Trims = trimsCalculados.size === 4;
-  // Publicar é permitido mesmo sem cobertura 4/4 — a publicarAction faz
-  // auto-cálculo dos 4 trimestres antes de congelar o snapshot.
   const podePublicar = editavel && errosCount === 0;
   const dirty = cenario.parametrosDirty;
 
-  // Stepper
   const calcDescricao = dirty
     ? "params alterados"
     : !jaCalculou
     ? "pendente"
-    : cobertura4Trims
-    ? "4 trimestres ok"
-    : `${trimsCalculados.size}/4 trimestres`;
+    : "ok";
   const steps: Step[] = [
     {
       label: "Classificar",
       description: `${cenario.classificacoes.length} sócios`,
       state: "done",
       tooltip:
-        "Define cada sócio: público (SC, SServiço, Líder), % de quotas, peso no Bloco B e originação esperada. Base do cálculo.",
+        "Define cada sócio: público (categoria), % de quotas, peso no Bloco B e originação esperada. Base do cálculo.",
     },
     {
       label: "Calcular",
       description: calcDescricao,
-      state: cobertura4Trims && !dirty ? "done" : "current",
+      state: jaCalculou && !dirty ? "done" : "current",
       tooltip:
-        "Roda o engine DSF nos 4 trimestres do ano com os parâmetros atuais (override ou premissa) e gera o pacote de cada sócio.",
+        "Roda o engine DSF em base anual com os parâmetros atuais (override ou premissa) + variáveis globais do ano.",
     },
     {
       label: "Revisar",
       description: errosCount > 0 ? `${errosCount} erro(s)` : "alertas ok",
-      state: cobertura4Trims ? (errosCount > 0 ? "current" : "done") : "pending",
-      tooltip:
-        "Confere alertas e valores. Erros [ERROR] bloqueiam Publicar; warnings só avisam.",
+      state: jaCalculou ? (errosCount > 0 ? "current" : "done") : "pending",
+      tooltip: "Confere alertas e valores. Erros [ERROR] bloqueiam Publicar.",
     },
     {
       label: "Publicar",
@@ -109,15 +113,14 @@ export async function ColunaCenario({
       state:
         cenario.status === "APPLIED"
           ? "done"
-          : cobertura4Trims && errosCount === 0
+          : jaCalculou && errosCount === 0
           ? "current"
           : "pending",
       tooltip:
-        "Congela o cenário como snapshot imutável (APPLIED). Outros APPLIED do mesmo modelo+ano são arquivados automaticamente.",
+        "Congela o cenário como snapshot imutável (APPLIED). Outros APPLIED do mesmo modelo+ano são arquivados.",
     },
   ];
 
-  // URL pra trocar essa coluna por outro cenário (abre drawer)
   const trocarHref = (() => {
     const sp = new URLSearchParams();
     if (outroCenarioId) sp.set(slot === "a" ? "b" : "a", outroCenarioId);
@@ -125,40 +128,9 @@ export async function ColunaCenario({
     return `/simulacao?${sp.toString()}`;
   })();
 
-  // Parâmetros efetivos = override OU premissa (vamos exibir o que está em uso)
   const paramsEfetivos =
     (cenario.parametrosOverride as Record<string, unknown> | null) ??
     (cenario.premissa.parametros as Record<string, unknown>);
-
-  // Insumos override do cenário (LL/funding por unidade)
-  const resOverride = (cenario.resultadosOverride ?? null) as
-    | Record<string, { lucroLiquido?: number; fundingVariavel?: number }>
-    | null;
-  const temInsumoOverride = !!resOverride && Object.keys(resOverride).length > 0;
-
-  // Originação override do cenário (anual por sócio)
-  const origOverride = (cenario.originacaoOverride ?? null) as
-    | Record<string, number>
-    | null;
-  const temOrigOverride = !!origOverride && Object.keys(origOverride).length > 0;
-
-  // Carrega LL/funding default + histórico — só se for editável (ADMIN/CONSULTOR
-  // em cenário DRAFT). Soma trimestres do ano para visão anual única.
-  const unidadesParaSheet: InsumosUnidadeBase[] = editavel
-    ? await carregarInsumosDoAno(cenario.ano, resOverride)
-    : [];
-
-  // Carrega originação anual oficial + lista de sócios elegíveis (apenas modelo NOVO)
-  const ehNovo = cenario.modelo === "NOVO";
-  const sociosParaOriginacaoSheet: OriginacaoSocioBase[] = editavel && ehNovo
-    ? await carregarOriginacaoDoAno(cenario.ano, cenario.classificacoes, origOverride)
-    : [];
-  const taxaComissao = ehNovo
-    ? Number(
-        (paramsEfetivos as Record<string, unknown>).taxaComissaoOriginacao ?? 0,
-      )
-    : 0;
-  const periodoRotulo = `${cenario.ano} (anual)`;
 
   return (
     <Card className="flex flex-col">
@@ -173,18 +145,8 @@ export async function ColunaCenario({
               <ModeloBadge modelo={cenario.modelo} />
               <StatusBadge status={cenario.status} />
               {dirty && (
-                <Badge variant="warning" size="sm" title="Parâmetros ou insumos alterados — recalcule">
+                <Badge variant="warning" size="sm" title="Parâmetros ou variáveis globais alterados — recalcule">
                   ● alterado
-                </Badge>
-              )}
-              {temInsumoOverride && (
-                <Badge variant="info" size="sm" title="Cenário usa insumos customizados">
-                  insumos custom
-                </Badge>
-              )}
-              {temOrigOverride && (
-                <Badge variant="warning" size="sm" title="Cenário usa originação customizada">
-                  originação custom
                 </Badge>
               )}
             </div>
@@ -202,24 +164,6 @@ export async function ColunaCenario({
             </CardDescription>
           </div>
           <div className="flex items-center gap-1">
-            {editavel && unidadesParaSheet.length > 0 && (
-              <InsumosSheet
-                cenarioId={cenario.id}
-                cenarioNome={cenario.nome}
-                periodoRotulo={periodoRotulo}
-                totalAtual={totalPacote}
-                unidades={unidadesParaSheet}
-              />
-            )}
-            {editavel && ehNovo && sociosParaOriginacaoSheet.length > 0 && (
-              <OriginacaoSheet
-                cenarioId={cenario.id}
-                cenarioNome={cenario.nome}
-                ano={cenario.ano}
-                taxaComissao={taxaComissao}
-                socios={sociosParaOriginacaoSheet}
-              />
-            )}
             {jaCalculou && (
               <ExplicacaoDialog
                 cenarioNome={cenario.nome}
@@ -229,8 +173,7 @@ export async function ColunaCenario({
                   ano: cenario.ano,
                   periodoRotulo: `Anual ${cenario.ano}`,
                   premissaNome: cenario.premissa.nome,
-                  // Agrega 4 trimestres por sócio para a narrativa: 1 entrada por sócio
-                  // com total anual, trace concatenado e alertas unificados.
+                  // Agrega por sócio (1 entrada por sócio com total + trace + alertas).
                   remuneracoes: (() => {
                     const agg = new Map<
                       string,
@@ -280,28 +223,11 @@ export async function ColunaCenario({
           <Kpi label="Total anual" valor={jaCalculou ? brl(totalPacote, true) : "—"} />
           <Kpi label="Sócios" valor={String(sociosUnicos.size)} />
           <KpiAlertasButton
-            valor={
-              errosCount === 0 && warnsCount === 0
-                ? "✓"
-                : `${errosCount > 0 ? errosCount + "✗" : ""} ${warnsCount > 0 ? warnsCount + "⚠" : ""}`.trim()
-            }
-            cor={errosCount > 0 ? "red" : warnsCount > 0 ? "amber" : "green"}
+            valor={kpiValorAlertas}
+            cor={kpiCorAlertas}
             cenarioNome={cenario.nome}
-            totalCount={errosCount + warnsCount}
-            alertasPorSocio={(() => {
-              const map = new Map<string, { socioNome: string; alertas: string[] }>();
-              for (const r of cenario.remuneracoes) {
-                const al = (r.alertas as string[] | null) ?? [];
-                if (al.length === 0) continue;
-                const cur = map.get(r.socioId);
-                if (cur) {
-                  cur.alertas.push(...al);
-                } else {
-                  map.set(r.socioId, { socioNome: r.socio.nome, alertas: [...al] });
-                }
-              }
-              return [...map.values()];
-            })()}
+            alertasPorSocio={alertasPorSocio}
+            totalCount={totalAlertas}
           />
         </div>
       </CardHeader>
@@ -314,7 +240,7 @@ export async function ColunaCenario({
       )}
 
       {/* Painel de parâmetros */}
-      <div className="px-5 py-3 border-b border-neutral-100" data-tour="parametros">
+      <div className="px-5 py-3 border-b border-neutral-100">
         <PainelParametros
           cenarioId={cenario.id}
           modelo={cenario.modelo as "ATUAL" | "NOVO"}
@@ -329,7 +255,7 @@ export async function ColunaCenario({
       </div>
 
       {/* Ações */}
-      <div className="px-5 py-3 flex items-center gap-2 flex-wrap mt-auto" data-tour="acoes-publicar">
+      <div className="px-5 py-3 flex items-center gap-2 flex-wrap mt-auto">
         {editavel && (
           <>
             <form action={calcularAction}>
@@ -338,8 +264,8 @@ export async function ColunaCenario({
                 side="top"
                 content={
                   jaCalculou
-                    ? "Roda o engine DSF nos 4 trimestres do ano com os parâmetros atuais (override ou premissa) e regrava os pacotes por sócio."
-                    : "Calcula os 4 trimestres do ano em sequência usando os parâmetros do cenário. Trimestres sem dados de DRE são ignorados."
+                    ? "Roda o engine DSF em base anual com os parâmetros atuais (override ou premissa) + variáveis globais do ano e regrava os pacotes por sócio."
+                    : "Calcula o cenário em base anual com os parâmetros atuais. Se não houver Lucro Líquido do ano cadastrado nos painéis globais, falha."
                 }
               >
                 <Button
@@ -377,14 +303,12 @@ export async function ColunaCenario({
                 content={
                   errosCount > 0
                     ? `Resolva os ${errosCount} alerta(s) ERROR antes de publicar.`
-                    : !cobertura4Trims
-                    ? `Vou calcular os 4 trimestres antes de publicar (atual: ${trimsCalculados.size}/4) e congelar o snapshot.`
                     : "Congela o cenário como snapshot imutável (status APPLIED). Outros cenários publicados do mesmo modelo+ano serão arquivados automaticamente."
                 }
               >
                 <Button variant="primary" size="sm" disabled={!podePublicar}>
                   <FileCheck2 className="h-3.5 w-3.5" />
-                  {!cobertura4Trims ? "Calcular & Publicar" : "Publicar"}
+                  Publicar
                 </Button>
               </Tooltip>
             }
@@ -392,8 +316,6 @@ export async function ColunaCenario({
             description={
               errosCount > 0
                 ? `Há ${errosCount} alerta(s) ERROR. Resolva antes de publicar.`
-                : !cobertura4Trims
-                ? `Vou calcular os 4 trimestres do ano antes de congelar o snapshot (atual: ${trimsCalculados.size}/4). Cenários APPLIED anteriores deste modelo/ano serão arquivados.`
                 : "O cálculo será congelado (snapshot imutável). Cenários APPLIED anteriores deste modelo/ano serão arquivados."
             }
             action={publicarAction}
@@ -436,111 +358,3 @@ function Kpi({
     </div>
   );
 }
-
-// ============================================================================
-// Insumos do ano (LL/funding agregados dos 4 trimestres)
-// ============================================================================
-
-async function carregarInsumosDoAno(
-  ano: number,
-  override: Record<string, { lucroLiquido?: number; fundingVariavel?: number }> | null,
-): Promise<InsumosUnidadeBase[]> {
-  const trimestres = await prisma.periodo.findMany({
-    where: { tipo: "TRIMESTRE", ano },
-    take: 4,
-  });
-  const trimIds = trimestres.map((t) => t.id);
-  const [unidades, resultados, historico] = await Promise.all([
-    prisma.unidade.findMany({
-      where: { ativa: true },
-      orderBy: [{ isMatriz: "desc" }, { codigo: "asc" }],
-      take: 50,
-    }),
-    trimIds.length > 0
-      ? prisma.resultadoPeriodo.findMany({
-          where: { periodoId: { in: trimIds } },
-          take: 200,
-        })
-      : Promise.resolve([]),
-    carregarHistoricoUnidades({ limite: 8 }),
-  ]);
-
-  // Agrega LL/funding dos 4 trimestres por unidade (visão anual)
-  const llPorUn = new Map<string, number>();
-  const fvPorUn = new Map<string, number | null>();
-  for (const r of resultados) {
-    llPorUn.set(r.unidadeId, (llPorUn.get(r.unidadeId) ?? 0) + r.lucroLiquido);
-    if (r.fundingVariavel != null) {
-      fvPorUn.set(r.unidadeId, (fvPorUn.get(r.unidadeId) ?? 0) + r.fundingVariavel);
-    }
-  }
-  const histPorUn = new Map(historico.map((h) => [h.unidadeId, h] as const));
-
-  return unidades.map((u) => {
-    const h = histPorUn.get(u.id);
-    return {
-      unidadeId: u.id,
-      unidadeCodigo: u.codigo,
-      unidadeNome: u.nome,
-      isMatriz: u.isMatriz,
-      llDefault: llPorUn.get(u.id) ?? 0,
-      fundingDefault: fvPorUn.get(u.id) ?? null,
-      llOverride: override?.[u.id]?.lucroLiquido,
-      fundingOverride: override?.[u.id]?.fundingVariavel,
-      hist: {
-        llMedia: h?.llMedia ?? 0,
-        llMin: h?.llMin ?? 0,
-        llMax: h?.llMax ?? 0,
-        amostras: h?.amostras ?? 0,
-        ultimoPeriodo: h?.ultimoPeriodo ?? null,
-      },
-    };
-  });
-}
-
-// ============================================================================
-// Originação anual oficial (somatório dos OriginacaoPeriodo do ano)
-// + lista de sócios elegíveis à comissão (todas as 6 categorias da Política DSF v1).
-// ============================================================================
-
-async function carregarOriginacaoDoAno(
-  ano: number,
-  classificacoes: CenarioCompleto["classificacoes"],
-  override: Record<string, number> | null,
-): Promise<OriginacaoSocioBase[]> {
-  const trimestres = await prisma.periodo.findMany({
-    where: { tipo: "TRIMESTRE", ano },
-    take: 4,
-  });
-  const trimIds = trimestres.map((t) => t.id);
-  const linhas = trimIds.length > 0
-    ? await prisma.originacaoPeriodo.findMany({
-        where: { periodoId: { in: trimIds } },
-        take: 1000,
-      })
-    : [];
-  const anualPorSocio = new Map<string, number>();
-  for (const l of linhas) {
-    anualPorSocio.set(l.socioId, (anualPorSocio.get(l.socioId) ?? 0) + l.valor);
-  }
-  // Categorias elegíveis à comissão (todas que recebem Bloco B) — exclui legado.
-  const elegiveis = new Set([
-    "SOCIO_CAPITAL",
-    "SOCIO_CAPITAL_GESTOR",
-    "SOCIO_CAPITAL_LIDER_UNIDADE",
-    "SOCIO_SERVICOS",
-    "SOCIO_SERVICOS_ESTRATEGICO",
-    "LIDER_UNIDADE_NON_EQUITY",
-  ]);
-  return classificacoes
-    .filter((c) => elegiveis.has(c.publico))
-    .map((c) => ({
-      socioId: c.socioId,
-      nome: c.socio.nome,
-      cargo: c.socio.cargo,
-      publico: c.publico,
-      anualDefault: anualPorSocio.get(c.socioId) ?? 0,
-      anualOverride: override?.[c.socioId],
-    }));
-}
-
