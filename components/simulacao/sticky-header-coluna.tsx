@@ -5,11 +5,13 @@
 // Como ColunaCenario é Server Component, observamos o header full via
 // document.getElementById em vez de ref (evita criar wrapper client).
 //
-// Conteúdo enxuto: badge slot + nome trunc + Total + Badge Alertas +
-// RecalcularButton (quando editável). Z-index 20 para passar sobre conteúdo
-// da Card sem brigar com Radix overlays (z-50).
+// Conteúdo enxuto: badge slot + nome trunc + Total (com tooltip explicando
+// o que é) + Badge Alertas (com help icon) + RecalcularButton.
+// Z-index 20 — Radix overlays ficam acima (z-50).
 import * as React from "react";
+import { HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip } from "@/components/ui/tooltip";
 import { RecalcularButton } from "./recalcular-button";
 
 export interface StickyHeaderColunaProps {
@@ -61,15 +63,45 @@ export function StickyHeaderColuna(props: StickyHeaderColunaProps) {
       <span className="font-semibold text-navy-900 text-sm truncate min-w-0 flex-1">
         {props.nome}
       </span>
-      <span className="text-xs tabular-nums font-semibold text-navy-900 whitespace-nowrap hidden sm:inline">
-        {props.totalLabel}
-      </span>
-      <span
-        className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded border ${corClasse} whitespace-nowrap`}
-        title="Alertas"
+
+      {/* Total anual com tooltip explicando o que representa */}
+      <Tooltip
+        side="bottom"
+        content={
+          <>
+            <strong>Total anual</strong> = soma de toda a remuneração paga aos sócios no ano:
+            pró-labore, remuneração de gestão, blocos A/B/C (Modelo NOVO) ou distribuição de
+            lucros (Modelo ATUAL), créditos interunidades, comissão de originação, funding
+            fundadores e prêmios. Não inclui despesas operacionais da firma.
+          </>
+        }
       >
-        {props.alertasLabel}
-      </span>
+        <span className="text-xs tabular-nums font-semibold text-navy-900 whitespace-nowrap hidden sm:inline-flex items-center gap-1 cursor-help">
+          {props.totalLabel}
+          <HelpCircle className="h-3 w-3 text-neutral-400" />
+        </span>
+      </Tooltip>
+
+      {/* Alertas + help */}
+      <Tooltip
+        side="bottom"
+        content={
+          <>
+            <strong>Alertas</strong>: verificações automáticas do cálculo.
+            <br />✓ = tudo ok.
+            <br />✗ = ERROR (bloqueia salvar versão).
+            <br />⚠ = WARNING (informativo).
+          </>
+        }
+      >
+        <span
+          className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded border ${corClasse} whitespace-nowrap inline-flex items-center gap-1 cursor-help`}
+        >
+          {props.alertasLabel}
+          <HelpCircle className="h-2.5 w-2.5 opacity-60" />
+        </span>
+      </Tooltip>
+
       {props.editavel && (
         <RecalcularButton
           cenarioId={props.cenarioId}

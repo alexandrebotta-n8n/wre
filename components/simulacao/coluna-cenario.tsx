@@ -5,7 +5,7 @@
 // Visão ANUAL única.
 import { FileCheck2, ListTree, Calculator, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge, ModeloBadge, StatusBadge } from "@/components/ui/badge";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -133,7 +133,6 @@ export function ColunaCenario({
               <Badge variant={slot === "a" ? "navy" : "info"} size="sm">
                 Coluna {slot.toUpperCase()}
               </Badge>
-              <ModeloBadge modelo={cenario.modelo} />
               <StatusBadge status={cenario.status} />
               {dirty && (
                 <Badge variant="warning" size="sm" title="Parâmetros ou variáveis globais alterados — recalcule">
@@ -155,6 +154,13 @@ export function ColunaCenario({
             </CardDescription>
           </div>
           <div className="flex items-center gap-1">
+            {editavel && jaCalculou && (
+              <RecalcularButton
+                cenarioId={cenario.id}
+                dirty={dirty}
+                jaCalculou={jaCalculou}
+              />
+            )}
             {jaCalculou && (
               <ExplicacaoDialog
                 cenarioNome={cenario.nome}
@@ -203,10 +209,11 @@ export function ColunaCenario({
           </div>
         </div>
 
-        {/* KPIs OU empty-state quando ainda não calculou */}
+        {/* KPIs OU empty-state quando ainda não calculou.
+            Total anual NÃO aparece aqui — fica no sticky header compacto
+            (evita duplicação). Aqui só: Sócios + Alertas (com ajuda). */}
         {jaCalculou ? (
-          <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-neutral-100">
-            <Kpi label="Total anual" valor={brl(totalPacote, true)} />
+          <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-neutral-100">
             <Kpi label="Sócios" valor={String(sociosUnicos.size)} />
             <KpiAlertasButton
               valor={kpiValorAlertas}
@@ -225,8 +232,7 @@ export function ColunaCenario({
             <RecalcularButton cenarioId={cenario.id} dirty={dirty} jaCalculou={jaCalculou} />
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-neutral-100">
-            <Kpi label="Total anual" valor="—" />
+          <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-neutral-100">
             <Kpi label="Sócios" valor={String(cenario.classificacoes.length)} />
             <Kpi label="Alertas" valor="—" />
           </div>
@@ -248,15 +254,9 @@ export function ColunaCenario({
         />
       </div>
 
-      {/* Ações — Recalcular + Salvar versão (somente DRAFT já calculado) */}
+      {/* Ações — apenas Salvar versão. Recalcular vive no topo (header full
+          + sticky compacto) para não duplicar CTA. */}
       <div className="px-5 py-3 flex items-center gap-2 flex-wrap mt-auto">
-        {editavel && jaCalculou && (
-          <RecalcularButton
-            cenarioId={cenario.id}
-            dirty={dirty}
-            jaCalculou={jaCalculou}
-          />
-        )}
         {editavel && jaCalculou && (
           <ConfirmDialog
             trigger={

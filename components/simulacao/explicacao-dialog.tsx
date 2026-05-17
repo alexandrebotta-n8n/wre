@@ -14,6 +14,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export function ExplicacaoDialog({
   paragrafos,
@@ -40,15 +41,27 @@ export function ExplicacaoDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" title="Gera um resumo em texto do cenário">
-          <BookOpen className="h-3.5 w-3.5" /> Explicar
-        </Button>
+        <Tooltip
+          side="bottom"
+          content={
+            <>
+              <strong>Explicar este cenário</strong>: gera uma narrativa em texto contando
+              como o total anual foi formado — premissas, blocos, créditos, fundadores, prêmios.
+              Útil para apresentar ao Comitê ou comparar com outro cenário.
+            </>
+          }
+        >
+          <Button variant="outline" size="sm">
+            <BookOpen className="h-3.5 w-3.5" /> Explicar
+          </Button>
+        </Tooltip>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Explicação do cenário</DialogTitle>
-          <DialogDescription className="truncate">
-            Resumo gerado a partir do cálculo de <strong className="font-medium">{cenarioNome}</strong>.
+          <DialogTitle>Como o total anual foi formado · {cenarioNome}</DialogTitle>
+          <DialogDescription>
+            Narrativa gerada a partir do trace de cálculo. Lista as etapas econômicas
+            (pró-labore, gestão, blocos, créditos, fundadores) e seus valores agregados.
             Útil para apresentar ao Comitê.
           </DialogDescription>
         </DialogHeader>

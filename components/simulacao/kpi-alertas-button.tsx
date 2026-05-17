@@ -1,7 +1,11 @@
 "use client";
 // KPI clicável que abre AlertasDialog. Usado em ColunaCenario para o KPI "Alertas".
 // Quando não há alerta, vira um KPI estático normal (não-clicável).
+// Inclui ícone "?" ao lado do label "Alertas" com tooltip explicando o significado
+// (✓ ok / ✗ ERROR bloqueia / ⚠ WARNING informativo).
 import * as React from "react";
+import { HelpCircle } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { AlertasDialog } from "./alertas-dialog";
 
 export function KpiAlertasButton({
@@ -28,9 +32,34 @@ export function KpiAlertasButton({
       ? "text-mint-700"
       : "text-navy-900";
 
+  const label = (
+    <div className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1">
+      Alertas
+      <Tooltip
+        side="top"
+        content={
+          <>
+            <strong>Alertas</strong>: verificações automáticas do cálculo.
+            <br />✓ = tudo ok.
+            <br />✗ = ERROR (bloqueia salvar versão).
+            <br />⚠ = WARNING (informativo, não bloqueia).
+            {interativo && (
+              <>
+                <br />
+                <em>Clique no número para ver a lista detalhada.</em>
+              </>
+            )}
+          </>
+        }
+      >
+        <HelpCircle className="h-3 w-3 text-neutral-400 cursor-help" />
+      </Tooltip>
+    </div>
+  );
+
   const inner = (
     <>
-      <div className="text-[10px] uppercase tracking-wider text-neutral-500">Alertas</div>
+      {label}
       <div className={`text-base font-semibold tabular-nums ${corClass}`}>{valor}</div>
     </>
   );
