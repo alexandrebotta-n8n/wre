@@ -41,3 +41,48 @@ jobs:
 
       - name: Unit tests
         run: npm run test:unit
+
+  migrate:
+    name: Prisma migrate (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: wre
+          POSTGRES_PASSWORD: wre
+          POSTGRES_DB: wre_simulador
+        ports:
+          - 5432:5432
+        # Healthcheck garante que o Postgres está pronto antes do step seguinte.
+        options: >-
+          --health-cmd "pg_isready -U wre"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://wre:wre@localhost:5432/wre_simulador?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Aplica migrations
+        # Roda todas as migrations contra um Postgres limpo. Detecta drift
+        # entre schema.prisma e migrations/, ou SQL inválido nas migrations.
+        run: npx prisma migrate deploy
+
+      - name: Detecta drift schema.prisma vs migrations
+        # Compara o estado do DB (após migrate deploy) com o schema.prisma.
+        # Exit 0 = igual; exit 2 = drift (migration faltando ou schema fora de sync).
+        # Pega bugs como "schema mudou mas esqueci de gerar migration".
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code

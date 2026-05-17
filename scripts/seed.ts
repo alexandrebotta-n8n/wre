@@ -266,6 +266,23 @@ async function main() {
   });
   console.log(`  ✓ Usuário admin: ${adminEmail} (senha: trocar-em-producao — provisória)`);
 
+  // Validação pós-insert: soma de quotas dos sócios deve estar perto de 100%.
+  // Avisa (não bloqueia) se drift > 1pp — provavelmente reclassificação faltando.
+  const sociosDb = await prisma.socio.findMany({
+    where: { ativo: true },
+    select: { nome: true, percentualQuotasDefault: true },
+  });
+  const somaQuotas = sociosDb.reduce((acc, s) => acc + s.percentualQuotasDefault, 0);
+  const driftPp = Math.abs(somaQuotas - 1) * 100;
+  if (driftPp > 1) {
+    console.warn(
+      `  ⚠ Σ quotas dos sócios ativos = ${(somaQuotas * 100).toFixed(2)}% ` +
+      `(drift ${driftPp.toFixed(2)}pp de 100%). Verifique percentualQuotasDefault.`,
+    );
+  } else {
+    console.log(`  ✓ Σ quotas dos sócios ativos = ${(somaQuotas * 100).toFixed(2)}% (≈100%, ok)`);
+  }
+
   console.log("→ Seed concluído.");
 }
 

@@ -38,7 +38,17 @@ const DEFAULT_PUBLICOS_PREMIO: Publico[] = ["SOCIO_CAPITAL", "SOCIO_CAPITAL_GEST
 export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao {
   const { periodo, socios, resultados, premissas } = input;
 
+  // Pré-condição: a unidade matriz declarada na premissa deve existir nos
+  // resultados. Caso contrário, llMatriz vira 0 silenciosamente e o cenário
+  // distribui R$ 0 — sintoma confuso de "tudo zerou". Falha cedo, alto.
   const matriz = resultados.find((r) => r.unidadeCodigo === premissas.unidadeMatriz);
+  if (!matriz && resultados.length > 0) {
+    throw new Error(
+      `Unidade matriz "${premissas.unidadeMatriz}" não encontrada em resultados ` +
+      `(unidades disponíveis: ${resultados.map((r) => r.unidadeCodigo).join(", ") || "nenhuma"}). ` +
+      `Verifique Premissa.unidadeMatriz ou cadastre o resultado da unidade.`,
+    );
+  }
   const llMatriz = matriz?.lucroLiquido ?? 0;
   // Funding dos fundadores agora vem do cadastro INDIVIDUAL de cada sócio
   // (Socio.fundingFundadorAnual). `premissas.fundingFundadoresAno` é deprecated

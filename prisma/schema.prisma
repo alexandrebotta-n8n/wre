@@ -83,6 +83,8 @@ model AuditLog {
 
   @@index([ocorridoEm])
   @@index([acao])
+  // Usado pelo rate-limit baseado em AuditLog (contagem por usuário+ação numa janela).
+  @@index([usuarioId, acao, ocorridoEm])
 }
 
 // ============================================================================
@@ -266,6 +268,8 @@ model ResultadoPeriodo {
 
   @@unique([unidadeId, periodoId])
   @@index([periodoId])
+  // Acelera queries do PainelGlobais (filtra ResultadoPeriodo por unidade).
+  @@index([unidadeId])
 }
 
 // Originação por sócio × período. Usada pelo engine NOVO para calcular
