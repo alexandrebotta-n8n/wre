@@ -2,7 +2,7 @@
 // Visão ANUAL única — agrega todas as linhas de RemuneracaoCalculada do
 // cenário (1 por sócio no novo sistema; pode ter até 4 em APPLIED antigos).
 import { nomeOuIniciais } from "@/lib/format";
-import type { CenarioCompleto, LinhaComparativa } from "./types";
+import type { CenarioCompleto, LinhaComparativa, TraceItem } from "./types";
 
 type RemuneracaoRow = NonNullable<CenarioCompleto>["remuneracoes"][number];
 
@@ -11,6 +11,8 @@ interface AggSocio {
   nome: string;
   isFundador: boolean;
   total: number;
+  trace: TraceItem[];
+  alertas: string[];
 }
 
 function agregar(rows: RemuneracaoRow[] | undefined): Map<string, AggSocio> {
@@ -24,10 +26,16 @@ function agregar(rows: RemuneracaoRow[] | undefined): Map<string, AggSocio> {
         nome: r.socio.nome,
         isFundador: r.socio.isFundador,
         total: 0,
+        trace: [],
+        alertas: [],
       };
       map.set(r.socioId, agg);
     }
     agg.total += r.total;
+    const tr = (r.trace as TraceItem[] | null) ?? [];
+    agg.trace.push(...tr);
+    const al = (r.alertas as string[] | null) ?? [];
+    agg.alertas.push(...al);
   }
   return map;
 }
@@ -56,6 +64,10 @@ export function construirLinhasComparativas(
       totalB,
       diff,
       diffPct,
+      traceA: ra?.trace ?? [],
+      traceB: rb?.trace ?? [],
+      alertasA: ra?.alertas ?? [],
+      alertasB: rb?.alertas ?? [],
     };
   });
   const single = !a || !b;

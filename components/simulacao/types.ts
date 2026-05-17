@@ -52,7 +52,8 @@ export interface TraceItem {
   valor?: number;
 }
 
-/** Linha agregada da tabela comparativa — totais ANUAIS. */
+/** Linha agregada da tabela comparativa — totais ANUAIS + trace/alertas
+ *  para o waterfall expansível por sócio. */
 export interface LinhaComparativa {
   socioId: string;
   nome: string;
@@ -62,4 +63,10 @@ export interface LinhaComparativa {
   totalB: number | null;
   diff: number; // B − A; sinal positivo = ganhou no novo
   diffPct: number | null;
+  /** Trace concatenado das etapas econômicas (pró-labore, gestão, blocos, etc.). */
+  traceA: TraceItem[];
+  traceB: TraceItem[];
+  /** Alertas concatenados (sobreposições / warnings). */
+  alertasA: string[];
+  alertasB: string[];
 }
