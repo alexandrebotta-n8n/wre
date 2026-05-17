@@ -12,6 +12,17 @@ export default defineConfig({
       reporter: ["text", "html"],
       include: ["lib/**/*.ts", "app/**/*.ts"],
       exclude: ["**/*.d.ts", "lib/generated/**", "lib/prisma.ts"],
+      // Threshold mínimo para lib/domain (engine de cálculo — core do app).
+      // Falha o `npm run test:cov` se cair abaixo. Outras pastas (UI, services
+      // Prisma) ainda não cobertas — coverage segue informativo lá.
+      thresholds: {
+        "lib/domain/**/*.ts": {
+          lines: 70,
+          branches: 60,
+          functions: 70,
+          statements: 70,
+        },
+      },
     },
   },
   resolve: {

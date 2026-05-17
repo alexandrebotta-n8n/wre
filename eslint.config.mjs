@@ -9,6 +9,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "coverage/**",      // relatórios HTML do vitest --coverage
     "next-env.d.ts",
     "prisma/migrations/**",
     "lib/generated/**",

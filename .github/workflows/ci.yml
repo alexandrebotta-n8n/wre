@@ -39,8 +39,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Unit tests
-        run: npm run test:unit
+      - name: Unit tests + coverage (threshold enforced em lib/domain)
+        # test:cov roda os mesmos testes + valida threshold do vitest.config.
+        # Falha o build se cobertura cair abaixo de 70% em lib/domain.
+        run: npm run test:cov
 
   migrate:
     name: Prisma migrate (Postgres)
