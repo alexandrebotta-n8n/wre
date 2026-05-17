@@ -145,7 +145,11 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   // const totalBlocoC = rda * premissas.percentualBlocoC; // mantido como reserva estratégica
 
   // Distribuição Bloco A — proporcional a quotas entre Sócios de Capital
-  const elegiveisA = socios.filter((s) => PUBLICOS_CAPITAL.includes(s.publico));
+  // NÃO-fundadores. Fundadores recebem só o funding individual (etapa 3.5);
+  // incluí-los no Bloco A seria duplo benefício.
+  const elegiveisA = socios.filter(
+    (s) => PUBLICOS_CAPITAL.includes(s.publico) && !s.isFundador,
+  );
   const somaQuotasA = elegiveisA.reduce((acc, s) => acc + s.percentualQuotas, 0);
 
   // Distribuição Bloco B — modo configurável (default: UNIFORME)
@@ -206,9 +210,9 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       });
     }
 
-    // Bloco A
+    // Bloco A — exclui fundadores (recebem só funding individual, etapa 3.5).
     let blocoA = 0;
-    if (PUBLICOS_CAPITAL.includes(s.publico) && somaQuotasA > 0) {
+    if (PUBLICOS_CAPITAL.includes(s.publico) && !s.isFundador && somaQuotasA > 0) {
       blocoA = (s.percentualQuotas / somaQuotasA) * totalBlocoA;
       trace.push({
         etapa: "8.bloco-A",

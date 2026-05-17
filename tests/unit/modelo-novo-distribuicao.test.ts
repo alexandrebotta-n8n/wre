@@ -175,7 +175,7 @@ describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", ()
   it("fundador com valorDiscricionario recebe o valor e fica fora do Bloco A", () => {
     const V = 100_000;
     const sociosV = sociosComFundador.map((s) =>
-      s.id === "s1" ? { ...s, valorDiscricionario: V } : s,
+      s.id === "s1" ? { ...s, fundingFundadorAnual: V } : s,
     );
     const r = calcularModeloNovo({
       periodo, socios: sociosV, resultados: baseResultados,

@@ -30,10 +30,10 @@ const tabela: TabelaSalarial = {
 const socios: SocioInput[] = [
   { id: "decio", nome: "Jose Décio Dupont", cargo: "Fundador", publico: "FUNDADOR",
     percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
-    valorDiscricionario: 131102.44 },
+    fundingFundadorAnual: 131102.44},
   { id: "gilberto", nome: "Gilberto Antonio Spiller", cargo: "Fundador", publico: "FUNDADOR",
     percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
-    valorDiscricionario: 131102.44 },
+    fundingFundadorAnual: 131102.44},
   { id: "alessandro", nome: "Alessandro Spiller", cargo: "CEO", publico: "SOCIO_CAPITAL_GESTOR",
     percentualQuotas: 0.13184, originacaoEsperadaAnual: 0, nivelCargo: "A", faixaSalarial: "INICIAL", isFundador: false },
   { id: "fadanelli", nome: "Jose Claudio Fadanelli", cargo: "Diretor Exec. Novos Negócios", publico: "SOCIO_CAPITAL_GESTOR",

@@ -44,10 +44,10 @@ describe("Modelo ATUAL — componentes individuais", () => {
       socios: [
         { id: "f1", nome: "Décio", cargo: "Fundador", publico: "FUNDADOR",
           percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
-          valorDiscricionario: 131102.46 },
+          fundingFundadorAnual: 131102.46 },
         { id: "f2", nome: "Gilberto", cargo: "Fundador", publico: "FUNDADOR",
           percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
-          valorDiscricionario: 131102.46 },
+          fundingFundadorAnual: 131102.46 },
       ],
       resultados: [
         { unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1394712.16 },
@@ -66,10 +66,10 @@ describe("Modelo ATUAL — componentes individuais", () => {
       socios: [
         { id: "f1", nome: "Décio", cargo: "Fundador", publico: "FUNDADOR",
           percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
-          valorDiscricionario: 131102.46 },
+          fundingFundadorAnual: 131102.46 },
         { id: "f2", nome: "Gilberto", cargo: "Fundador", publico: "FUNDADOR",
           percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
-          valorDiscricionario: 131102.46 },
+          fundingFundadorAnual: 131102.46 },
       ],
       resultados: [
         { unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1394712.16 },
