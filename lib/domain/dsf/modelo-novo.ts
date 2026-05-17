@@ -90,15 +90,21 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
 
   // Etapa 3 — Remuneração de Administração (calculada antes; é custo).
   // Aplica às 4 categorias da matriz oficial (Default + Condicionado).
-  // Default vs Condicionado fica codificado pela presença de nivelCargo+faixaSalarial:
-  // Capital Gestor e Sócio Serviços conceitualmente sempre têm; Capital Líder e
-  // Serviços Estratégico só recebem se o usuário cadastrar cargo formal.
+  // Default vs Condicionado fica codificado pela presença de nivelCargo+faixaSalarial
+  // OU de remuneracaoGestaoMensalOverride no cadastro do sócio.
+  // Override individual (Socio.remuneracaoGestaoMensal) > tabela[nivel][faixa].
   let totalAdmin = 0;
   const adminPorSocio = new Map<string, number>();
   for (const s of socios) {
-    if (PUBLICOS_REM_ADMIN.includes(s.publico) && s.nivelCargo && s.faixaSalarial) {
+    if (!PUBLICOS_REM_ADMIN.includes(s.publico)) continue;
+    let valor = 0;
+    if (s.remuneracaoGestaoMensalOverride != null && s.remuneracaoGestaoMensalOverride > 0) {
+      valor = s.remuneracaoGestaoMensalOverride * periodo.meses;
+    } else if (s.nivelCargo && s.faixaSalarial) {
       const mensal = premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0;
-      const valor = mensal * periodo.meses;
+      valor = mensal * periodo.meses;
+    }
+    if (valor > 0) {
       adminPorSocio.set(s.id, valor);
       totalAdmin += valor;
     }
@@ -178,16 +184,16 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
 
   for (const s of socios) {
     const trace: TraceItem[] = [];
-    // Pró-labore — aplicado a todas as 6 categorias da Política DSF v1.
-    // Custo já refletido no LL — não é deduzido novamente do RDA, apenas
-    // contabilizado no pacote do sócio.
+    // Pró-labore — aplicado às 5 categorias elegíveis da Política DSF v1.
+    // Override individual (Socio.proLaboreMensal) > global da Premissa.
+    const mensalEfetivo = s.proLaboreMensalOverride ?? proLaboreMensal;
     const proLabore = PUBLICOS_PRO_LABORE.includes(s.publico)
-      ? proLaboreMensal * periodo.meses
+      ? mensalEfetivo * periodo.meses
       : 0;
     if (proLabore > 0) {
       trace.push({
         etapa: "3.pro-labore",
-        descricao: `R$ ${proLaboreMensal.toLocaleString("pt-BR")} × ${periodo.meses} meses`,
+        descricao: `R$ ${mensalEfetivo.toLocaleString("pt-BR")} × ${periodo.meses} meses${s.proLaboreMensalOverride != null ? " (override individual)" : ""}`,
         valor: proLabore,
       });
     }

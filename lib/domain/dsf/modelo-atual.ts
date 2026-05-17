@@ -45,17 +45,23 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
   const fundingFundadoresAno = Math.max(0, premissas.fundingFundadoresAno ?? 0);
 
   // ---------- Etapa 1: Pró-labore por sócio ----------
+  // Override individual (Socio.proLaboreMensal) > premissa.proLaboreMensal.
   const proLaborePorSocio = new Map<string, number>();
   for (const s of socios) {
     if (elegivelProLabore(s)) {
-      proLaborePorSocio.set(s.id, premissas.proLaboreMensal * periodo.meses);
+      const mensal = s.proLaboreMensalOverride ?? premissas.proLaboreMensal;
+      proLaborePorSocio.set(s.id, mensal * periodo.meses);
     }
   }
 
   // ---------- Etapa 2: Remuneração de gestão por sócio ----------
+  // Override individual (Socio.remuneracaoGestaoMensal) > tabela[nivel][faixa].
   const remGestaoPorSocio = new Map<string, number>();
   for (const s of socios) {
-    if (s.nivelCargo && s.faixaSalarial) {
+    const mensalOverride = s.remuneracaoGestaoMensalOverride;
+    if (mensalOverride != null && mensalOverride > 0) {
+      remGestaoPorSocio.set(s.id, mensalOverride * periodo.meses);
+    } else if (s.nivelCargo && s.faixaSalarial) {
       const mensal = premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0;
       remGestaoPorSocio.set(s.id, mensal * periodo.meses);
     }

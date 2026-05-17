@@ -79,6 +79,35 @@ async function atualizarClassificacaoNovaAction(formData: FormData) {
   revalidatePath("/socios");
 }
 
+async function atualizarRemuneracaoIndividualAction(formData: FormData) {
+  "use server";
+  const session = await auth();
+  const roles = session?.user?.roles ?? [];
+  if (!roles.some((r) => r === "ADMIN" || r === "CONSULTOR")) return;
+  const id = String(formData.get("id"));
+  const parseOpt = (v: FormDataEntryValue | null): number | null => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    if (!isFinite(n) || n < 0) return null;
+    return n;
+  };
+  const proLaboreMensal = parseOpt(formData.get("proLaboreMensal"));
+  const remuneracaoGestaoMensal = parseOpt(formData.get("remuneracaoGestaoMensal"));
+  await prisma.socio.update({
+    where: { id },
+    data: { proLaboreMensal, remuneracaoGestaoMensal },
+  });
+  await logAudit({
+    usuarioId: session?.user?.id,
+    acao: "socio.remuneracao.atualizar",
+    recurso: `Socio:${id}`,
+    meta: { proLaboreMensal, remuneracaoGestaoMensal },
+  });
+  await flashSuccess("Remuneração individual atualizada.");
+  revalidatePath("/socios");
+  revalidatePath("/simulacao");
+}
+
 export default async function SociosPage({
   searchParams,
 }: {
@@ -189,6 +218,7 @@ export default async function SociosPage({
                 <TH>Nível · Faixa</TH>
                 <TH>Área de prática</TH>
                 <TH>Classificação (Política DSF v1)</TH>
+                <TH>Remuneração (override individual)</TH>
                 <TH>Tipo</TH>
               </tr>
             </THead>
@@ -290,6 +320,58 @@ export default async function SociosPage({
                           <span className="ml-1.5 text-neutral-500">
                             · {s.unidadeLiderada.codigo}
                           </span>
+                        )}
+                      </div>
+                    )}
+                  </TD>
+                  <TD>
+                    {escopo.podeMutar ? (
+                      <form
+                        action={atualizarRemuneracaoIndividualAction}
+                        className="flex items-center gap-1.5 flex-wrap min-w-[280px]"
+                      >
+                        <input type="hidden" name="id" value={s.id} />
+                        <div className="flex flex-col text-[10px] text-neutral-500">
+                          <label className="leading-none mb-0.5">Pró-labore/mês</label>
+                          <input
+                            type="number"
+                            name="proLaboreMensal"
+                            defaultValue={s.proLaboreMensal ?? ""}
+                            placeholder="(usa premissa)"
+                            step={500}
+                            min={0}
+                            className="h-8 w-24 px-1.5 text-xs text-right tabular-nums border border-neutral-300 rounded focus:outline-none focus:ring-1 focus:ring-peri-400"
+                            aria-label={`Pró-labore mensal de ${s.nome}`}
+                          />
+                        </div>
+                        <div className="flex flex-col text-[10px] text-neutral-500">
+                          <label className="leading-none mb-0.5">Gestão/mês</label>
+                          <input
+                            type="number"
+                            name="remuneracaoGestaoMensal"
+                            defaultValue={s.remuneracaoGestaoMensal ?? ""}
+                            placeholder="(usa tabela)"
+                            step={500}
+                            min={0}
+                            className="h-8 w-24 px-1.5 text-xs text-right tabular-nums border border-neutral-300 rounded focus:outline-none focus:ring-1 focus:ring-peri-400"
+                            aria-label={`Remuneração de gestão mensal de ${s.nome}`}
+                          />
+                        </div>
+                        <SubmitButton size="sm" variant="subtle">
+                          Salvar
+                        </SubmitButton>
+                      </form>
+                    ) : (
+                      <div className="text-xs text-neutral-600 tabular-nums">
+                        {s.proLaboreMensal != null ? (
+                          <div>Pró: R$ {s.proLaboreMensal.toLocaleString("pt-BR")}/mês</div>
+                        ) : (
+                          <div className="text-neutral-400">Pró: usa premissa</div>
+                        )}
+                        {s.remuneracaoGestaoMensal != null ? (
+                          <div>Gestão: R$ {s.remuneracaoGestaoMensal.toLocaleString("pt-BR")}/mês</div>
+                        ) : (
+                          <div className="text-neutral-400">Gestão: usa tabela</div>
                         )}
                       </div>
                     )}

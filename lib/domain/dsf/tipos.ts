@@ -37,6 +37,12 @@ export interface SocioInput {
   nivelCargo?: NivelCargo;
   faixaSalarial?: FaixaSalarial;
   isFundador: boolean;
+  // Overrides individuais de remuneração — vêm do cadastro do Sócio em /socios.
+  // Quando setados, sobrescrevem a regra global da Premissa (proLaboreMensal)
+  // e o lookup da TabelaSalario (rem. gestão) APENAS para este sócio.
+  // Permite definição case-a-case sem afetar a premissa.
+  proLaboreMensalOverride?: number;
+  remuneracaoGestaoMensalOverride?: number;
 }
 
 export interface ResultadoUnidade {

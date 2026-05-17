@@ -63,6 +63,9 @@ function classificacoesParaSocioInput(
     nivelCargo: (c.nivelCargoOverride ?? c.socio.nivelCargo) as NivelCargo | undefined,
     faixaSalarial: (c.faixaSalarialOverride ?? c.socio.faixaSalarial) as FaixaSalarial | undefined,
     isFundador: c.socio.isFundador,
+    // Overrides individuais do cadastro do Sócio (case-a-case).
+    proLaboreMensalOverride: c.socio.proLaboreMensal ?? undefined,
+    remuneracaoGestaoMensalOverride: c.socio.remuneracaoGestaoMensal ?? undefined,
   }));
 }
 

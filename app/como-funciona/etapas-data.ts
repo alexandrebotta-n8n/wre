@@ -21,7 +21,7 @@ export const ETAPAS: EtapaInfo[] = [
     modelo: "AMBOS",
     formula: "proLaboreMensal × meses (por sócio elegível)",
     descricao:
-      "Pagamento mensal fixo aplicado a 5 categorias da Política DSF v1 (Sócio de Capital, Capital Gestor, Capital Líder, Sócio de Serviços, Serviços Estratégico). Conforme matriz oficial, Líder de Unidade Non-Equity NÃO recebe pró-labore. Configurado em proLaboreMensal na Premissa NOVA. Sai do LL antes de chegar ao RDA.",
+      "Pagamento mensal fixo aplicado a 5 categorias da Política DSF v1 (Sócio de Capital, Capital Gestor, Capital Líder, Sócio de Serviços, Serviços Estratégico). Conforme matriz oficial, Líder de Unidade Non-Equity NÃO recebe pró-labore. Valor padrão configurado em proLaboreMensal na Premissa; cada sócio pode ter override individual em /socios (campo Pró-labore/mês). Sai do LL antes de chegar ao RDA.",
     exemploNumeros: "R$ 5.000 × 12 meses × 8 sócios elegíveis",
     exemploResultado: "R$ 480.000 ano",
     veja: "/politica/categorias-socio",
@@ -33,7 +33,7 @@ export const ETAPAS: EtapaInfo[] = [
     modelo: "AMBOS",
     formula: "tabelaSalarial[nível][faixa] × meses",
     descricao:
-      "Aplicada a 4 categorias conforme matriz oficial. Default: Capital Gestor e Sócio de Serviços (sempre que tiverem cargo formal). Condicionado: Capital Líder e Serviços Estratégico (só se houver cargo formal de admin). Capital sem função executiva e Líder Non-Equity NÃO recebem. O engine aplica quando o sócio tem nivelCargo + faixaSalarial cadastrados — para os 2 Default isso é esperado por construção; para os 2 Condicionados, só quando o usuário explicitamente cadastra.",
+      "Aplicada a 4 categorias conforme matriz oficial. Default: Capital Gestor e Sócio de Serviços. Condicionado: Capital Líder e Serviços Estratégico (só se houver cargo formal). Capital sem função executiva e Líder Non-Equity NÃO recebem. O engine usa o lookup TabelaSalário[nível][faixa] do cadastro do sócio — OU um valor mensal individual digitado em /socios (campo Gestão/mês), que sobrescreve a tabela para casos não-padrão.",
     exemploNumeros: "Nível Diretor / Faixa 3 = R$ 18.000 × 12m × 2 gestores",
     exemploResultado: "R$ 432.000 ano",
     veja: "/politica/categorias-socio",
