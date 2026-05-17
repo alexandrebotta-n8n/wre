@@ -2,10 +2,142 @@
 // Painel expansível embaixo da linha do sócio na tabela comparativa.
 // Mostra a composição do pacote (trace[] do engine) lado a lado para A e B,
 // com barra horizontal proporcional a cada etapa relativa ao total.
+//
+// Cada etapa tem um ícone "?" com tooltip rico explicando o que aquela
+// linha de remuneração representa (vê `EXPLICACOES_ETAPAS`).
+import * as React from "react";
 import Link from "next/link";
-import { AlertCircle, ExternalLink } from "lucide-react";
+import { AlertCircle, ExternalLink, HelpCircle } from "lucide-react";
 import { brl } from "@/lib/format";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { TraceItem } from "./types";
+
+// Dicionário de explicações por etapa. A chave é o prefixo antes do ponto
+// (ex: "1.pro-labore" → key "pro-labore"); número indica ordem de apuração.
+// Mantém o texto curto e didático — vira tooltip.
+const EXPLICACOES_ETAPAS: Record<string, { titulo: string; corpo: React.ReactNode }> = {
+  "pro-labore": {
+    titulo: "Pró-labore",
+    corpo: (
+      <>
+        Valor mensal fixo (igual ao salário CLT do sócio), pago todo mês.
+        Cadastrado em <strong>Premissa.proLaboreMensal</strong> (global) ou no próprio
+        sócio (<strong>Socio.proLaboreMensal</strong>, override individual).
+        Aplica-se a todas as categorias de sócio elegíveis (exceto Líder Non-Equity).
+      </>
+    ),
+  },
+  gestao: {
+    titulo: "Remuneração de Gestão",
+    corpo: (
+      <>
+        Pagamento mensal por exercer cargo de gestão (CEO, Diretor, Gestor de
+        área). Valor vem da <strong>tabela salarial por nível × faixa</strong>
+        (ex: A/INICIAL = R$ 9.600/mês). Override individual via
+        <strong> Socio.remuneracaoGestaoMensal</strong>.
+      </>
+    ),
+  },
+  admin: {
+    titulo: "Remuneração de Administração (Modelo NOVO)",
+    corpo: (
+      <>
+        Equivalente à <strong>Remuneração de Gestão</strong> no Modelo NOVO.
+        Pago a Capital Gestor (Default), Sócio de Serviços (Default), Capital
+        Líder de Unidade (Condicionado) e Serviços Estratégico (Condicionado),
+        quando cadastrados com nível+faixa. É deduzido do LL antes do RDA.
+      </>
+    ),
+  },
+  fundador: {
+    titulo: "Funding Fundador",
+    corpo: (
+      <>
+        Valor anual <strong>discricionário</strong> definido individualmente
+        no cadastro do fundador (<code>/socios</code> →
+        <strong> Funding fundador anual</strong>). Cada fundador recebe o
+        valor próprio (sem rateio por quotas). É deduzido do LL antes de
+        formar a base de distribuição (DSF residual ou RDA central).
+      </>
+    ),
+  },
+  "comissao-orig": {
+    titulo: "Comissão de Originação (Modelo NOVO)",
+    corpo: (
+      <>
+        % aplicado sobre o valor que o sócio <strong>originou</strong> no ano
+        (cadastrado em <code>/socios</code> →
+        <strong> Originação anual padrão</strong>). Taxa configurada em
+        <strong> Premissa.taxaComissaoOriginacao</strong>. Incentivo direto a
+        quem traz negócio.
+      </>
+    ),
+  },
+  distribuicao: {
+    titulo: "Distribuição de Lucros (Modelo ATUAL)",
+    corpo: (
+      <>
+        Parcela do <strong>funding residual</strong> (LL DSF − funding
+        fundadores) rateada entre sócios não-fundadores proporcional ao
+        <strong> % de quotas</strong>. Depois ainda é multiplicado por
+        (1 − reserva), tipicamente 0,95 (5% vai pra reserva/prêmio).
+      </>
+    ),
+  },
+  "pool-unidade": {
+    titulo: "Pool da Unidade (Modelo NOVO)",
+    corpo: (
+      <>
+        Cada unidade não-matriz tem o LL fatiado em 50/30/20:
+        <br />• 50% volta à matriz (entra no RDA central);
+        <br />• <strong>30% vai pro Líder da Unidade</strong> (esta linha);
+        <br />• 20% retido localmente (equipe/reserva).
+      </>
+    ),
+  },
+  premio: {
+    titulo: "Prêmio de Performance (Modelo ATUAL)",
+    corpo: (
+      <>
+        A <strong>reserva</strong> (5% do funding residual) é distribuída
+        <strong> uniformemente</strong> entre sócios elegíveis ao prêmio
+        (default: Sócio Capital + Capital Gestor). Cada um recebe o mesmo
+        valor — independente de quotas.
+      </>
+    ),
+  },
+  "bloco-A": {
+    titulo: "Bloco A — Quotas (Modelo NOVO)",
+    corpo: (
+      <>
+        <strong>45% do RDA</strong> (Resultado Disponível para Apuração)
+        distribuído proporcional ao % de quotas entre <strong>Sócios de
+        Capital não-fundadores</strong>. Recompensa quem investiu no
+        capital social da firma.
+      </>
+    ),
+  },
+  "bloco-B": {
+    titulo: "Bloco B — Mérito (Modelo NOVO)",
+    corpo: (
+      <>
+        <strong>35% do RDA</strong> distribuído por mérito entre 5 categorias
+        (todas exceto Líder Non-Equity). Modo configurável:
+        <br />• <strong>UNIFORME</strong>: igual pra todos;
+        <br />• <strong>PESO_INDIVIDUAL</strong>: peso editável por sócio;
+        <br />• <strong>ORIGINACAO</strong>: proporcional ao originado;
+        <br />• <strong>POR_AREA</strong>: pesos por área de prática (orgânico + incremental).
+      </>
+    ),
+  },
+};
+
+function explicacaoPara(etapa: string): { titulo: string; corpo: React.ReactNode } | null {
+  // "8.bloco-A" → "bloco-A"
+  const m = /^\d+\.(.+)$/.exec(etapa);
+  const key = m ? m[1] : etapa;
+  return EXPLICACOES_ETAPAS[key] ?? null;
+}
 
 export function SocioWaterfall({
   nome,
@@ -55,7 +187,8 @@ export function SocioWaterfall({
       <div className="mt-3 pt-3 border-t border-neutral-200/70 text-[11px] text-neutral-500 flex items-center justify-between flex-wrap gap-2">
         <span>
           Composição do pacote de <strong className="text-neutral-700">{nome}</strong>. Etapas vêm da
-          ordem de apuração do engine; barras são proporcionais ao total da coluna.
+          ordem de apuração do engine; barras são proporcionais ao total da coluna. Passe o mouse
+          no <HelpCircle className="inline h-3 w-3 -mt-0.5" /> de cada linha para entender o que ela representa.
         </span>
         <Link
           href="/como-funciona"
@@ -94,6 +227,7 @@ function Coluna({
         {comValor.map((t, i) => {
           const pct = (Math.abs(t.valor!) / maxAbs) * 100;
           const negativo = t.valor! < 0;
+          const exp = explicacaoPara(t.etapa);
           return (
             <li key={i} className="text-xs">
               <div className="flex items-baseline justify-between gap-2 mb-0.5">
@@ -102,6 +236,19 @@ function Coluna({
                     {t.etapa}
                   </code>
                   <span className="text-neutral-700 truncate">{t.descricao}</span>
+                  {exp && (
+                    <Tooltip
+                      side="top"
+                      content={
+                        <div className="space-y-1">
+                          <div className="font-semibold">{exp.titulo}</div>
+                          <div className="text-white/90 font-normal">{exp.corpo}</div>
+                        </div>
+                      }
+                    >
+                      <HelpCircle className="h-3 w-3 text-neutral-400 hover:text-neutral-600 cursor-help flex-shrink-0" />
+                    </Tooltip>
+                  )}
                 </span>
                 <span
                   className={
