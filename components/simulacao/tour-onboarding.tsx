@@ -26,7 +26,7 @@ const PASSOS: PassoTour[] = [
     titulo: "Bem-vindo à Simulação",
     corpo: (
       <>
-        Aqui você compara cenários de remuneração lado a lado e publica a versão oficial.
+        Aqui você compara cenários de remuneração lado a lado e salva a versão oficial.
         Vou te mostrar os 4 lugares-chave em 30 segundos. Pode pular a qualquer momento.
       </>
     ),
@@ -48,19 +48,19 @@ const PASSOS: PassoTour[] = [
     titulo: "Parâmetros editáveis",
     corpo: (
       <>
-        Ajuste os parâmetros do cenário inline. Clique <strong>Aplicar parâmetros</strong> para
-        salvar e depois <strong>Recalcular</strong> para rodar o engine nos 4 trimestres do ano.
+        Ajuste os parâmetros do cenário inline — eles são <strong>salvos automaticamente</strong>.
+        Depois clique em <strong>Recalcular</strong> para refletir nos valores anuais.
       </>
     ),
   },
   {
     alvo: '[data-tour="acoes-publicar"]',
     lado: "top",
-    titulo: "Calcular & Publicar",
+    titulo: "Calcular & Salvar versão",
     corpo: (
       <>
-        Quando estiver satisfeito, <strong>Publicar</strong> congela o cenário como snapshot
-        imutável. Se faltarem trimestres, o sistema calcula antes de publicar.
+        Quando estiver satisfeito, <strong>Salvar versão</strong> congela o cenário como snapshot
+        imutável (registro formal). Versões anteriores do mesmo modelo+ano são arquivadas.
       </>
     ),
   },

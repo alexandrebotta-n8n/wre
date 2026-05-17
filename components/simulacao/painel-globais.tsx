@@ -1,23 +1,18 @@
 "use client";
-// Painel "Variáveis globais" — vive no topo de /simulacao. Edição inline
-// do único insumo global anual que afeta TODOS os cenários do ano:
-//   - Lucro Líquido da DSF (matriz consolidada)
-//   - Lucro Líquido de cada unidade não-matriz
+// Painel "Variáveis globais" — vive no topo de /simulacao, SEMPRE expandido
+// (sem colapsar) num layout horizontal compacto. Edição inline de LL DSF +
+// LL por unidade. Estado de salvamento vive no próprio botão (Salvo ✓ /
+// ● Salvar variáveis globais).
 //
-// Funding (variável das unidades, fundadores) foi REMOVIDO desta tela.
-// Funding fundador agora é campo individual em /socios (per fundador).
-//
-// Layout: card único com grid limpo, máscara de moeda BRL nos inputs.
-// Ao salvar, marca todos os DRAFTs do ano como dirty.
+// Ao salvar, marca todos os DRAFTs do ano como dirty (warning inline aparece
+// só quando há alteração pendente).
 import * as React from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Save, Globe2, Building2, Building } from "lucide-react";
+import { Save, Globe2, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MoneyInput } from "@/components/ui/money-input";
-import { brl } from "@/lib/format";
 import { salvarGlobaisAction } from "@/app/simulacao/acoes-globais";
 
 export interface UnidadeGlobal {
@@ -36,7 +31,6 @@ export interface PainelGlobaisProps {
 
 export function PainelGlobais({ ano, unidades, cenariosDraftDoAno }: PainelGlobaisProps) {
   const router = useRouter();
-  const [aberto, setAberto] = useState(false);
   const [pending, start] = useTransition();
 
   const inicial: Record<string, number> = React.useMemo(() => {
@@ -45,6 +39,13 @@ export function PainelGlobais({ ano, unidades, cenariosDraftDoAno }: PainelGloba
     return e;
   }, [unidades]);
   const [llPorUnidade, setLLPorUnidade] = useState<Record<string, number>>(inicial);
+
+  // Re-sync interno quando a prop muda (após salvar e refresh).
+  const [prevInicial, setPrevInicial] = useState(inicial);
+  if (prevInicial !== inicial) {
+    setPrevInicial(inicial);
+    setLLPorUnidade(inicial);
+  }
 
   const temAlteracao = (): boolean => {
     for (const u of unidades) {
@@ -69,130 +70,93 @@ export function PainelGlobais({ ano, unidades, cenariosDraftDoAno }: PainelGloba
     });
   }
 
-  const matriz = unidades.find((u) => u.isMatriz);
-  const naoMatriz = unidades.filter((u) => !u.isMatriz);
+  const dirty = temAlteracao();
 
   return (
-    <Card className="overflow-hidden border-peri-200">
-      {/* Header colapsável */}
-      <button
-        type="button"
-        onClick={() => setAberto((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-peri-50/40 transition-colors text-left"
-      >
-        <div className="flex items-center gap-2">
+    <Card className="border-peri-200 px-4 py-2.5">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="inline-flex items-center gap-2 shrink-0">
           <Globe2 className="h-4 w-4 text-peri-700" />
-          <span className="font-semibold text-navy-900">Variáveis globais — ano {ano}</span>
-          <span className="text-xs text-neutral-500 hidden sm:inline">
-            afetam todos os cenários
-          </span>
-          {temAlteracao() && (
-            <Badge variant="warning" size="sm">● alterações não salvas</Badge>
-          )}
+          <span className="font-semibold text-navy-900 text-sm">Globais {ano}</span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-neutral-600 tabular-nums hidden sm:inline">
-            LL DSF: <strong className="text-navy-900">{brl(matriz?.llAtual ?? 0, true)}</strong>
-          </span>
-          {aberto ? (
-            <ChevronDown className="h-4 w-4 text-neutral-500" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-neutral-500" />
-          )}
-        </div>
-      </button>
 
-      {aberto && (
-        <div className="border-t border-peri-100 p-4 space-y-4 bg-peri-50/20">
-          {cenariosDraftDoAno > 0 && (
-            <div className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 flex items-start gap-2">
-              <span>⚠</span>
-              <span>
-                Ao salvar, <strong>{cenariosDraftDoAno}</strong> cenário(s) DRAFT do ano serão
-                marcados como dirty. Recalcule cada um para refletir.
-              </span>
-            </div>
-          )}
+        {unidades.map((u) => (
+          <UnidadeInline
+            key={u.unidadeId}
+            unidade={u}
+            valor={llPorUnidade[u.unidadeId] ?? u.llAtual}
+            onChange={(v) => setLLPorUnidade((c) => ({ ...c, [u.unidadeId]: v ?? 0 }))}
+          />
+        ))}
 
-          {/* Grid: DSF Global em destaque + unidades */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {matriz && (
-              <LinhaUnidade
-                u={matriz}
-                valor={llPorUnidade[matriz.unidadeId] ?? matriz.llAtual}
-                onChange={(v) => setLLPorUnidade((c) => ({ ...c, [matriz.unidadeId]: v ?? 0 }))}
-                destaque
-              />
+        <div className="ml-auto inline-flex items-center gap-2">
+          {dirty && cenariosDraftDoAno > 0 && (
+            <span className="text-[11px] text-amber-700 hidden md:inline">
+              ⚠ {cenariosDraftDoAno} DRAFT(s) ficarão dirty
+            </span>
+          )}
+          <Button
+            type="button"
+            variant={dirty ? "primary" : "ghost"}
+            size="sm"
+            onClick={salvar}
+            disabled={pending || !dirty}
+            aria-busy={pending}
+          >
+            {pending ? (
+              <>
+                <Save className="h-3.5 w-3.5" /> Salvando…
+              </>
+            ) : dirty ? (
+              <>
+                <Save className="h-3.5 w-3.5" /> Salvar variáveis globais
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5 text-mint-600" /> Salvo
+              </>
             )}
-            {naoMatriz.map((u) => (
-              <LinhaUnidade
-                key={u.unidadeId}
-                u={u}
-                valor={llPorUnidade[u.unidadeId] ?? u.llAtual}
-                onChange={(v) => setLLPorUnidade((c) => ({ ...c, [u.unidadeId]: v ?? 0 }))}
-              />
-            ))}
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-peri-200">
-            {!temAlteracao() && (
-              <span className="text-xs text-neutral-500">sem alterações</span>
-            )}
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={salvar}
-              disabled={pending || !temAlteracao()}
-            >
-              <Save className="h-3.5 w-3.5" />
-              {pending ? "Salvando…" : "Salvar variáveis globais"}
-            </Button>
-          </div>
+          </Button>
         </div>
-      )}
+      </div>
     </Card>
   );
 }
 
-function LinhaUnidade({
-  u,
+function UnidadeInline({
+  unidade,
   valor,
   onChange,
-  destaque = false,
 }: {
-  u: UnidadeGlobal;
+  unidade: UnidadeGlobal;
   valor: number;
   onChange: (v: number | null) => void;
-  destaque?: boolean;
 }) {
-  const Icon = destaque ? Building2 : Building;
+  const label = unidade.isMatriz ? `${unidade.codigo} (matriz)` : unidade.codigo;
   return (
-    <div
-      className={
-        "rounded-lg border p-3 bg-white " +
-        (destaque ? "border-peri-300 ring-1 ring-peri-100" : "border-neutral-200")
-      }
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className={"h-4 w-4 " + (destaque ? "text-peri-700" : "text-neutral-500")} />
-        <span className="font-semibold text-navy-900 text-sm">{u.nome}</span>
-        {destaque ? (
-          <Badge variant="navy" size="sm">matriz consolidada</Badge>
-        ) : (
-          <span className="text-[10px] text-neutral-500">cód. {u.codigo}</span>
-        )}
-      </div>
-      <label className="text-[11px] font-medium text-navy-900 block mb-1">
-        Lucro Líquido anual
-      </label>
-      <MoneyInput
-        value={valor}
-        onChange={onChange}
-        aria-label={`Lucro líquido anual de ${u.nome}`}
-      />
-      <div className="text-[10px] text-neutral-500 mt-1">
-        Salvo: <span className="tabular-nums">{brl(u.llAtual, true)}</span>
+    <div className="inline-flex items-center gap-1.5 shrink-0">
+      <span
+        className={
+          "text-[11px] font-medium whitespace-nowrap " +
+          (unidade.isMatriz ? "text-peri-700" : "text-neutral-600")
+        }
+        title={unidade.nome}
+      >
+        {label}:
+      </span>
+      <div
+        className={
+          unidade.isMatriz
+            ? "ring-1 ring-peri-200 rounded"
+            : ""
+        }
+      >
+        <MoneyInput
+          value={valor}
+          onChange={onChange}
+          aria-label={`Lucro líquido anual de ${unidade.nome}`}
+          className="w-40 h-8 text-sm"
+        />
       </div>
     </div>
   );

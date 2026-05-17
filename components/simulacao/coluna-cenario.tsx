@@ -1,22 +1,23 @@
-// Server component: header da coluna + KPIs + stepper + painel de parâmetros
-// + ações (calcular, salvar versão). Sem botões de classificações ou salvar
-// como premissa — config vem 100% de /socios e /premissas.
+// Server component: header da coluna + KPIs + painel de parâmetros + ações.
+// Sem botão "Trocar" (drawer 📋 Cenários é o único caminho de swap).
+// Sem Stepper de 4 etapas (sinais consolidados em: empty-state quando não
+// calculou, badge "● alterado", KPI Alertas, RecalcularButton smart).
 // Visão ANUAL única.
-import Link from "next/link";
-import { Replace, FileCheck2, ListTree } from "lucide-react";
+import { FileCheck2, ListTree, Calculator, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge, ModeloBadge, StatusBadge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { brl } from "@/lib/format";
-import { Stepper, type Step } from "@/components/cenario/stepper";
 import { publicarAction } from "@/app/simulacao/acoes";
 import { PainelParametros } from "./painel-parametros";
 import { MenuCenario, type CenarioStatus as CenarioStatusType } from "./menu-cenario";
 import { ExplicacaoDialog } from "./explicacao-dialog";
 import { KpiAlertasButton } from "./kpi-alertas-button";
 import { RecalcularButton } from "./recalcular-button";
+import { StickyHeaderColuna } from "./sticky-header-coluna";
 import { gerarNarrativa } from "@/lib/explicacao/narrativa";
 import type { CenarioCompleto, AreaOption } from "./types";
 
@@ -37,10 +38,10 @@ export function ColunaCenario({
 }) {
   void modoNome;
   const isDraft = cenario.status === "DRAFT";
+  const isApplied = cenario.status === "APPLIED";
   const editavel = podeMutar && isDraft;
 
   // Consolidado: total anual + contagens de alertas + alertas por sócio + valoresPorEtapa
-  // (a partir do trace, agrupando por etapa sem o prefixo numérico).
   let totalPacote = 0;
   let errosCount = 0;
   let warnsCount = 0;
@@ -80,61 +81,52 @@ export function ColunaCenario({
   const podePublicar = editavel && errosCount === 0;
   const dirty = cenario.parametrosDirty;
 
-  const calcDescricao = dirty
-    ? "params alterados"
-    : !jaCalculou
-    ? "pendente"
-    : "ok";
-  const steps: Step[] = [
-    {
-      label: "Classificar",
-      description: `${cenario.classificacoes.length} sócios`,
-      state: "done",
-      tooltip:
-        "Define cada sócio: público (categoria), % de quotas, peso no Bloco B e originação esperada. Base do cálculo.",
-    },
-    {
-      label: "Calcular",
-      description: calcDescricao,
-      state: jaCalculou && !dirty ? "done" : "current",
-      tooltip:
-        "Roda o engine DSF em base anual com os parâmetros atuais (override ou premissa) + variáveis globais do ano.",
-    },
-    {
-      label: "Revisar",
-      description: errosCount > 0 ? `${errosCount} erro(s)` : "alertas ok",
-      state: jaCalculou ? (errosCount > 0 ? "current" : "done") : "pending",
-      tooltip: "Confere alertas e valores. Erros [ERROR] bloqueiam Publicar.",
-    },
-    {
-      label: "Salvar versão",
-      description: cenario.status === "APPLIED" ? "salvo" : "versão final",
-      state:
-        cenario.status === "APPLIED"
-          ? "done"
-          : jaCalculou && errosCount === 0
-          ? "current"
-          : "pending",
-      tooltip:
-        "Salva uma versão final do cenário (snapshot imutável). Versões anteriores deste modelo+ano são arquivadas.",
-    },
-  ];
-
-  const trocarHref = (() => {
-    const sp = new URLSearchParams();
-    if (outroCenarioId) sp.set(slot === "a" ? "b" : "a", outroCenarioId);
-    sp.set("drawer", "1");
-    return `/simulacao?${sp.toString()}`;
-  })();
-
   const paramsEfetivos =
     (cenario.parametrosOverride as Record<string, unknown> | null) ??
     (cenario.premissa.parametros as Record<string, unknown>);
 
+  const headerId = `coluna-header-${slot}-${cenario.id}`;
+  const totalLabel = jaCalculou ? brl(totalPacote, true) : "—";
+
+  // Banner APPLIED — formata data localizada PT-BR.
+  const aplicadoEmStr = (() => {
+    const d = cenario.aplicadoEm;
+    if (!d) return null;
+    try {
+      return new Date(d).toLocaleDateString("pt-BR");
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <Card className="flex flex-col">
-      {/* Header */}
-      <CardHeader className="flex-col items-stretch gap-2">
+      {/* Sticky compacto — aparece quando header full sai da viewport */}
+      <StickyHeaderColuna
+        targetId={headerId}
+        slot={slot}
+        nome={cenario.nome}
+        totalLabel={totalLabel}
+        alertasLabel={kpiValorAlertas}
+        alertasCor={kpiCorAlertas}
+        cenarioId={cenario.id}
+        dirty={dirty}
+        jaCalculou={jaCalculou}
+        editavel={editavel}
+      />
+
+      {/* Banner APPLIED — substitui visualmente o stepper "tudo done" */}
+      {isApplied && aplicadoEmStr && (
+        <div className="px-5 py-2 bg-mint-50 border-b border-mint-200 inline-flex items-center gap-2 text-xs text-mint-800">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          <span>
+            Versão final salva em <strong>{aplicadoEmStr}</strong> · v{cenario.versao}
+          </span>
+        </div>
+      )}
+
+      {/* Header full */}
+      <CardHeader id={headerId} className="flex-col items-stretch gap-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -172,7 +164,6 @@ export function ColunaCenario({
                   ano: cenario.ano,
                   periodoRotulo: `Anual ${cenario.ano}`,
                   premissaNome: cenario.premissa.nome,
-                  // Agrega por sócio (1 entrada por sócio com total + trace + alertas).
                   remuneracoes: (() => {
                     const agg = new Map<
                       string,
@@ -200,11 +191,6 @@ export function ColunaCenario({
                 })}
               />
             )}
-            <Button asChild variant="ghost" size="sm">
-              <Link href={trocarHref}>
-                <Replace className="h-3.5 w-3.5" /> Trocar
-              </Link>
-            </Button>
             {podeMutar && (
               <MenuCenario
                 cenarioId={cenario.id}
@@ -217,26 +203,35 @@ export function ColunaCenario({
           </div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-neutral-100">
-          <Kpi label="Total anual" valor={jaCalculou ? brl(totalPacote, true) : "—"} />
-          <Kpi label="Sócios" valor={String(sociosUnicos.size)} />
-          <KpiAlertasButton
-            valor={kpiValorAlertas}
-            cor={kpiCorAlertas}
-            cenarioNome={cenario.nome}
-            alertasPorSocio={alertasPorSocio}
-            totalCount={totalAlertas}
-          />
-        </div>
+        {/* KPIs OU empty-state quando ainda não calculou */}
+        {jaCalculou ? (
+          <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-neutral-100">
+            <Kpi label="Total anual" valor={brl(totalPacote, true)} />
+            <Kpi label="Sócios" valor={String(sociosUnicos.size)} />
+            <KpiAlertasButton
+              valor={kpiValorAlertas}
+              cor={kpiCorAlertas}
+              cenarioNome={cenario.nome}
+              alertasPorSocio={alertasPorSocio}
+              totalCount={totalAlertas}
+            />
+          </div>
+        ) : editavel ? (
+          <div className="mt-2 pt-3 border-t border-neutral-100 flex flex-col items-center gap-2 text-center py-2">
+            <Calculator className="h-5 w-5 text-peri-600" />
+            <p className="text-xs text-neutral-600 max-w-xs">
+              Cenário recém-criado — clique em <strong>Calcular</strong> para gerar a remuneração anual.
+            </p>
+            <RecalcularButton cenarioId={cenario.id} dirty={dirty} jaCalculou={jaCalculou} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-neutral-100">
+            <Kpi label="Total anual" valor="—" />
+            <Kpi label="Sócios" valor={String(cenario.classificacoes.length)} />
+            <Kpi label="Alertas" valor="—" />
+          </div>
+        )}
       </CardHeader>
-
-      {/* Stepper (apenas DRAFT) */}
-      {editavel && (
-        <div className="px-5 py-3 border-b border-neutral-100">
-          <Stepper steps={steps} />
-        </div>
-      )}
 
       {/* Painel de parâmetros */}
       <div className="px-5 py-3 border-b border-neutral-100">
@@ -253,9 +248,9 @@ export function ColunaCenario({
         />
       </div>
 
-      {/* Ações */}
+      {/* Ações — Recalcular + Salvar versão (somente DRAFT já calculado) */}
       <div className="px-5 py-3 flex items-center gap-2 flex-wrap mt-auto">
-        {editavel && (
+        {editavel && jaCalculou && (
           <RecalcularButton
             cenarioId={cenario.id}
             dirty={dirty}
@@ -291,9 +286,9 @@ export function ColunaCenario({
             disabled={!podePublicar}
           />
         )}
-        {!editavel && jaCalculou && (
+        {!editavel && jaCalculou && !isApplied && (
           <span className="text-xs text-neutral-500 inline-flex items-center gap-1.5">
-            <ListTree className="h-3 w-3" /> Versão salva — somente leitura.
+            <ListTree className="h-3 w-3" /> Somente leitura.
           </span>
         )}
       </div>
