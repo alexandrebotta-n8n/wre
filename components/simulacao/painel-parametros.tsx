@@ -1,13 +1,16 @@
 "use client";
 // Painel de parâmetros editáveis inline na coluna do cenário.
 // Switch entre modelo ATUAL (campos diretos) e NOVO (5 grupos colapsáveis).
+//
+// AUTO-SAVE: cada mudança em qualquer input dispara um auto-submit do form
+// após 600ms de debounce. Sem botão "Aplicar parâmetros". Indicador
+// "Salvando…" aparece inline enquanto a action está em andamento.
 import * as React from "react";
-import { useState } from "react";
-import { Settings2, ChevronDown, HelpCircle } from "lucide-react";
+import { useState, useRef, useTransition } from "react";
+import { Settings2, ChevronDown, HelpCircle, Check, Loader2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SumValidator } from "@/components/premissa/sum-validator";
@@ -18,6 +21,82 @@ import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { AreaOption } from "./types";
+
+/** Hook para auto-submeter um form após N ms de inatividade.
+ *  `salvouAt` é atualizado via callback do useTransition (não em useEffect). */
+function useAutoSubmit(delay = 600) {
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pending, start] = useTransition();
+  const [salvouAt, setSalvouAt] = useState<number>(0); // incrementa cada salvamento
+  // Detecta transição pending→idle via "adjusting state during render"
+  // (sem ler clock no render — incrementa contador puro).
+  const [prevPending, setPrevPending] = useState(false);
+  if (prevPending && !pending) {
+    setPrevPending(false);
+    setSalvouAt((n) => n + 1);
+  } else if (!prevPending && pending) {
+    setPrevPending(true);
+  }
+
+  const onAnyChange = React.useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (formRef.current) {
+        start(() => {
+          formRef.current?.requestSubmit();
+        });
+      }
+    }, delay);
+  }, [delay]);
+
+  React.useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return { formRef, onAnyChange, pending, salvouAt };
+}
+
+/** Indicador "Salvando…" / "Salvo" inline. */
+function StatusSalvamento({
+  pending,
+  salvouAt,
+}: {
+  pending: boolean;
+  /** Contador incrementado a cada save completo (0 = nenhum save ainda). */
+  salvouAt: number;
+}) {
+  const [prevSalvouAt, setPrevSalvouAt] = React.useState(salvouAt);
+  const [mostraSalvo, setMostraSalvo] = React.useState(false);
+  if (salvouAt !== prevSalvouAt) {
+    setPrevSalvouAt(salvouAt);
+    setMostraSalvo(true);
+  }
+  React.useEffect(() => {
+    if (mostraSalvo) {
+      const t = setTimeout(() => setMostraSalvo(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [mostraSalvo]);
+
+  if (pending) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-peri-700">
+        <Loader2 className="h-3 w-3 animate-spin" /> Salvando…
+      </span>
+    );
+  }
+  if (mostraSalvo && salvouAt > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] text-mint-700">
+        <Check className="h-3 w-3" /> Salvo
+      </span>
+    );
+  }
+  return null;
+}
 
 const TOL = 0.001;
 
@@ -151,24 +230,23 @@ function FormParamsAtual({
   valoresPorEtapa: Record<string, number>;
   dirty: boolean;
 }) {
+  const { formRef, onAnyChange, pending, salvouAt } = useAutoSubmit();
   return (
     <form
+      ref={formRef}
+      onChange={onAnyChange}
       action={async (fd) => {
-        // Recompõe override a partir do form e envia como JSON.
         const override = {
           proLaboreMensal: Number(fd.get("proLaboreMensal")),
-          unidadeFundadores: String(fd.get("unidadeFundadores")),
           unidadeMatriz: String(fd.get("unidadeMatriz")),
           reservaPercentual: Number(fd.get("reservaPercentual")),
           reservaViraPremio: fd.get("reservaViraPremio") === "on",
         };
-        // Validação client-side antes do server (evita form.reset confuso).
         const erros: string[] = [];
         if (override.proLaboreMensal < 0) erros.push("Pró-labore não pode ser negativo");
         if (override.reservaPercentual < 0 || override.reservaPercentual > 1) {
-          erros.push(`Reserva (%) deve estar entre 0 e 1 (atual: ${override.reservaPercentual})`);
+          erros.push(`Reserva (%) deve estar entre 0 e 1`);
         }
-        if (!override.unidadeFundadores) erros.push("Unidade fundadores não pode ser vazia");
         if (!override.unidadeMatriz) erros.push("Unidade matriz não pode ser vazia");
         if (erros.length > 0) {
           toast.error(erros.join(" · "), { duration: 6000 });
@@ -206,25 +284,15 @@ function FormParamsAtual({
           <ChipValor etapa="reserva" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Un. fundadores" htmlFor={`uf-${cenarioId}`}>
-          <Input id={`uf-${cenarioId}`} name="unidadeFundadores" defaultValue={String(parametros.unidadeFundadores ?? "BG")} required />
-        </Field>
-        <Field label="Un. matriz" htmlFor={`um-${cenarioId}`}>
-          <Input id={`um-${cenarioId}`} name="unidadeMatriz" defaultValue={String(parametros.unidadeMatriz ?? "DSF")} required />
-        </Field>
-      </div>
+      <Field label="Unidade matriz (código)" htmlFor={`um-${cenarioId}`}>
+        <Input id={`um-${cenarioId}`} name="unidadeMatriz" defaultValue={String(parametros.unidadeMatriz ?? "DSF")} required />
+      </Field>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="reservaViraPremio" defaultChecked={Boolean(parametros.reservaViraPremio ?? true)} className="accent-peri-600" />
         <span>Reserva vira prêmio uniforme</span>
       </label>
-      <div className="flex justify-end pt-1">
-        <Tooltip
-          side="top"
-          content="Salva os valores acima como override do cenário. Não roda o cálculo — clique em Recalcular depois para gerar os pacotes por sócio."
-        >
-          <Button type="submit" variant="subtle" size="sm">Aplicar parâmetros</Button>
-        </Tooltip>
+      <div className="flex justify-end pt-1 min-h-[18px]">
+        <StatusSalvamento pending={pending} salvouAt={salvouAt} />
       </div>
     </form>
   );
@@ -248,9 +316,12 @@ function FormParamsNovo({
   dirty: boolean;
 }) {
   const distribAtual = String(parametros.distribuicaoBlocoB ?? "UNIFORME");
+  const { formRef, onAnyChange, pending, salvouAt } = useAutoSubmit();
 
   return (
     <form
+      ref={formRef}
+      onChange={onAnyChange}
       action={async (fd) => {
         // Recompõe pesosPorArea a partir dos campos pesoOrg-X / pesoInc-X
         const pesosOrganico: Record<string, number> = {};
@@ -428,13 +499,8 @@ function FormParamsNovo({
         )}
       </Grupo>
 
-      <div className="flex justify-end pt-1">
-        <Tooltip
-          side="top"
-          content="Salva os valores acima como override do cenário. Não roda o cálculo — clique em Recalcular depois para gerar os pacotes por sócio."
-        >
-          <Button type="submit" variant="subtle" size="sm">Aplicar parâmetros</Button>
-        </Tooltip>
+      <div className="flex justify-end pt-1 min-h-[18px]">
+        <StatusSalvamento pending={pending} salvouAt={salvouAt} />
       </div>
     </form>
   );

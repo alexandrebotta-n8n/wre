@@ -43,11 +43,11 @@ export const ETAPAS: EtapaInfo[] = [
     slug: "funding-fundadores",
     titulo: "Funding fundadores",
     modelo: "AMBOS",
-    formula: "(quota_fund / Σquotas_fund) × fundingFundadoresAno",
+    formula: "Σ(Socio.fundingFundadorAnual) | per-fundador (sem rateio)",
     descricao:
-      "Valor arbitrário anual (configurado no painel Variáveis Globais da /simulacao) distribuído proporcionalmente entre os sócios fundadores (Socio.isFundador=true). Deduzido do LL antes do RDA no NOVO e do funding residual no ATUAL. Se 0, fundadores não recebem.",
-    exemploNumeros: "R$ 1.500.000 ÷ 3 fundadores com quotas 10/20/30%",
-    exemploResultado: "R$ 250k / 500k / 750k",
+      "Cada fundador (Socio.isFundador=true) tem seu próprio campo discricionário 'Funding fundador anual' em /socios. Engine soma esses valores e deduz do LL antes do RDA (NOVO) ou do funding residual (ATUAL). Cada fundador recebe exatamente o valor configurado em seu cadastro — não há rateio por quotas.",
+    exemploNumeros: "Fund. A: R$ 500k · Fund. B: R$ 700k · Fund. C: R$ 300k",
+    exemploResultado: "Σ = R$ 1.500.000 deduzido do LL",
     veja: "/politica/categorias-socio",
   },
   {
@@ -105,7 +105,7 @@ export const ETAPAS: EtapaInfo[] = [
     modelo: "NOVO",
     formula: "originacaoAnualSocio × taxaComissaoOriginacao",
     descricao:
-      "Componente individual: cada sócio recebe um percentual sobre a receita que originou. O valor anual de originação por sócio é cadastrado no painel 'Originação por sócio' (topo da /simulacao), e a taxa de comissão é configurada na Premissa NOVA (taxaComissaoOriginacao). Como é variável global, afeta todos os cenários DRAFT do ano.",
+      "Componente individual: cada sócio recebe um percentual sobre a receita que originou. O valor anual de originação por sócio é cadastrado em /socios (campo 'Originação anual padrão'). A taxa de comissão é configurada na Premissa NOVA (taxaComissaoOriginacao).",
     exemploNumeros: "Sócio X originou R$ 800.000 × 5% taxa",
     exemploResultado: "Comissão R$ 40.000 ano",
     veja: "/politica/categorias-socio",

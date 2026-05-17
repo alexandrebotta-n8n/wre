@@ -36,6 +36,8 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
   const percentualQuotasRaw = String(formData.get("percentualQuotasDefault") ?? "0");
   const proLaboreRaw = String(formData.get("proLaboreMensal") ?? "");
   const remGestaoRaw = String(formData.get("remuneracaoGestaoMensal") ?? "");
+  const originacaoRaw = String(formData.get("originacaoAnualPadrao") ?? "");
+  const fundingFundRaw = String(formData.get("fundingFundadorAnual") ?? "");
   const observacoesRaw = String(formData.get("observacoes") ?? "");
 
   // Helper: string vazia / inválida → null (= "usa default da premissa/tabela").
@@ -56,6 +58,8 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
     percentualQuotasDefault: Number(percentualQuotasRaw) / 100,
     proLaboreMensal: parseOptNumber(proLaboreRaw),
     remuneracaoGestaoMensal: parseOptNumber(remGestaoRaw),
+    originacaoAnualPadrao: parseOptNumber(originacaoRaw),
+    fundingFundadorAnual: parseOptNumber(fundingFundRaw),
     observacoes: observacoesRaw.trim() || null,
   };
 
@@ -86,6 +90,8 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
         percentualQuotasDefault: input.percentualQuotasDefault,
         proLaboreMensal: input.proLaboreMensal,
         remuneracaoGestaoMensal: input.remuneracaoGestaoMensal,
+        originacaoAnualPadrao: input.originacaoAnualPadrao,
+        fundingFundadorAnual: input.fundingFundadorAnual,
         observacoes: input.observacoes,
       },
     });

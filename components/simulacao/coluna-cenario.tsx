@@ -1,23 +1,22 @@
 // Server component: header da coluna + KPIs + stepper + painel de parâmetros
-// + ações (calcular, publicar, editar classificações).
-// Visão ANUAL única — sem stepper trimestral, sem botões de override de
-// insumos/originação (esses agora vivem nos painéis globais do topo).
+// + ações (calcular, salvar versão). Sem botões de classificações ou salvar
+// como premissa — config vem 100% de /socios e /premissas.
+// Visão ANUAL única.
 import Link from "next/link";
-import { Replace, RotateCcw, FileCheck2, ListTree } from "lucide-react";
+import { Replace, FileCheck2, ListTree } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge, ModeloBadge, StatusBadge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { brl } from "@/lib/format";
 import { Stepper, type Step } from "@/components/cenario/stepper";
-import { calcularAction, publicarAction } from "@/app/simulacao/acoes";
+import { publicarAction } from "@/app/simulacao/acoes";
 import { PainelParametros } from "./painel-parametros";
-import { DrawerClassificacoes } from "./drawer-classificacoes";
-import { SalvarPremissaDialog } from "./salvar-premissa-dialog";
 import { MenuCenario, type CenarioStatus as CenarioStatusType } from "./menu-cenario";
 import { ExplicacaoDialog } from "./explicacao-dialog";
 import { KpiAlertasButton } from "./kpi-alertas-button";
+import { RecalcularButton } from "./recalcular-button";
 import { gerarNarrativa } from "@/lib/explicacao/narrativa";
 import type { CenarioCompleto, AreaOption } from "./types";
 
@@ -108,8 +107,8 @@ export function ColunaCenario({
       tooltip: "Confere alertas e valores. Erros [ERROR] bloqueiam Publicar.",
     },
     {
-      label: "Publicar",
-      description: cenario.status === "APPLIED" ? "publicado" : "snapshot final",
+      label: "Salvar versão",
+      description: cenario.status === "APPLIED" ? "salvo" : "versão final",
       state:
         cenario.status === "APPLIED"
           ? "done"
@@ -117,7 +116,7 @@ export function ColunaCenario({
           ? "current"
           : "pending",
       tooltip:
-        "Congela o cenário como snapshot imutável (APPLIED). Outros APPLIED do mesmo modelo+ano são arquivados.",
+        "Salva uma versão final do cenário (snapshot imutável). Versões anteriores deste modelo+ano são arquivadas.",
     },
   ];
 
@@ -257,43 +256,11 @@ export function ColunaCenario({
       {/* Ações */}
       <div className="px-5 py-3 flex items-center gap-2 flex-wrap mt-auto">
         {editavel && (
-          <>
-            <form action={calcularAction}>
-              <input type="hidden" name="cenarioId" value={cenario.id} />
-              <Tooltip
-                side="top"
-                content={
-                  jaCalculou
-                    ? "Roda o engine DSF em base anual com os parâmetros atuais (override ou premissa) + variáveis globais do ano e regrava os pacotes por sócio."
-                    : "Calcula o cenário em base anual com os parâmetros atuais. Se não houver Lucro Líquido do ano cadastrado nos painéis globais, falha."
-                }
-              >
-                <Button
-                  type="submit"
-                  variant={dirty ? "primary" : "secondary"}
-                  size="sm"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  {jaCalculou ? "Recalcular" : "Calcular"}
-                </Button>
-              </Tooltip>
-            </form>
-            <DrawerClassificacoes
-              cenarioId={cenario.id}
-              classificacoes={cenario.classificacoes.map((c) => ({
-                id: c.id,
-                nome: c.socio.nome,
-                cargo: c.socio.cargo,
-                publico: c.publico,
-                percentualQuotas: c.percentualQuotas,
-                pesoBlocoB: c.pesoBlocoB,
-                originacaoEsperada: c.originacaoEsperada,
-              }))}
-            />
-            {cenario.parametrosOverride && (
-              <SalvarPremissaDialog cenarioId={cenario.id} cenarioNome={cenario.nome} />
-            )}
-          </>
+          <RecalcularButton
+            cenarioId={cenario.id}
+            dirty={dirty}
+            jaCalculou={jaCalculou}
+          />
         )}
         {editavel && jaCalculou && (
           <ConfirmDialog
@@ -302,31 +269,31 @@ export function ColunaCenario({
                 side="top"
                 content={
                   errosCount > 0
-                    ? `Resolva os ${errosCount} alerta(s) ERROR antes de publicar.`
-                    : "Congela o cenário como snapshot imutável (status APPLIED). Outros cenários publicados do mesmo modelo+ano serão arquivados automaticamente."
+                    ? `Resolva os ${errosCount} alerta(s) ERROR antes de salvar.`
+                    : "Salva uma versão final do cenário (snapshot imutável). Outras versões finais do mesmo modelo+ano são arquivadas automaticamente."
                 }
               >
                 <Button variant="primary" size="sm" disabled={!podePublicar}>
                   <FileCheck2 className="h-3.5 w-3.5" />
-                  Publicar
+                  Salvar versão
                 </Button>
               </Tooltip>
             }
-            title="Publicar este cenário?"
+            title="Salvar versão final deste cenário?"
             description={
               errosCount > 0
-                ? `Há ${errosCount} alerta(s) ERROR. Resolva antes de publicar.`
-                : "O cálculo será congelado (snapshot imutável). Cenários APPLIED anteriores deste modelo/ano serão arquivados."
+                ? `Há ${errosCount} alerta(s) ERROR. Resolva antes de salvar.`
+                : "O cálculo será congelado como versão final (snapshot imutável). Outras versões finais deste modelo/ano serão arquivadas."
             }
             action={publicarAction}
             hiddenFields={{ cenarioId: cenario.id }}
-            confirmLabel="Publicar"
+            confirmLabel="Salvar versão"
             disabled={!podePublicar}
           />
         )}
         {!editavel && jaCalculou && (
           <span className="text-xs text-neutral-500 inline-flex items-center gap-1.5">
-            <ListTree className="h-3 w-3" /> Cenário publicado — somente leitura.
+            <ListTree className="h-3 w-3" /> Versão salva — somente leitura.
           </span>
         )}
       </div>

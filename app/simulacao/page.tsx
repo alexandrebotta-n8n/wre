@@ -9,7 +9,6 @@ import { getModoNome, getTourVisto } from "@/lib/preferencias";
 import { SimulacaoShell } from "@/components/simulacao/shell";
 import type { CenarioModelo, CenarioStatus } from "@/components/simulacao/types";
 import type { UnidadeGlobal } from "@/components/simulacao/painel-globais";
-import type { SocioOriginacao } from "@/components/simulacao/painel-originacao";
 
 export default async function SimulacaoPage({
   searchParams,
@@ -65,16 +64,13 @@ export default async function SimulacaoPage({
   const anoRef =
     cenarioA?.ano ?? cenarioB?.ano ?? Number(sp.ano) ?? new Date().getFullYear();
 
-  // Painéis globais — só carrega se for editor.
-  const [unidadesGlobais, fundingFundadores, sociosOriginacao, draftsDoAno] =
-    escopo.podeMutar
-      ? await Promise.all([
-          carregarUnidadesGlobais(anoRef),
-          carregarFundingFundadores(anoRef),
-          carregarSociosComOriginacao(anoRef),
-          prisma.cenario.count({ where: { ano: anoRef, status: "DRAFT" } }),
-        ])
-      : [[] as UnidadeGlobal[], 0, [] as SocioOriginacao[], 0];
+  // Painel global — só carrega se for editor.
+  const [unidadesGlobais, draftsDoAno] = escopo.podeMutar
+    ? await Promise.all([
+        carregarUnidadesGlobais(anoRef),
+        prisma.cenario.count({ where: { ano: anoRef, status: "DRAFT" } }),
+      ])
+    : [[] as UnidadeGlobal[], 0];
 
   return (
     <SimulacaoShell
@@ -101,8 +97,6 @@ export default async function SimulacaoPage({
       mostrarTour={!tourVisto}
       ano={anoRef}
       unidadesGlobais={unidadesGlobais}
-      fundingFundadoresAtual={fundingFundadores}
-      sociosOriginacao={sociosOriginacao}
       cenariosDraftDoAno={draftsDoAno}
     />
   );
@@ -192,40 +186,6 @@ async function carregarUnidadesGlobais(ano: number): Promise<UnidadeGlobal[]> {
       nome: u.nome,
       isMatriz: u.isMatriz,
       llAtual: r?.lucroLiquido ?? 0,
-      fundingAtual: r?.fundingVariavel ?? null,
     };
   });
-}
-
-async function carregarFundingFundadores(ano: number): Promise<number> {
-  const c = await prisma.configuracaoAno.findUnique({
-    where: { ano },
-    select: { fundingFundadoresAno: true },
-  });
-  return c?.fundingFundadoresAno ?? 0;
-}
-
-async function carregarSociosComOriginacao(ano: number): Promise<SocioOriginacao[]> {
-  const [socios, periodoAno] = await Promise.all([
-    prisma.socio.findMany({
-      where: { ativo: true },
-      orderBy: [{ isFundador: "desc" }, { nome: "asc" }],
-      take: 200,
-      select: { id: true, nome: true, cargo: true },
-    }),
-    prisma.periodo.findFirst({ where: { tipo: "ANO", ano }, select: { id: true } }),
-  ]);
-  const linhas = periodoAno
-    ? await prisma.originacaoPeriodo.findMany({
-        where: { periodoId: periodoAno.id },
-        take: 500,
-      })
-    : [];
-  const porSocio = new Map(linhas.map((l) => [l.socioId, l.valor] as const));
-  return socios.map((s) => ({
-    socioId: s.id,
-    nome: s.nome,
-    cargo: s.cargo,
-    valorAtual: porSocio.get(s.id) ?? 0,
-  }));
 }

@@ -229,6 +229,8 @@ export default async function SociosPage({
                           percentualQuotasDefault: s.percentualQuotasDefault,
                           proLaboreMensal: s.proLaboreMensal,
                           remuneracaoGestaoMensal: s.remuneracaoGestaoMensal,
+                          originacaoAnualPadrao: s.originacaoAnualPadrao,
+                          fundingFundadorAnual: s.fundingFundadorAnual,
                           observacoes: s.observacoes,
                         }}
                         areas={areas}

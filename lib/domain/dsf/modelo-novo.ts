@@ -120,19 +120,15 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     // Implementação completa do retorno ao RDA fica para iteração futura.
   }
 
-  // Etapa 3.5 — Funding fundadores (arbitrário, vindo da ConfiguracaoAno).
-  // Distribuído proporcionalmente às quotas dos sócios isFundador=true.
-  // É deduzido do LL antes de formar o RDA — fundadores recebem ANTES da
-  // distribuição central, mesmo no modelo NOVO (compatibilidade com a regra
-  // contábil de que fundadores têm direito histórico ao seu funding).
-  const fundingFundadoresAno = Math.max(0, premissas.fundingFundadoresAno ?? 0);
+  // Etapa 3.5 — Funding fundadores (discricionário, cadastrado por sócio
+  // em /socios via Socio.fundingFundadorAnual). Cada fundador recebe seu
+  // valor próprio (não rateio por quotas). Deduzido do LL antes do RDA.
   const fundadores = socios.filter((s) => s.isFundador);
-  const somaQuotasFund = fundadores.reduce((acc, s) => acc + s.percentualQuotas, 0);
   const remFundadorPorSocio = new Map<string, number>();
   let totalFundadores = 0;
-  if (fundingFundadoresAno > 0 && somaQuotasFund > 0) {
-    for (const s of fundadores) {
-      const v = (s.percentualQuotas / somaQuotasFund) * fundingFundadoresAno;
+  for (const s of fundadores) {
+    const v = Math.max(0, s.fundingFundadorAnual ?? 0);
+    if (v > 0) {
       remFundadorPorSocio.set(s.id, v);
       totalFundadores += v;
     }
@@ -200,12 +196,12 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     const remGestao = adminPorSocio.get(s.id) ?? 0;
     if (remGestao > 0) trace.push({ etapa: "3.admin", descricao: "rem. de administração", valor: remGestao });
 
-    // Funding fundadores (dedução prévia ao RDA, distribuído por quotas)
+    // Funding fundador individual (cadastrado em /socios)
     const remFundador = remFundadorPorSocio.get(s.id) ?? 0;
     if (remFundador > 0) {
       trace.push({
         etapa: "3.fundador",
-        descricao: `${((s.percentualQuotas / somaQuotasFund) * 100).toFixed(2)}% × R$ ${fundingFundadoresAno.toLocaleString("pt-BR")} (funding fundadores)`,
+        descricao: "funding fundador individual (cadastro /socios)",
         valor: remFundador,
       });
     }

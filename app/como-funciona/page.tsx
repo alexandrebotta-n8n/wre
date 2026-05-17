@@ -87,20 +87,22 @@ export default async function ComoFuncionaHub() {
         <h3 className="font-semibold text-navy-900 mb-2">Primeiros passos — fluxo recomendado</h3>
         <ol className="text-sm text-neutral-700 space-y-2 list-decimal list-inside leading-relaxed">
           <li>
-            <Link href="/socios" className="text-peri-700 hover:underline font-medium">/socios</Link> — defina a <strong>Classificação (Política DSF v1)</strong> de cada sócio (uma das 6 categorias) e, para líderes, a unidade que gerenciam.
+            <Link href="/socios" className="text-peri-700 hover:underline font-medium">/socios</Link> — para cada sócio, defina:
+            <ul className="list-disc list-inside ml-5 mt-1 space-y-0.5 text-[13px]">
+              <li><strong>Classificação (Política DSF v1)</strong>, unidade liderada (se for líder)</li>
+              <li><strong>Pró-labore</strong> e <strong>Rem. Gestão</strong> mensais (opcionais — sobrescrevem premissa/tabela)</li>
+              <li><strong>Originação anual padrão</strong> (alimenta a Comissão de Originação no NOVO)</li>
+              <li><strong>Funding fundador anual</strong> (só fundadores — valor pago direto a cada um)</li>
+            </ul>
           </li>
           <li>
-            <Link href="/premissas" className="text-peri-700 hover:underline font-medium">/premissas</Link> — configure a premissa NOVA com{" "}
-            <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">proLaboreMensal</code>,{" "}
-            <code className="text-xs bg-neutral-100 px-1 py-0.5 rounded">taxaComissaoOriginacao</code> e os percentuais dos Blocos.
+            <Link href="/premissas" className="text-peri-700 hover:underline font-medium">/premissas</Link> — configure a premissa NOVA: percentuais dos Blocos A/B/C, pool 50/30/20, chave de originação, taxa de comissão.
           </li>
           <li>
-            <Link href="/simulacao" className="text-peri-700 hover:underline font-medium">/simulacao</Link> — no painel <em>Variáveis globais</em> (topo) edite{" "}
-            o <strong>LL DSF global</strong>, o <strong>LL de cada unidade</strong> e o{" "}
-            <strong>funding dos fundadores</strong>. No painel <em>Originação</em> defina o valor anual por sócio. Todos os cenários DRAFT do ano refletem essas variáveis ao recalcular.
+            <Link href="/simulacao" className="text-peri-700 hover:underline font-medium">/simulacao</Link> — no painel <em>Variáveis globais</em> (topo) edite o <strong>LL DSF</strong> e o <strong>LL de cada unidade</strong>. Esses são os únicos globais — todo o resto (fundador, originação, pró-labore/gestão custom) vem de /socios.
           </li>
           <li>
-            Crie cenários A (ATUAL) e B (NOVO) lado a lado. Cada cenário tem sua premissa + parâmetros (Blocos %, pool, chave) editáveis inline.
+            Crie cenários A (ATUAL) e B (NOVO) lado a lado. Parâmetros do cenário (Blocos %, pool, chave) <strong>auto-salvam</strong> ao digitar — sem botão Aplicar. O botão <strong>Recalcular</strong> destaca quando há algo a recalcular. <strong>Salvar versão</strong> congela o cenário como snapshot imutável.
           </li>
         </ol>
       </Card>

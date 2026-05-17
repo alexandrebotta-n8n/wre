@@ -15,9 +15,7 @@ import {
   clonarCenarioComoRascunho,
   criarCenarioComDefaults,
   atualizarParametrosOverride,
-  salvarOverrideComoPremissa,
 } from "@/lib/cenario-service";
-import type { Publico } from "@/lib/domain/dsf";
 
 function rev() {
   revalidatePath("/simulacao");
@@ -161,7 +159,7 @@ export async function publicarAction(formData: FormData) {
     recurso: `Cenario:${cenarioId}`,
     meta: { modelo: cenario.modelo, ano: cenario.ano },
   });
-  await flashSuccess("Cenário publicado — cálculo congelado.");
+  await flashSuccess("Versão final salva — cálculo congelado.");
   rev();
 }
 
@@ -298,92 +296,4 @@ export async function atualizarOverrideAction(formData: FormData) {
   rev();
 }
 
-export async function salvarComoPremissaAction(formData: FormData) {
-  const session = await auth();
-  const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) return;
-  const cenarioId = String(formData.get("cenarioId"));
-  const nome = String(formData.get("nome") ?? "").trim();
-  const descricao = String(formData.get("descricao") ?? "").trim() || undefined;
-  if (!nome) {
-    await flashError("Nome da premissa é obrigatório.");
-    return;
-  }
-  try {
-    const r = await salvarOverrideComoPremissa({ cenarioId, nome, descricao });
-    await logAudit({
-      usuarioId: session?.user?.id,
-      acao: "premissa.criar.de-override",
-      recurso: `Premissa:${r.premissaId}`,
-      meta: { cenarioOriginalId: cenarioId, nome },
-    });
-    await flashSuccess(`Premissa "${nome}" criada e vinculada ao cenário.`);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Falha ao salvar premissa";
-    await flashError(msg);
-  }
-  rev();
-}
 
-// ============================================================================
-// Classificações em lote
-// ============================================================================
-
-export async function atualizarClassificacoesAction(formData: FormData) {
-  const session = await auth();
-  const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) return;
-  const cenarioId = String(formData.get("cenarioId"));
-  const classificacoesJson = String(formData.get("classificacoes") ?? "[]");
-  let classificacoes: Array<{
-    id: string;
-    publico?: Publico;
-    pesoBlocoB?: number | null;
-    originacaoEsperada?: number;
-    percentualQuotas?: number;
-  }>;
-  try {
-    classificacoes = JSON.parse(classificacoesJson);
-  } catch {
-    await flashError("Payload inválido");
-    return;
-  }
-  try {
-    const cenario = await prisma.cenario.findUnique({
-      where: { id: cenarioId },
-      select: { status: true },
-    });
-    if (!cenario || cenario.status !== "DRAFT") {
-      await flashError("Apenas cenários em rascunho podem ser editados.");
-      return;
-    }
-    await prisma.$transaction([
-      ...classificacoes.map((c) =>
-        prisma.classificacaoSocio.update({
-          where: { id: c.id },
-          data: {
-            ...(c.publico ? { publico: c.publico } : {}),
-            ...(c.pesoBlocoB !== undefined ? { pesoBlocoB: c.pesoBlocoB } : {}),
-            ...(c.originacaoEsperada !== undefined ? { originacaoEsperada: c.originacaoEsperada } : {}),
-            ...(c.percentualQuotas !== undefined ? { percentualQuotas: c.percentualQuotas } : {}),
-          },
-        }),
-      ),
-      prisma.cenario.update({
-        where: { id: cenarioId },
-        data: { versao: { increment: 1 } },
-      }),
-    ]);
-    await logAudit({
-      usuarioId: session?.user?.id,
-      acao: "cenario.classificacoes.atualizar",
-      recurso: `Cenario:${cenarioId}`,
-      meta: { quantidade: classificacoes.length },
-    });
-    await flashSuccess(`${classificacoes.length} classificação(ões) atualizadas.`);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Falha ao salvar classificações";
-    await flashError(msg);
-  }
-  rev();
-}

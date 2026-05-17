@@ -42,6 +42,11 @@ export const AtualizarSocioSchema = z
     // Null = usa default (Premissa.proLaboreMensal / TabelaSalario).
     proLaboreMensal: z.number().min(0).nullable(),
     remuneracaoGestaoMensal: z.number().min(0).nullable(),
+    // Insumos individuais anuais (commit 20260518).
+    // Originação alimenta a Comissão de Originação (NOVO);
+    // Funding fundador é deduzido do LL antes do RDA/funding residual.
+    originacaoAnualPadrao: z.number().min(0).nullable(),
+    fundingFundadorAnual: z.number().min(0).nullable(),
     observacoes: z.string().max(500).nullable(),
   })
   .strict();

@@ -187,6 +187,14 @@ model Socio {
   proLaboreMensal           Float?  // R$/mês override individual
   remuneracaoGestaoMensal   Float?  // R$/mês override individual
 
+  // Originação anual padrão (R$/ano) — alimenta a Comissão de Originação
+  // no engine NOVO. Editado no cadastro do sócio. Null/0 = sócio não originou.
+  originacaoAnualPadrao     Float?
+  // Funding fundador anual (R$/ano) — campo discricionário; só preenchido
+  // para sócios isFundador=true. Cada fundador recebe esse valor direto.
+  // Engine deduz Σ desses valores do LL antes do RDA/distribuição residual.
+  fundingFundadorAnual      Float?
+
   // Classificação default na nova política (Política DSF v1).
   // Obrigatório — é o ponto de partida ao criar uma ClassificacaoSocio em
   // qualquer novo cenário. Pode ser sobreposto por cenário se necessário.

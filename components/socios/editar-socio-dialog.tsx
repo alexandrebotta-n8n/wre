@@ -48,6 +48,8 @@ export interface SocioEditavel {
   percentualQuotasDefault: number;
   proLaboreMensal: number | null;
   remuneracaoGestaoMensal: number | null;
+  originacaoAnualPadrao: number | null;
+  fundingFundadorAnual: number | null;
   observacoes: string | null;
 }
 
@@ -241,6 +243,53 @@ export function EditarSocioDialog({
                 />
               </Field>
             </div>
+          </fieldset>
+
+          <fieldset className="rounded-md border border-amber-200 bg-amber-50/30 p-3 space-y-3">
+            <legend className="px-1.5 text-xs font-medium text-navy-900">
+              Insumos individuais anuais (R$/ano)
+            </legend>
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Originação anual padrão"
+                htmlFor="socio-originacao"
+                hint="Alimenta a Comissão de Originação no engine NOVO."
+              >
+                <Input
+                  id="socio-originacao"
+                  name="originacaoAnualPadrao"
+                  type="number"
+                  step="10000"
+                  min="0"
+                  defaultValue={socio.originacaoAnualPadrao ?? ""}
+                  placeholder="0"
+                  className="tabular-nums"
+                />
+              </Field>
+              {socio.isFundador && (
+                <Field
+                  label="Funding fundador anual"
+                  htmlFor="socio-funding-fund"
+                  hint="Valor anual deduzido do LL e pago diretamente a este fundador."
+                >
+                  <Input
+                    id="socio-funding-fund"
+                    name="fundingFundadorAnual"
+                    type="number"
+                    step="10000"
+                    min="0"
+                    defaultValue={socio.fundingFundadorAnual ?? ""}
+                    placeholder="0"
+                    className="tabular-nums"
+                  />
+                </Field>
+              )}
+            </div>
+            {!socio.isFundador && (
+              <p className="text-[11px] text-neutral-500 -mt-1">
+                <em>Funding fundador</em> só aparece para sócios marcados como fundador (flag <code>isFundador</code>).
+              </p>
+            )}
           </fieldset>
 
           <Field label="Observações" htmlFor="socio-obs">

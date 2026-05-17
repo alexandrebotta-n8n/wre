@@ -47,26 +47,37 @@ interface ClassificacaoComSocio extends ClassificacaoSocio {
 
 function classificacoesParaSocioInput(
   classificacoes: ClassificacaoComSocio[],
-  originacaoEfetivaPorSocio: Map<string, number>,
+  originacaoLegadaPorSocio: Map<string, number>,
 ): SocioInput[] {
-  return classificacoes.map((c) => ({
-    id: c.socioId,
-    nome: c.socio.nome,
-    cargo: c.socio.cargo,
-    publico: c.publico as Publico,
-    unidadeCodigo: c.unidade?.codigo,
-    percentualQuotas: c.percentualQuotas,
-    originacaoEsperadaAnual: c.originacaoEsperada,
-    originacaoEfetiva: originacaoEfetivaPorSocio.get(c.socioId) ?? 0,
-    pesoBlocoB: c.pesoBlocoB ?? undefined,
-    areaPraticaCodigo: c.socio.areaPratica?.codigo,
-    nivelCargo: (c.nivelCargoOverride ?? c.socio.nivelCargo) as NivelCargo | undefined,
-    faixaSalarial: (c.faixaSalarialOverride ?? c.socio.faixaSalarial) as FaixaSalarial | undefined,
-    isFundador: c.socio.isFundador,
-    // Overrides individuais do cadastro do Sócio (case-a-case).
-    proLaboreMensalOverride: c.socio.proLaboreMensal ?? undefined,
-    remuneracaoGestaoMensalOverride: c.socio.remuneracaoGestaoMensal ?? undefined,
-  }));
+  return classificacoes.map((c) => {
+    // Originação efetiva: prioridade ao novo campo Socio.originacaoAnualPadrao
+    // (cadastro em /socios). Fallback: OriginacaoPeriodo legado por ano
+    // (para dados antigos não-migrados).
+    const origPadrao = c.socio.originacaoAnualPadrao;
+    const origEfetiva =
+      origPadrao != null && origPadrao > 0
+        ? origPadrao
+        : originacaoLegadaPorSocio.get(c.socioId) ?? 0;
+    return {
+      id: c.socioId,
+      nome: c.socio.nome,
+      cargo: c.socio.cargo,
+      publico: c.publico as Publico,
+      unidadeCodigo: c.unidade?.codigo,
+      percentualQuotas: c.percentualQuotas,
+      originacaoEsperadaAnual: c.originacaoEsperada,
+      originacaoEfetiva: origEfetiva,
+      pesoBlocoB: c.pesoBlocoB ?? undefined,
+      areaPraticaCodigo: c.socio.areaPratica?.codigo,
+      nivelCargo: (c.nivelCargoOverride ?? c.socio.nivelCargo) as NivelCargo | undefined,
+      faixaSalarial: (c.faixaSalarialOverride ?? c.socio.faixaSalarial) as FaixaSalarial | undefined,
+      isFundador: c.socio.isFundador,
+      // Overrides individuais do cadastro do Sócio (case-a-case).
+      proLaboreMensalOverride: c.socio.proLaboreMensal ?? undefined,
+      remuneracaoGestaoMensalOverride: c.socio.remuneracaoGestaoMensal ?? undefined,
+      fundingFundadorAnual: c.socio.fundingFundadorAnual ?? undefined,
+    };
+  });
 }
 
 /**
@@ -221,15 +232,15 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
   if (resultados.length === 0) {
     throw new ApiError(`Nenhum ResultadoPeriodo cadastrado para ${cenario.ano}`, 400);
   }
-  const originacaoEfetiva = await carregarOriginacaoEfetivaAno(cenario.ano);
-  const socios = classificacoesParaSocioInput(cenario.classificacoes, originacaoEfetiva);
+  // Originação efetiva: novo padrão lê Socio.originacaoAnualPadrao (em
+  // classificacoesParaSocioInput). O fallback abaixo busca OriginacaoPeriodo
+  // ANO legado para sócios sem o novo campo preenchido.
+  const originacaoLegada = await carregarOriginacaoEfetivaAno(cenario.ano);
+  const socios = classificacoesParaSocioInput(cenario.classificacoes, originacaoLegada);
 
-  // Configuração global anual (funding fundadores arbitrário)
-  const configAno = await prisma.configuracaoAno.findUnique({
-    where: { ano: cenario.ano },
-    select: { fundingFundadoresAno: true },
-  });
-  const fundingFundadoresAno = configAno?.fundingFundadoresAno ?? 0;
+  // Funding fundadores agora é per-sócio (Socio.fundingFundadorAnual),
+  // já propagado no SocioInput. Engine não precisa de parâmetro global.
+  const fundingFundadoresAno = 0;
 
   // Override de parâmetros (Blocos %, pool, chave, etc.) ainda existe — é
   // só sobre os parâmetros da Premissa, não sobre os insumos globais.
@@ -483,44 +494,6 @@ export async function atualizarParametrosOverride(args: {
   });
 }
 
-/**
- * Salva override atual como Premissa nova e vincula ao cenário.
- */
-export async function salvarOverrideComoPremissa(args: {
-  cenarioId: string;
-  nome: string;
-  descricao?: string;
-}): Promise<{ premissaId: string }> {
-  const cenario = await prisma.cenario.findUnique({
-    where: { id: args.cenarioId },
-    select: { modelo: true, parametrosOverride: true, premissaId: true },
-  });
-  if (!cenario) throw new ApiError("Cenário não encontrado", 404);
-  if (!cenario.parametrosOverride) {
-    throw new ApiError("Cenário não tem parâmetros customizados — nada para salvar", 400);
-  }
-
-  const novaPremissa = await prisma.$transaction(async (tx) => {
-    const p = await tx.premissa.create({
-      data: {
-        nome: args.nome,
-        descricao: args.descricao,
-        modelo: cenario.modelo,
-        parametros: cenario.parametrosOverride as never,
-      },
-    });
-    await tx.cenario.update({
-      where: { id: args.cenarioId },
-      data: {
-        premissaId: p.id,
-        parametrosOverride: null as never,
-      },
-    });
-    return p;
-  });
-
-  return { premissaId: novaPremissa.id };
-}
 
 // ============================================================================
 // Variáveis globais — afetam TODOS os cenários do ano
@@ -529,12 +502,12 @@ export async function salvarOverrideComoPremissa(args: {
 /**
  * Salva LL de uma unidade no ano (ResultadoPeriodo tipo=ANO).
  * Marca todos os DRAFTs do ano como dirty para sinalizar recálculo.
+ * Campo fundingVariavel é preservado se existia (não toca).
  */
 export async function salvarLLUnidadeAno(args: {
   ano: number;
   unidadeId: string;
   lucroLiquido: number;
-  fundingVariavel?: number | null;
   fonte?: string | null;
 }): Promise<void> {
   const periodoAno = await garantirPeriodoAno(args.ano);
@@ -544,64 +517,11 @@ export async function salvarLLUnidadeAno(args: {
       unidadeId: args.unidadeId,
       periodoId: periodoAno.id,
       lucroLiquido: args.lucroLiquido,
-      fundingVariavel: args.fundingVariavel ?? undefined,
       ehReal: true,
       fonte: args.fonte ?? "manual /simulacao",
     },
     update: {
       lucroLiquido: args.lucroLiquido,
-      fundingVariavel: args.fundingVariavel ?? null,
-      fonte: args.fonte ?? "manual /simulacao",
-    },
-  });
-  await marcarDraftsDoAnoComoDirty(args.ano);
-}
-
-/**
- * Salva o funding arbitrário dos fundadores na ConfiguracaoAno.
- * Marca DRAFTs do ano como dirty.
- */
-export async function salvarFundingFundadoresAno(args: {
-  ano: number;
-  valor: number;
-  atualizadoPorId?: string;
-}): Promise<void> {
-  await prisma.configuracaoAno.upsert({
-    where: { ano: args.ano },
-    create: {
-      ano: args.ano,
-      fundingFundadoresAno: Math.max(0, args.valor),
-      atualizadoPorId: args.atualizadoPorId,
-    },
-    update: {
-      fundingFundadoresAno: Math.max(0, args.valor),
-      atualizadoPorId: args.atualizadoPorId,
-    },
-  });
-  await marcarDraftsDoAnoComoDirty(args.ano);
-}
-
-/**
- * Salva originação anual de um sócio (OriginacaoPeriodo tipo=ANO).
- */
-export async function salvarOriginacaoAnoPorSocio(args: {
-  ano: number;
-  socioId: string;
-  valor: number;
-  fonte?: string | null;
-}): Promise<void> {
-  const periodoAno = await garantirPeriodoAno(args.ano);
-  await prisma.originacaoPeriodo.upsert({
-    where: { socioId_periodoId: { socioId: args.socioId, periodoId: periodoAno.id } },
-    create: {
-      socioId: args.socioId,
-      periodoId: periodoAno.id,
-      valor: Math.max(0, args.valor),
-      ehReal: true,
-      fonte: args.fonte ?? "manual /simulacao",
-    },
-    update: {
-      valor: Math.max(0, args.valor),
       fonte: args.fonte ?? "manual /simulacao",
     },
   });

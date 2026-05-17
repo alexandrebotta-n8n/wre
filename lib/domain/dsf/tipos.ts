@@ -43,6 +43,10 @@ export interface SocioInput {
   // Permite definição case-a-case sem afetar a premissa.
   proLaboreMensalOverride?: number;
   remuneracaoGestaoMensalOverride?: number;
+  // Valor anual arbitrário (R$) — só fundadores. Engine soma estes valores
+  // de todos isFundador=true e deduz do LL antes do RDA/distribuição residual.
+  // Cada fundador recebe esse valor direto (sem rateio por quotas).
+  fundingFundadorAnual?: number;
 }
 
 export interface ResultadoUnidade {

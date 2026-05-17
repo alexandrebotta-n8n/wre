@@ -12,7 +12,6 @@ import { AjudaDrawer } from "./ajuda-drawer";
 import { TourOnboarding } from "./tour-onboarding";
 import { TabelaComparativa } from "./tabela-comparativa";
 import { PainelGlobais, type UnidadeGlobal } from "./painel-globais";
-import { PainelOriginacao, type SocioOriginacao } from "./painel-originacao";
 import type {
   CenarioListItem,
   CenarioCompleto,
@@ -37,8 +36,6 @@ export interface SimulacaoShellProps {
   /** Ano de referência para os painéis globais. */
   ano: number;
   unidadesGlobais: UnidadeGlobal[];
-  fundingFundadoresAtual: number;
-  sociosOriginacao: SocioOriginacao[];
   cenariosDraftDoAno: number;
 }
 
@@ -97,21 +94,13 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
         }
       />
 
-      {/* Painéis globais (só para editores) */}
+      {/* Painel de variáveis globais (só para editores) */}
       {props.podeMutar && !props.ehSocioRestrito && (
-        <div className="space-y-3">
-          <PainelGlobais
-            ano={props.ano}
-            unidades={props.unidadesGlobais}
-            fundingFundadoresAtual={props.fundingFundadoresAtual}
-            cenariosDraftDoAno={props.cenariosDraftDoAno}
-          />
-          <PainelOriginacao
-            ano={props.ano}
-            socios={props.sociosOriginacao}
-            cenariosDraftDoAno={props.cenariosDraftDoAno}
-          />
-        </div>
+        <PainelGlobais
+          ano={props.ano}
+          unidades={props.unidadesGlobais}
+          cenariosDraftDoAno={props.cenariosDraftDoAno}
+        />
       )}
 
       {/* 2 colunas */}
