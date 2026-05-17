@@ -42,6 +42,6 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       });
       return p;
     },
-    { roles: ["ADMIN", "CONSULTOR"] },
+    { roles: ["ADMIN", "CONSULTOR"], req },
   );
 }

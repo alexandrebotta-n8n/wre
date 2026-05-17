@@ -39,6 +39,6 @@ export async function POST(req: Request) {
       });
       return Response.json(p, { status: 201 });
     },
-    { roles: ["ADMIN", "CONSULTOR"] },
+    { roles: ["ADMIN", "CONSULTOR"], req },
   );
 }

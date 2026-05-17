@@ -67,6 +67,6 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
       });
       return { ok: true, atualizadas: body.classificacoes.length, versao: cenario.versao + 1 };
     },
-    { roles: ["ADMIN", "CONSULTOR"] },
+    { roles: ["ADMIN", "CONSULTOR"], req },
   );
 }

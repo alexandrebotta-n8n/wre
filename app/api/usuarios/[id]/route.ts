@@ -62,5 +62,5 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       meta: { campos: Object.keys(data) },
     });
     return u;
-  }, { roles: ["ADMIN"] });
+  }, { roles: ["ADMIN"], req });
 }

@@ -16,6 +16,7 @@ import {
   criarCenarioComDefaults,
   atualizarParametrosOverride,
 } from "@/lib/cenario-service";
+import { logPermissionDenied } from "@/lib/auth/audit-denied";
 
 function rev() {
   revalidatePath("/simulacao");
@@ -89,8 +90,11 @@ export async function criarCenarioAction(formData: FormData) {
 export async function calcularAction(formData: FormData) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
+  if (!escopo.podeMutar) {
+    await logPermissionDenied(session?.user?.id, "cenario.calcular", `Cenario:${cenarioId}`);
+    return;
+  }
   try {
     await calcularCenario({ cenarioId });
     await logAudit({
@@ -109,8 +113,11 @@ export async function calcularAction(formData: FormData) {
 export async function publicarAction(formData: FormData) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
+  if (!escopo.podeMutar) {
+    await logPermissionDenied(session?.user?.id, "cenario.aplicar", `Cenario:${cenarioId}`);
+    return;
+  }
 
   // Auto-cálculo antes de publicar — garante snapshot atualizado.
   try {
@@ -210,8 +217,11 @@ export async function reabrirComoRascunhoAction(formData: FormData) {
 export async function arquivarCenarioAction(formData: FormData) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
+  if (!escopo.podeMutar) {
+    await logPermissionDenied(session?.user?.id, "cenario.arquivar", `Cenario:${cenarioId}`);
+    return;
+  }
   const c = await prisma.cenario.findUnique({ where: { id: cenarioId }, select: { status: true, nome: true } });
   if (!c) return;
   if (c.status === "ARCHIVED") {
@@ -235,8 +245,11 @@ export async function arquivarCenarioAction(formData: FormData) {
 export async function excluirCenarioAction(formData: FormData) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
+  if (!escopo.podeMutar) {
+    await logPermissionDenied(session?.user?.id, "cenario.excluir", `Cenario:${cenarioId}`);
+    return;
+  }
   const c = await prisma.cenario.findUnique({
     where: { id: cenarioId },
     select: { status: true, nome: true },
@@ -270,8 +283,11 @@ export async function excluirCenarioAction(formData: FormData) {
 export async function atualizarOverrideAction(formData: FormData) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) return;
   const cenarioId = String(formData.get("cenarioId"));
+  if (!escopo.podeMutar) {
+    await logPermissionDenied(session?.user?.id, "cenario.parametros.atualizar", `Cenario:${cenarioId}`);
+    return;
+  }
   const overrideJson = String(formData.get("override") ?? "");
   let override: Record<string, unknown> | null;
   try {

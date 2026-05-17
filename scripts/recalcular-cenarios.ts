@@ -1,9 +1,15 @@
-// Recalcula cenários para refletir mudanças no engine.
+// Recalcula cenários DRAFT para refletir mudanças no engine.
 //
 // Comportamento:
-//   - DRAFT com RemuneracaoCalculada existente → recalcula os 4 trimestres.
-//   - DRAFT sem cálculo prévio → ignora (não há nada a atualizar).
-//   - APPLIED / ARCHIVED → ignora (snapshot imutável). Lista no final.
+//   - DRAFT → recalcula (com ou sem cálculo prévio). Necessário pós-migrations
+//     que zeram RemuneracaoCalculada.
+//   - APPLIED / ARCHIVED → ignora (snapshot imutável). Lista no final com
+//     instrução pra reabrir como rascunho na UI se quiser refletir engine novo.
+//
+// Histórico: existia um flag --include-applied que prometia reabrir APPLIED
+// automaticamente, mas nunca foi implementado (era dead code que apenas
+// imprimia um aviso). Removido pra não dar impressão errada — quem precisa,
+// usa o botão "Reabrir como rascunho" na UI, que registra audit log próprio.
 //
 // Uso:
 //   npx tsx scripts/recalcular-cenarios.ts                    # local (.env)
@@ -11,23 +17,23 @@
 //
 //   --dry-run       lista o que faria, sem executar
 //   --only=<id>     recalcula apenas 1 cenário
-//   --include-applied  reabre APPLIED como rascunho antes de recalcular (PERIGOSO)
 import { prisma } from "../lib/prisma";
 import { calcularCenario } from "../lib/cenario-service";
 
 interface Args {
   dryRun: boolean;
   onlyId?: string;
-  includeApplied: boolean;
 }
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2);
   const dryRun = argv.includes("--dry-run");
-  const includeApplied = argv.includes("--include-applied");
   const onlyArg = argv.find((a) => a.startsWith("--only="));
   const onlyId = onlyArg?.split("=")[1];
-  return { dryRun, onlyId, includeApplied };
+  if (argv.includes("--include-applied")) {
+    console.warn("⚠️  --include-applied foi REMOVIDO (era dead code). Use 'Reabrir como rascunho' na UI.");
+  }
+  return { dryRun, onlyId };
 }
 
 async function main() {
@@ -37,7 +43,6 @@ async function main() {
   console.log("=".repeat(70));
   if (args.dryRun) console.log("Modo: DRY-RUN (nada será salvo)");
   if (args.onlyId) console.log(`Apenas cenário: ${args.onlyId}`);
-  if (args.includeApplied) console.log("⚠️  Incluindo APPLIED — VAI ARQUIVAR e reabrir como rascunho");
   console.log("");
 
   // Snapshot dos cenários
@@ -72,7 +77,7 @@ async function main() {
   console.log(`  ${archived.length} ARCHIVED (ignorados)`);
   console.log("");
 
-  if (draftsParaRecalcular.length === 0 && !args.includeApplied) {
+  if (draftsParaRecalcular.length === 0) {
     console.log("Nada a recalcular.");
     return;
   }

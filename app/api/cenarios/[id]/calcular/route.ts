@@ -2,7 +2,7 @@ import { withAuth } from "@/lib/api/handler";
 import { calcularCenario } from "@/lib/cenario-service";
 import { logAudit } from "@/lib/audit";
 
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return withAuth(
     async (session) => {
       const { id: cenarioId } = await ctx.params;
@@ -17,6 +17,6 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       });
       return resultado;
     },
-    { roles: ["ADMIN", "CONSULTOR"] },
+    { roles: ["ADMIN", "CONSULTOR"], req },
   );
 }

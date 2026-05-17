@@ -1,6 +1,7 @@
 // Helpers para route handlers — wrapping consistente de auth + erro + JSON.
 import { ZodError, type z } from "zod";
 import { AuthError, requireSession, requireRole } from "@/lib/auth/guards";
+import { assertSameOrigin } from "@/lib/api/origin-check";
 import type { UsuarioRole } from "@prisma/client";
 
 export class ApiError extends Error {
@@ -26,9 +27,19 @@ export function noStore(res: Response): Response {
 
 export async function withAuth<T>(
   handler: (session: Awaited<ReturnType<typeof requireSession>>) => Promise<T>,
-  options?: { roles?: UsuarioRole[]; noStore?: boolean },
+  options?: {
+    roles?: UsuarioRole[];
+    noStore?: boolean;
+    /** Request a ser usado para checagem de Origin (CSRF). Necessário para
+     *  rotas que mudam estado (POST/PUT/PATCH/DELETE). */
+    req?: Request;
+  },
 ): Promise<Response> {
   try {
+    if (options?.req) {
+      // CSRF defense-in-depth para rotas mutantes — checa Origin/Referer.
+      assertSameOrigin(options.req);
+    }
     const session = options?.roles
       ? await requireRole(...options.roles)
       : await requireSession();

@@ -49,7 +49,7 @@ function getClientHeaders(): { ip?: string; userAgent?: string } {
 }
 void getClientHeaders;
 
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return withAuth(async (session) => {
     const { id } = await ctx.params;
 
@@ -78,5 +78,5 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       userAgent,
     });
     return { senhaProvisoria };
-  }, { roles: ["ADMIN"], noStore: true });
+  }, { roles: ["ADMIN"], noStore: true, req });
 }

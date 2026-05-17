@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { logAudit } from "@/lib/audit";
+import { logPermissionDenied } from "@/lib/auth/audit-denied";
 import { flashError, flashSuccess } from "@/lib/flash";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
@@ -14,18 +15,21 @@ function rev() {
   revalidatePath("/simulacao");
 }
 
-async function exigirMutacao() {
+async function exigirMutacao(acao: string, recurso: string) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
-  if (!escopo.podeMutar) throw new Error("Sem permissão");
+  if (!escopo.podeMutar) {
+    await logPermissionDenied(session?.user?.id, acao, recurso);
+    throw new Error("Sem permissão");
+  }
   return { session };
 }
 
 /** Payload JSON: `{ unidades: [{unidadeId, lucroLiquido}] }`. */
 export async function salvarGlobaisAction(formData: FormData) {
   try {
-    const { session } = await exigirMutacao();
     const ano = Number(formData.get("ano"));
+    const { session } = await exigirMutacao("globais.atualizar", `Ano:${ano}`);
     const payload = JSON.parse(String(formData.get("payload") ?? "{}")) as {
       unidades?: Array<{ unidadeId: string; lucroLiquido: number }>;
     };
