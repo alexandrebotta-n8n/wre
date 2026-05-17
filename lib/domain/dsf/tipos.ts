@@ -99,11 +99,10 @@ export interface PremissasModeloAtual {
   reservaViraPremio: boolean;
   // Públicos elegíveis ao prêmio de performance (default: capital + capital_gestor)
   publicosElegiveisPremio?: Publico[];
-  // Valor anual arbitrário (BRL) distribuído entre fundadores (isFundador=true).
-  // Substitui o cálculo antigo "Σquotas_fund × fundingVariavel_BG".
-  // Vem da ConfiguracaoAno do ano do cenário. Default 0 → fundadores não recebem.
-  fundingFundadoresAno: number;
-  // Tabela de remuneração de gestão (mensal por nível × faixa)
+  // Tabela de remuneração de gestão (mensal por nível × faixa).
+  // Remuneração dos fundadores agora é definida CASO A CASO em
+  // ClassificacaoSocio.valorDiscricionario (campo `valorDiscricionario` no
+  // SocioInput). Não há mais valor anual global.
   tabelaSalarial: TabelaSalarial;
 }
 
@@ -176,12 +175,9 @@ export interface PremissasModeloNovo {
   // categorias específicas (ex: SOCIO_SERVICOS_ESTRATEGICO = 1.2).
   pesoCategoria?: Partial<Record<Publico, number>>;
 
-  // Valor anual arbitrário (BRL) distribuído entre fundadores (isFundador=true).
-  // Deduzido do LL da matriz ANTES de formar o RDA central. Vem da ConfiguracaoAno
-  // do ano do cenário. Default 0 → fundadores não recebem e o RDA é preservado.
-  fundingFundadoresAno?: number;
-
-  // Tabela salarial de gestão
+  // Tabela salarial de gestão. Remuneração dos fundadores é definida CASO
+  // A CASO em ClassificacaoSocio.valorDiscricionario (campo
+  // `valorDiscricionario` no SocioInput), abatida do LL antes do RDA.
   tabelaSalarial: TabelaSalarial;
 }
 

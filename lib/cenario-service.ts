@@ -225,13 +225,6 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
   const originacaoEfetiva = await carregarOriginacaoEfetivaAno(cenario.ano);
   const socios = classificacoesParaSocioInput(cenario.classificacoes, originacaoEfetiva);
 
-  // Configuração global anual (funding fundadores arbitrário)
-  const configAno = await prisma.configuracaoAno.findUnique({
-    where: { ano: cenario.ano },
-    select: { fundingFundadoresAno: true },
-  });
-  const fundingFundadoresAno = configAno?.fundingFundadoresAno ?? 0;
-
   // Override de parâmetros (Blocos %, pool, chave, etc.) ainda existe — é
   // só sobre os parâmetros da Premissa, não sobre os insumos globais.
   const paramsBase = cenario.premissa.parametros as Record<string, unknown>;
@@ -247,7 +240,6 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
       reservaPercentual: Number(params.reservaPercentual ?? 0.05),
       reservaViraPremio: Boolean(params.reservaViraPremio ?? true),
       publicosElegiveisPremio: params.publicosElegiveisPremio as Publico[] | undefined,
-      fundingFundadoresAno,
       tabelaSalarial,
     };
     resultado = calcularModeloAtual({
@@ -280,7 +272,6 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
       proLaboreMensal: params.proLaboreMensal != null ? Number(params.proLaboreMensal) : undefined,
       taxaComissaoOriginacao: params.taxaComissaoOriginacao != null ? Number(params.taxaComissaoOriginacao) : undefined,
       pesoCategoria: params.pesoCategoria as PremissasModeloNovo["pesoCategoria"],
-      fundingFundadoresAno,
       tabelaSalarial,
     };
     resultado = calcularModeloNovo({
@@ -553,30 +544,6 @@ export async function salvarLLUnidadeAno(args: {
       lucroLiquido: args.lucroLiquido,
       fundingVariavel: args.fundingVariavel ?? null,
       fonte: args.fonte ?? "manual /simulacao",
-    },
-  });
-  await marcarDraftsDoAnoComoDirty(args.ano);
-}
-
-/**
- * Salva o funding arbitrário dos fundadores na ConfiguracaoAno.
- * Marca DRAFTs do ano como dirty.
- */
-export async function salvarFundingFundadoresAno(args: {
-  ano: number;
-  valor: number;
-  atualizadoPorId?: string;
-}): Promise<void> {
-  await prisma.configuracaoAno.upsert({
-    where: { ano: args.ano },
-    create: {
-      ano: args.ano,
-      fundingFundadoresAno: Math.max(0, args.valor),
-      atualizadoPorId: args.atualizadoPorId,
-    },
-    update: {
-      fundingFundadoresAno: Math.max(0, args.valor),
-      atualizadoPorId: args.atualizadoPorId,
     },
   });
   await marcarDraftsDoAnoComoDirty(args.ano);

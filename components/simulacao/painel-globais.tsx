@@ -2,7 +2,9 @@
 // Painel "Variáveis globais" — vive no topo de /simulacao. Edição inline
 // dos insumos que afetam TODOS os cenários do ano:
 //   - LL DSF Global (matriz) + LL de cada unidade não-matriz
-//   - Funding variável dos fundadores (arbitrário)
+//
+// A remuneração dos fundadores é definida CASO A CASO em
+// ClassificacaoSocio.valorDiscricionario (drawer de classificações por cenário).
 //
 // Ao salvar, o servidor marca todos os DRAFTs do ano como dirty.
 import * as React from "react";
@@ -29,14 +31,12 @@ export interface UnidadeGlobal {
 export interface PainelGlobaisProps {
   ano: number;
   unidades: UnidadeGlobal[];
-  fundingFundadoresAtual: number;
   cenariosDraftDoAno: number;
 }
 
 export function PainelGlobais({
   ano,
   unidades,
-  fundingFundadoresAtual,
   cenariosDraftDoAno,
 }: PainelGlobaisProps) {
   const router = useRouter();
@@ -50,10 +50,8 @@ export function PainelGlobais({
     return e;
   }, [unidades]);
   const [estado, setEstado] = useState<Estado>(inicial);
-  const [funding, setFunding] = useState<number>(fundingFundadoresAtual);
 
   function temAlteracao(): boolean {
-    if (Math.abs(funding - fundingFundadoresAtual) > 0.5) return true;
     for (const u of unidades) {
       const e = estado[u.unidadeId];
       if (!e) continue;
@@ -71,7 +69,6 @@ export function PainelGlobais({
           lucroLiquido: estado[u.unidadeId]?.ll ?? 0,
           fundingVariavel: estado[u.unidadeId]?.fv ?? null,
         })),
-        fundingFundadoresAno: funding,
       };
       const fd = new FormData();
       fd.set("ano", String(ano));
@@ -106,8 +103,6 @@ export function PainelGlobais({
         <div className="flex items-center gap-2">
           <span className="text-xs text-neutral-500 tabular-nums">
             LL matriz: <strong>{brl(matriz?.llAtual ?? 0, true)}</strong>
-            {" · "}
-            Funding fund.: <strong>{brl(fundingFundadoresAtual, true)}</strong>
           </span>
           {aberto ? (
             <ChevronDown className="h-4 w-4 text-neutral-500" />
@@ -168,29 +163,10 @@ export function PainelGlobais({
             </div>
           )}
 
-          {/* Funding Fundadores */}
-          <div className="rounded-lg border border-amber-200 p-3 bg-amber-50/30">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="font-semibold text-navy-900 text-sm">Funding variável — Fundadores</span>
-              <Tooltip content="Valor anual arbitrário distribuído entre sócios fundadores (Socio.isFundador=true) proporcional às suas quotas. Substitui o cálculo antigo Σquotas × funding_BG. No engine NOVO, é deduzido do LL antes do RDA. No engine ATUAL, é deduzido do funding antes da distribuição residual.">
-                <HelpCircle className="h-3 w-3 text-neutral-400" />
-              </Tooltip>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-medium text-navy-900">Valor anual (R$)</label>
-                <Input
-                  type="number"
-                  step={10000}
-                  value={Math.round(funding)}
-                  onChange={(e) => setFunding(Number(e.target.value) || 0)}
-                  className="text-right tabular-nums"
-                />
-                <div className="text-[10px] text-neutral-500 mt-1">
-                  Salvo: <span className="tabular-nums">{brl(fundingFundadoresAtual, true)}</span>
-                </div>
-              </div>
-            </div>
+          {/* Remuneração dos fundadores — agora editada caso a caso */}
+          <div className="rounded-lg border border-amber-200 p-3 bg-amber-50/30 text-xs text-amber-900">
+            <strong>Remuneração de fundadores:</strong> agora é definida CASO A CASO em cada cenário,
+            no drawer <em>Classificações</em> (coluna &quot;Discricionário&quot;).
           </div>
 
           {/* Footer ações */}

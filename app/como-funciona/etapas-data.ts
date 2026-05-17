@@ -40,14 +40,14 @@ export const ETAPAS: EtapaInfo[] = [
   },
   {
     numero: 3,
-    slug: "funding-fundadores",
-    titulo: "Funding fundadores",
+    slug: "discricionario-fundadores",
+    titulo: "Discricionário fundadores",
     modelo: "AMBOS",
-    formula: "(quota_fund / Σquotas_fund) × fundingFundadoresAno",
+    formula: "ClassificacaoSocio.valorDiscricionario (BRL por sócio, por cenário)",
     descricao:
-      "Valor arbitrário anual (configurado no painel Variáveis Globais da /simulacao) distribuído proporcionalmente entre os sócios fundadores (Socio.isFundador=true). Deduzido do LL antes do RDA no NOVO e do funding residual no ATUAL. Se 0, fundadores não recebem.",
-    exemploNumeros: "R$ 1.500.000 ÷ 3 fundadores com quotas 10/20/30%",
-    exemploResultado: "R$ 250k / 500k / 750k",
+      "Valor BRL fixo definido CASO A CASO no drawer Classificações de cada cenário. Aplicável apenas a sócios com isFundador=true. Deduzido do LL antes do RDA no NOVO e do funding residual no ATUAL. Quando 0/vazio, fundadores não recebem nesta etapa. Substitui o antigo valor anual global rateado por quotas.",
+    exemploNumeros: "Décio R$ 130.000 + Gilberto R$ 130.000 (definidos no cenário)",
+    exemploResultado: "Σ R$ 260.000 abatido do LL",
     veja: "/politica/categorias-socio",
   },
   {

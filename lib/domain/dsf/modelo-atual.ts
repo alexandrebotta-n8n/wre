@@ -4,11 +4,10 @@
 // Resumo do fluxo:
 //   1. Pró-labore: 5000 × meses por sócio elegível
 //   2. Rem. Gestão: tabela[nivel][faixa] × meses
-//   3. Rem. Fundadores: distribuição PROPORCIONAL às quotas dos fundadores
-//      a partir de um valor anual arbitrário (premissas.fundingFundadoresAno —
-//      vindo da ConfiguracaoAno). Substitui o antigo cálculo
-//      "quota × funding_BG", que era acoplado ao LL de uma unidade específica.
-//   4. Funding DSF residual = LL_matriz − fundingFundadoresAno
+//   3. Rem. Fundadores: cada fundador recebe `ClassificacaoSocio.valorDiscricionario`
+//      (BRL fixo definido por cenário no drawer de classificações). Não há
+//      mais um valor anual global rateado por quotas.
+//   4. Funding DSF residual = LL_matriz − Σ valorDiscricionário_fundadores
 //   5. Reserva = funding_DSF × reservaPct
 //   6. Distribuição sócios não-fund = funding_DSF × (1 − reservaPct), rateada
 //      por (quota / Σquotas_nãoFund)
@@ -40,9 +39,6 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
 
   const matriz = resultados.find((r) => r.unidadeCodigo === premissas.unidadeMatriz);
   const llMatriz = matriz?.lucroLiquido ?? 0;
-  // Funding dos fundadores agora é input arbitrário (ConfiguracaoAno),
-  // não mais derivado do LL de uma unidade específica.
-  const fundingFundadoresAno = Math.max(0, premissas.fundingFundadoresAno ?? 0);
 
   // ---------- Etapa 1: Pró-labore por sócio ----------
   // Override individual (Socio.proLaboreMensal) > premissa.proLaboreMensal.
@@ -68,23 +64,22 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
   }
 
   // ---------- Etapa 3: Remuneração de fundadores ----------
-  // Distribui o valor anual arbitrário (fundingFundadoresAno) PROPORCIONALMENTE
-  // às quotas dos fundadores. Σ pacotes_fundadores = fundingFundadoresAno exato.
+  // Cada fundador recebe `s.valorDiscricionario` (BRL fixo definido por
+  // cenário em ClassificacaoSocio). Sem valor → 0.
   const remFundadorPorSocio = new Map<string, number>();
-  const fundadores = socios.filter((s) => s.isFundador);
-  const somaQuotasFund = fundadores.reduce((acc, s) => acc + s.percentualQuotas, 0);
   let totalFundadores = 0;
-  if (fundingFundadoresAno > 0 && somaQuotasFund > 0) {
-    for (const s of fundadores) {
-      const valor = (s.percentualQuotas / somaQuotasFund) * fundingFundadoresAno;
+  for (const s of socios) {
+    if (!s.isFundador) continue;
+    const valor = s.valorDiscricionario ?? 0;
+    if (valor > 0) {
       remFundadorPorSocio.set(s.id, valor);
       totalFundadores += valor;
     }
   }
 
   // ---------- Etapa 4: Funding DSF residual ----------
-  // Funding = LL_matriz − fundingFundadoresAno. Não desconta pró-labore/gestão
-  // pois já são despesas contabilizadas no LL.
+  // Funding = LL_matriz − Σ valorDiscricionário_fundadores. Não desconta
+  // pró-labore/gestão pois já são despesas contabilizadas no LL.
   const fundingMatriz = matriz?.fundingVariavel ?? llMatriz - totalFundadores;
 
   // ---------- Etapa 5: Reserva ----------
@@ -124,7 +119,7 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
 
     if (proLabore) trace.push({ etapa: "1.pro-labore", descricao: `${premissas.proLaboreMensal} × ${periodo.meses}m`, valor: proLabore });
     if (remGestao) trace.push({ etapa: "2.gestao", descricao: `${s.nivelCargo}/${s.faixaSalarial}`, valor: remGestao });
-    if (remFundador) trace.push({ etapa: "3.fundador", descricao: `${((s.percentualQuotas / somaQuotasFund) * 100).toFixed(2)}% × R$ ${fundingFundadoresAno.toLocaleString("pt-BR")} (funding fundadores)`, valor: remFundador });
+    if (remFundador) trace.push({ etapa: "3.fundador", descricao: "discricionário do fundador (BRL por cenário)", valor: remFundador });
     if (distSocio) trace.push({ etapa: "6.distribuicao", descricao: `${(s.percentualQuotas * 100).toFixed(4)}% / Σquotas × funding × ${(1 - premissas.reservaPercentual).toFixed(2)}`, valor: distSocio });
     if (premio) trace.push({ etapa: "7.premio", descricao: "reserva uniforme", valor: premio });
 

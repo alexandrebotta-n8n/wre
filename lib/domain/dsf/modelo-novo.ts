@@ -121,28 +121,16 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   }
 
   // Etapa 3.5 — Remuneração dos sócios fundadores (abatida do LL antes do RDA).
-  // Combina dois mecanismos:
-  //   (a) Funding fundadores ANUAL (premissas.fundingFundadoresAno, vindo da
-  //       ConfiguracaoAno): valor global distribuído proporcionalmente às
-  //       quotas dos fundadores.
-  //   (b) Valor discricionário POR SÓCIO (ClassificacaoSocio.valorDiscricionario):
-  //       BRL fixo definido por cenário no drawer de classificações.
-  //
-  // Cada fundador recebe a SOMA dos dois. O total é abatido do LL antes do
-  // cálculo do RDA — fundadores ficam ANTES da distribuição central e por
-  // isso NÃO participam do Bloco A (Bloco A só para sócios de capital
-  // não-fundadores).
-  const fundingFundadoresAno = Math.max(0, premissas.fundingFundadoresAno ?? 0);
-  const fundadores = socios.filter((s) => s.isFundador);
-  const somaQuotasFund = fundadores.reduce((acc, s) => acc + s.percentualQuotas, 0);
+  // Cada fundador recebe `ClassificacaoSocio.valorDiscricionario` (BRL fixo
+  // por cenário, editável no drawer de classificações). O total é abatido
+  // do LL antes do cálculo do RDA — fundadores ficam ANTES da distribuição
+  // central e por isso NÃO participam do Bloco A (Bloco A só para sócios
+  // de capital não-fundadores).
   const remFundadorPorSocio = new Map<string, number>();
   let totalFundadores = 0;
-  for (const s of fundadores) {
-    let v = 0;
-    if (fundingFundadoresAno > 0 && somaQuotasFund > 0) {
-      v += (s.percentualQuotas / somaQuotasFund) * fundingFundadoresAno;
-    }
-    v += s.valorDiscricionario ?? 0;
+  for (const s of socios) {
+    if (!s.isFundador) continue;
+    const v = s.valorDiscricionario ?? 0;
     if (v > 0) {
       remFundadorPorSocio.set(s.id, v);
       totalFundadores += v;
@@ -214,23 +202,13 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     const remGestao = adminPorSocio.get(s.id) ?? 0;
     if (remGestao > 0) trace.push({ etapa: "3.admin", descricao: "rem. de administração", valor: remGestao });
 
-    // Remuneração de fundadores — funding anual (proporcional a quotas) +
-    // discricionário por sócio (BRL fixo). Abatida do LL antes do RDA.
+    // Remuneração de fundadores — valor discricionário por sócio (BRL fixo).
+    // Abatida do LL antes do RDA.
     const remFundador = remFundadorPorSocio.get(s.id) ?? 0;
     if (remFundador > 0) {
-      const parcelaFunding =
-        somaQuotasFund > 0 ? (s.percentualQuotas / somaQuotasFund) * fundingFundadoresAno : 0;
-      const parcelaDiscricionario = s.valorDiscricionario ?? 0;
-      const partes: string[] = [];
-      if (parcelaFunding > 0) {
-        partes.push(`${((s.percentualQuotas / somaQuotasFund) * 100).toFixed(2)}% × funding fundadores`);
-      }
-      if (parcelaDiscricionario > 0) {
-        partes.push(`discricionário (cenário)`);
-      }
       trace.push({
         etapa: "3.fundador",
-        descricao: `remuneração fundador: ${partes.join(" + ")}`,
+        descricao: "discricionário do fundador (abatido do LL antes do RDA)",
         valor: remFundador,
       });
     }

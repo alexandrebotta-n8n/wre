@@ -37,7 +37,6 @@ export interface SimulacaoShellProps {
   /** Ano de referência para os painéis globais. */
   ano: number;
   unidadesGlobais: UnidadeGlobal[];
-  fundingFundadoresAtual: number;
   sociosOriginacao: SocioOriginacao[];
   cenariosDraftDoAno: number;
 }
@@ -103,7 +102,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           <PainelGlobais
             ano={props.ano}
             unidades={props.unidadesGlobais}
-            fundingFundadoresAtual={props.fundingFundadoresAtual}
             cenariosDraftDoAno={props.cenariosDraftDoAno}
           />
           <PainelOriginacao

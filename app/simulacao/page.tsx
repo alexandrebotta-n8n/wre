@@ -66,15 +66,14 @@ export default async function SimulacaoPage({
     cenarioA?.ano ?? cenarioB?.ano ?? Number(sp.ano) ?? new Date().getFullYear();
 
   // Painéis globais — só carrega se for editor.
-  const [unidadesGlobais, fundingFundadores, sociosOriginacao, draftsDoAno] =
+  const [unidadesGlobais, sociosOriginacao, draftsDoAno] =
     escopo.podeMutar
       ? await Promise.all([
           carregarUnidadesGlobais(anoRef),
-          carregarFundingFundadores(anoRef),
           carregarSociosComOriginacao(anoRef),
           prisma.cenario.count({ where: { ano: anoRef, status: "DRAFT" } }),
         ])
-      : [[] as UnidadeGlobal[], 0, [] as SocioOriginacao[], 0];
+      : [[] as UnidadeGlobal[], [] as SocioOriginacao[], 0];
 
   return (
     <SimulacaoShell
@@ -101,7 +100,6 @@ export default async function SimulacaoPage({
       mostrarTour={!tourVisto}
       ano={anoRef}
       unidadesGlobais={unidadesGlobais}
-      fundingFundadoresAtual={fundingFundadores}
       sociosOriginacao={sociosOriginacao}
       cenariosDraftDoAno={draftsDoAno}
     />
@@ -195,14 +193,6 @@ async function carregarUnidadesGlobais(ano: number): Promise<UnidadeGlobal[]> {
       fundingAtual: r?.fundingVariavel ?? null,
     };
   });
-}
-
-async function carregarFundingFundadores(ano: number): Promise<number> {
-  const c = await prisma.configuracaoAno.findUnique({
-    where: { ano },
-    select: { fundingFundadoresAno: true },
-  });
-  return c?.fundingFundadoresAno ?? 0;
 }
 
 async function carregarSociosComOriginacao(ano: number): Promise<SocioOriginacao[]> {

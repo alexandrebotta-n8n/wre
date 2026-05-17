@@ -10,7 +10,6 @@ import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
 import {
   salvarLLUnidadeAno,
-  salvarFundingFundadoresAno,
   salvarOriginacaoAnoPorSocio,
 } from "@/lib/cenario-service";
 
@@ -25,14 +24,13 @@ async function exigirMutacao() {
   return { session };
 }
 
-/** Recebe payload JSON: `{ ano, unidades: [{unidadeId, lucroLiquido, fundingVariavel?}], fundingFundadoresAno }`. */
+/** Recebe payload JSON: `{ ano, unidades: [{unidadeId, lucroLiquido, fundingVariavel?}] }`. */
 export async function salvarGlobaisAction(formData: FormData) {
   try {
     const { session } = await exigirMutacao();
     const ano = Number(formData.get("ano"));
     const payload = JSON.parse(String(formData.get("payload") ?? "{}")) as {
       unidades?: Array<{ unidadeId: string; lucroLiquido: number; fundingVariavel?: number | null }>;
-      fundingFundadoresAno?: number;
     };
     if (!ano || ano < 2020) {
       await flashError("Ano inválido.");
@@ -50,19 +48,11 @@ export async function salvarGlobaisAction(formData: FormData) {
       });
     }
 
-    if (typeof payload.fundingFundadoresAno === "number") {
-      await salvarFundingFundadoresAno({
-        ano,
-        valor: payload.fundingFundadoresAno,
-        atualizadoPorId: session?.user?.id,
-      });
-    }
-
     await logAudit({
       usuarioId: session?.user?.id,
       acao: "globais.atualizar",
       recurso: `Ano:${ano}`,
-      meta: { unidades: unidades.length, fundingFundadores: payload.fundingFundadoresAno },
+      meta: { unidades: unidades.length },
     });
     await flashSuccess(
       "Variáveis globais salvas. Cenários DRAFT marcados para recalcular.",

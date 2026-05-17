@@ -38,14 +38,16 @@ describe("Modelo ATUAL — componentes individuais", () => {
     expect(r.pacotes[0].remuneracaoGestao).toBe(28800); // 9600 × 3
   });
 
-  it("fundadores recebem quota × funding_BG (sem normalização)", () => {
+  it("fundadores recebem valorDiscricionario por sócio (BRL fixo)", () => {
     const input: InputModeloAtual = {
       periodo: { rotulo: "1T2026", tipo: "TRIMESTRE", meses: 3 },
       socios: [
         { id: "f1", nome: "Décio", cargo: "Fundador", publico: "FUNDADOR",
-          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true },
+          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
+          valorDiscricionario: 131102.46 },
         { id: "f2", nome: "Gilberto", cargo: "Fundador", publico: "FUNDADOR",
-          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true },
+          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
+          valorDiscricionario: 131102.46 },
       ],
       resultados: [
         { unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1394712.16 },
@@ -54,7 +56,6 @@ describe("Modelo ATUAL — componentes individuais", () => {
       premissas: premissasBase,
     };
     const r = calcularModeloAtual(input);
-    // Cada fundador: 0.14871 × 881598 = 131102.46
     expect(r.pacotes[0].remuneracaoFundador).toBeCloseTo(131102.46, 1);
     expect(r.pacotes[1].remuneracaoFundador).toBeCloseTo(131102.46, 1);
   });
@@ -64,9 +65,11 @@ describe("Modelo ATUAL — componentes individuais", () => {
       periodo: { rotulo: "1T2026", tipo: "TRIMESTRE", meses: 3 },
       socios: [
         { id: "f1", nome: "Décio", cargo: "Fundador", publico: "FUNDADOR",
-          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true },
+          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
+          valorDiscricionario: 131102.46 },
         { id: "f2", nome: "Gilberto", cargo: "Fundador", publico: "FUNDADOR",
-          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true },
+          percentualQuotas: 0.14871, originacaoEsperadaAnual: 0, isFundador: true,
+          valorDiscricionario: 131102.46 },
       ],
       resultados: [
         { unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1394712.16 },
