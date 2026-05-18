@@ -1,18 +1,22 @@
 "use client";
-// Sticky header compacto da ColunaCenario. Aparece quando o header full
-// sai da viewport (IntersectionObserver), some quando ele volta.
+// Sticky header compacto da ColunaCenario. Aparece quando o header full sai
+// da viewport (passa por baixo do nav do app), some quando volta.
+//
+// **Sem ações** — só contexto: badge slot + nome + total + alertas badge.
+// O botão Recalcular vive APENAS no header full (action area) — evitar
+// duplicação foi pedido explícito do usuário (round 4.x).
+//
+// IntersectionObserver com `rootMargin: "-56px 0px 0px 0px"`: encolhe o topo
+// do root em 56px (altura do nav app `h-14`). Sticky vira visível quando o
+// header full passa pra cima dessa linha — i.e. quando rola e some sob o nav.
 //
 // Como ColunaCenario é Server Component, observamos o header full via
-// document.getElementById em vez de ref (evita criar wrapper client).
-//
-// Conteúdo enxuto: badge slot + nome trunc + Total (com tooltip explicando
-// o que é) + Badge Alertas (com help icon) + RecalcularButton.
-// Z-index 20 — Radix overlays ficam acima (z-50).
+// document.getElementById (evita criar wrapper client). Z-index 20 — Radix
+// overlays ficam acima (z-50).
 import * as React from "react";
 import { HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
-import { RecalcularButton } from "./recalcular-button";
 
 export interface StickyHeaderColunaProps {
   /** ID do header full a ser observado. */
@@ -22,10 +26,6 @@ export interface StickyHeaderColunaProps {
   totalLabel: string;
   alertasLabel: string;
   alertasCor: "red" | "amber" | "green";
-  cenarioId: string;
-  dirty: boolean;
-  jaCalculou: boolean;
-  editavel: boolean;
 }
 
 export function StickyHeaderColuna(props: StickyHeaderColunaProps) {
@@ -36,7 +36,9 @@ export function StickyHeaderColuna(props: StickyHeaderColunaProps) {
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => setVisivel(!entry.isIntersecting),
-      { rootMargin: "0px 0px -100% 0px", threshold: 0 },
+      // Encolhe o topo do root 56px (altura do nav app). Sticky aparece quando
+      // o header full sai por cima desse limite — i.e. rolou pra baixo.
+      { rootMargin: "-56px 0px 0px 0px", threshold: 0 },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -101,14 +103,6 @@ export function StickyHeaderColuna(props: StickyHeaderColunaProps) {
           <HelpCircle className="h-2.5 w-2.5 opacity-60" />
         </span>
       </Tooltip>
-
-      {props.editavel && (
-        <RecalcularButton
-          cenarioId={props.cenarioId}
-          dirty={props.dirty}
-          jaCalculou={props.jaCalculou}
-        />
-      )}
     </div>
   );
 }

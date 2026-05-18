@@ -109,10 +109,6 @@ export function ColunaCenario({
         totalLabel={totalLabel}
         alertasLabel={kpiValorAlertas}
         alertasCor={kpiCorAlertas}
-        cenarioId={cenario.id}
-        dirty={dirty}
-        jaCalculou={jaCalculou}
-        editavel={editavel}
       />
 
       {/* Banner APPLIED — substitui visualmente o stepper "tudo done" */}
