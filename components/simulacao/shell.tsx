@@ -100,6 +100,8 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           ano={props.ano}
           unidades={props.unidadesGlobais}
           cenariosDraftDoAno={props.cenariosDraftDoAno}
+          aId={aId || undefined}
+          bId={bId || undefined}
         />
       )}
 

@@ -28,9 +28,18 @@ export interface PainelGlobaisProps {
   ano: number;
   unidades: UnidadeGlobal[];
   cenariosDraftDoAno: number;
+  /** IDs dos cenários A/B visíveis — recalculados automaticamente após save. */
+  aId?: string;
+  bId?: string;
 }
 
-export function PainelGlobais({ ano, unidades, cenariosDraftDoAno }: PainelGlobaisProps) {
+export function PainelGlobais({
+  ano,
+  unidades,
+  cenariosDraftDoAno,
+  aId,
+  bId,
+}: PainelGlobaisProps) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -62,6 +71,8 @@ export function PainelGlobais({ ano, unidades, cenariosDraftDoAno }: PainelGloba
           unidadeId: u.unidadeId,
           lucroLiquido: llPorUnidade[u.unidadeId] ?? 0,
         })),
+        aId,
+        bId,
       };
       const fd = new FormData();
       fd.set("ano", String(ano));
