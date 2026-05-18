@@ -539,6 +539,22 @@ async function marcarDraftsDoAnoComoDirty(ano: number): Promise<void> {
   });
 }
 
+/**
+ * Marca TODOS os cenários DRAFT (qualquer ano) como dirty. Usado pela action
+ * de Sócios: mudança em base do sócio (publico, nível, faixa, quotas,
+ * overrides de remuneração, originação, funding fundador) afeta o cálculo
+ * de qualquer cenário que o use — não dá pra filtrar por ano específico.
+ *
+ * Retorna a contagem de cenários marcados, pra UI mostrar feedback.
+ */
+export async function marcarTodosDraftsComoDirty(): Promise<number> {
+  const result = await prisma.cenario.updateMany({
+    where: { status: "DRAFT" },
+    data: { parametrosDirty: true },
+  });
+  return result.count;
+}
+
 function defaultPublico(s: { isFundador: boolean; cargo: string }, modelo: "ATUAL" | "NOVO"): Publico {
   if (modelo === "ATUAL") {
     if (s.isFundador) return "FUNDADOR";

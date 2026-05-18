@@ -96,3 +96,50 @@ export function MoneyInput({
     </>
   );
 }
+
+/**
+ * MoneyField — wrapper que conecta MoneyInput a forms uncontrolled.
+ *
+ * MoneyInput é controlado (value + onChange). Pra usar em forms com
+ * `<form action>` que leem FormData, este wrapper mantém estado local + o
+ * hidden input `name` do MoneyInput entrega o valor numérico cru pra action.
+ *
+ * Auto-save: quando dentro de um form que usa `useAutoSubmit`, o onChange
+ * interno do MoneyInput dispara o `onChange` do form pai naturalmente.
+ *
+ * Re-sync: quando a prop `initial` muda (após revalidate de save), o estado
+ * sincroniza via "adjusting state during render".
+ */
+export function MoneyField({
+  id,
+  name,
+  initial,
+  placeholder,
+  className,
+  required,
+}: {
+  id?: string;
+  name: string;
+  initial: number | null;
+  placeholder?: string;
+  className?: string;
+  required?: boolean;
+}) {
+  const [valor, setValor] = React.useState<number | null>(initial);
+  const [prev, setPrev] = React.useState(initial);
+  if (prev !== initial) {
+    setPrev(initial);
+    setValor(initial);
+  }
+  return (
+    <MoneyInput
+      id={id}
+      name={name}
+      value={valor}
+      onChange={setValor}
+      placeholder={placeholder}
+      className={className}
+      required={required}
+    />
+  );
+}

@@ -9,18 +9,25 @@
 //   - Auto-save com debounce 600ms (useAutoSubmit do components/ui).
 //   - Sem botão "Salvar". Indicador "Salvando… / Salvo ✓" no canto.
 //
+// FEEDBACK DE IMPACTO:
+//   - Banner no topo da expansão avisa quantos cenários DRAFT serão marcados
+//     pra recalcular ao salvar mudança de cálculo.
+//   - Cada fieldset tem badge "afeta cálculo" / "override" / "não afeta".
+//   - Inputs R$ usam MoneyInput (máscara BRL on blur, número on focus).
+//
 // SOCIO restrito: ainda renderiza, mas inputs ficam disabled + hint visual
 // "Somente leitura" (defesa: action já recusa via requireRole; UI evita
 // frustração).
 import * as React from "react";
 import { useState } from "react";
-import { ChevronRight, AlertCircle, Lock } from "lucide-react";
+import { ChevronRight, AlertCircle, Lock, Info } from "lucide-react";
 import { TR, TD } from "@/components/ui/data-table";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Tooltip } from "@/components/ui/tooltip";
+import { MoneyField } from "@/components/ui/money-input";
 import { useAutoSubmit, StatusSalvamento } from "@/components/ui/use-auto-submit";
 import { atualizarSocioAction } from "@/app/socios/acoes";
 import { nomeOuIniciais } from "@/lib/format";
@@ -92,6 +99,7 @@ export function LinhaSocio({
   editavel,
   modoNome,
   colSpan,
+  cenariosDraftCount,
 }: {
   socio: SocioRow;
   areas: AreaOption[];
@@ -100,6 +108,8 @@ export function LinhaSocio({
   modoNome: "completo" | "iniciais";
   /** Número de colunas na tabela — usado pelo colSpan da linha expandida. */
   colSpan: number;
+  /** Quantos cenários DRAFT existem hoje. Banner de impacto usa essa contagem. */
+  cenariosDraftCount: number;
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -193,6 +203,7 @@ export function LinhaSocio({
               areas={areas}
               unidades={unidades}
               editavel={editavel}
+              cenariosDraftCount={cenariosDraftCount}
             />
           </td>
         </tr>
@@ -207,11 +218,13 @@ function FormSocio({
   areas,
   unidades,
   editavel,
+  cenariosDraftCount,
 }: {
   socio: SocioRow;
   areas: AreaOption[];
   unidades: UnidadeOption[];
   editavel: boolean;
+  cenariosDraftCount: number;
 }) {
   const { formRef, onAnyChange, pending, salvouAt } = useAutoSubmit();
 
@@ -257,6 +270,18 @@ function FormSocio({
     >
       <input type="hidden" name="id" value={socio.id} />
 
+      {/* Banner: impacto da edição nos cenários DRAFT */}
+      {editavel && cenariosDraftCount > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900 inline-flex items-start gap-2">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            Mudanças nos campos marcados como <strong>afeta cálculo</strong> abaixo
+            sinalizam <strong>{cenariosDraftCount} cenário(s) DRAFT</strong> pra
+            recalcular. Cenários publicados (APPLIED) não são tocados (snapshot imutável).
+          </span>
+        </div>
+      )}
+
       {!editavel && (
         <div className="text-xs text-neutral-600 inline-flex items-center gap-1.5 bg-neutral-100 rounded px-2 py-1">
           <Lock className="h-3 w-3" /> Somente leitura — sem permissão de edição.
@@ -265,105 +290,111 @@ function FormSocio({
 
       {/* Grupo 1: Classificação */}
       <fieldset
-        className="grid grid-cols-1 md:grid-cols-3 gap-3"
+        className="border border-neutral-200 rounded-md bg-white p-3 space-y-2"
         disabled={!editavel}
       >
-        <Field label="Área de prática" htmlFor={`area-${socio.id}`}>
-          <NativeSelect
-            id={`area-${socio.id}`}
-            name="areaPraticaId"
-            defaultValue={socio.areaPraticaId ?? ""}
-            key={`area-${socio.id}-${socio.areaPraticaId ?? "x"}`}
-          >
-            <option value="">— sem área —</option>
-            {areas.map((a) => (
-              <option key={a.id} value={a.id}>{a.nome}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-
-        <Field label="Classificação (DSF v1)" htmlFor={`pub-${socio.id}`}>
-          <NativeSelect
-            id={`pub-${socio.id}`}
-            name="publicoDefault"
-            value={publicoSelecionado}
-            onChange={(e) => setPublicoSelecionado(e.target.value)}
-          >
-            {PUBLICOS.map((p) => (
-              <option key={p.id} value={p.id}>{p.nome}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-
-        {ehLider ? (
-          <Field label="Unidade liderada" htmlFor={`un-${socio.id}`} required>
+        <GroupLegend titulo="Classificação" impacto="afeta-calculo" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Field label="Área de prática" htmlFor={`area-${socio.id}`}>
             <NativeSelect
-              id={`un-${socio.id}`}
-              name="unidadeLideradaId"
-              defaultValue={socio.unidadeLideradaId ?? ""}
-              key={`un-${socio.id}-${socio.unidadeLideradaId ?? "x"}`}
-              required
+              id={`area-${socio.id}`}
+              name="areaPraticaId"
+              defaultValue={socio.areaPraticaId ?? ""}
+              key={`area-${socio.id}-${socio.areaPraticaId ?? "x"}`}
             >
-              <option value="">— escolher —</option>
-              {unidades.map((u) => (
-                <option key={u.id} value={u.id}>{u.codigo} — {u.nome}</option>
+              <option value="">— sem área —</option>
+              {areas.map((a) => (
+                <option key={a.id} value={a.id}>{a.nome}</option>
               ))}
             </NativeSelect>
           </Field>
-        ) : (
-          // Mantém hidden pra zerar caso classificação mude pra não-líder.
-          <input type="hidden" name="unidadeLideradaId" value="" />
-        )}
+
+          <Field label="Classificação (DSF v1)" htmlFor={`pub-${socio.id}`}>
+            <NativeSelect
+              id={`pub-${socio.id}`}
+              name="publicoDefault"
+              value={publicoSelecionado}
+              onChange={(e) => setPublicoSelecionado(e.target.value)}
+            >
+              {PUBLICOS.map((p) => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+
+          {ehLider ? (
+            <Field label="Unidade liderada" htmlFor={`un-${socio.id}`} required>
+              <NativeSelect
+                id={`un-${socio.id}`}
+                name="unidadeLideradaId"
+                defaultValue={socio.unidadeLideradaId ?? ""}
+                key={`un-${socio.id}-${socio.unidadeLideradaId ?? "x"}`}
+                required
+              >
+                <option value="">— escolher —</option>
+                {unidades.map((u) => (
+                  <option key={u.id} value={u.id}>{u.codigo} — {u.nome}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+          ) : (
+            // Mantém hidden pra zerar caso classificação mude pra não-líder.
+            <input type="hidden" name="unidadeLideradaId" value="" />
+          )}
+        </div>
       </fieldset>
 
       {/* Grupo 2: Cargo */}
       <fieldset
-        className="grid grid-cols-1 md:grid-cols-3 gap-3"
+        className="border border-neutral-200 rounded-md bg-white p-3 space-y-2"
         disabled={!editavel}
       >
-        <Field label="Nível de cargo" htmlFor={`nv-${socio.id}`}>
-          <NativeSelect
-            id={`nv-${socio.id}`}
-            name="nivelCargo"
-            defaultValue={socio.nivelCargo ?? ""}
-            key={`nv-${socio.id}-${socio.nivelCargo ?? "x"}`}
+        <GroupLegend titulo="Cargo" impacto="afeta-calculo" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Field label="Nível de cargo" htmlFor={`nv-${socio.id}`}>
+            <NativeSelect
+              id={`nv-${socio.id}`}
+              name="nivelCargo"
+              defaultValue={socio.nivelCargo ?? ""}
+              key={`nv-${socio.id}-${socio.nivelCargo ?? "x"}`}
+            >
+              <option value="">— sem nível —</option>
+              {NIVEIS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Faixa salarial" htmlFor={`fx-${socio.id}`}>
+            <NativeSelect
+              id={`fx-${socio.id}`}
+              name="faixaSalarial"
+              defaultValue={socio.faixaSalarial ?? ""}
+              key={`fx-${socio.id}-${socio.faixaSalarial ?? "x"}`}
+            >
+              <option value="">— sem faixa —</option>
+              {FAIXAS.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field
+            label="Quotas default (%)"
+            htmlFor={`q-${socio.id}`}
+            hint="Participação base; cenário pode sobrescrever."
           >
-            <option value="">— sem nível —</option>
-            {NIVEIS.map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Faixa salarial" htmlFor={`fx-${socio.id}`}>
-          <NativeSelect
-            id={`fx-${socio.id}`}
-            name="faixaSalarial"
-            defaultValue={socio.faixaSalarial ?? ""}
-            key={`fx-${socio.id}-${socio.faixaSalarial ?? "x"}`}
-          >
-            <option value="">— sem faixa —</option>
-            {FAIXAS.map((f) => (
-              <option key={f} value={f}>{f}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field
-          label="Quotas default (%)"
-          htmlFor={`q-${socio.id}`}
-          hint="Participação base; cenário pode sobrescrever."
-        >
-          <Input
-            id={`q-${socio.id}`}
-            name="percentualQuotasDefault"
-            type="number"
-            step="0.0001"
-            min="0"
-            max="100"
-            defaultValue={(socio.percentualQuotasDefault * 100).toFixed(4)}
-            key={`q-${socio.id}-${socio.percentualQuotasDefault}`}
-            className="tabular-nums"
-          />
-        </Field>
+            <Input
+              id={`q-${socio.id}`}
+              name="percentualQuotasDefault"
+              type="number"
+              step="0.0001"
+              min="0"
+              max="100"
+              defaultValue={(socio.percentualQuotasDefault * 100).toFixed(4)}
+              key={`q-${socio.id}-${socio.percentualQuotasDefault}`}
+              className="tabular-nums"
+            />
+          </Field>
+        </div>
       </fieldset>
 
       {/* Grupo 3: Remuneração — override individual */}
@@ -371,38 +402,26 @@ function FormSocio({
         className="rounded-md border border-neutral-200 bg-white p-3 space-y-2"
         disabled={!editavel}
       >
-        <legend className="px-1.5 text-xs font-medium text-navy-900">
-          Remuneração — override individual
-        </legend>
+        <GroupLegend titulo="Remuneração — override individual" impacto="override" />
         <p className="text-[11px] text-neutral-500 -mt-0.5">
           Deixe em branco para usar o default da premissa (Pró-labore) ou da
           tabela salarial (Rem. Gestão).
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field label="Pró-labore (R$/mês)" htmlFor={`pl-${socio.id}`}>
-            <Input
+            <MoneyField
               id={`pl-${socio.id}`}
               name="proLaboreMensal"
-              type="number"
-              step="100"
-              min="0"
-              defaultValue={socio.proLaboreMensal ?? ""}
-              key={`pl-${socio.id}-${socio.proLaboreMensal ?? "x"}`}
+              initial={socio.proLaboreMensal}
               placeholder="usa premissa"
-              className="tabular-nums"
             />
           </Field>
           <Field label="Rem. Gestão (R$/mês)" htmlFor={`rg-${socio.id}`}>
-            <Input
+            <MoneyField
               id={`rg-${socio.id}`}
               name="remuneracaoGestaoMensal"
-              type="number"
-              step="100"
-              min="0"
-              defaultValue={socio.remuneracaoGestaoMensal ?? ""}
-              key={`rg-${socio.id}-${socio.remuneracaoGestaoMensal ?? "x"}`}
+              initial={socio.remuneracaoGestaoMensal}
               placeholder="usa tabela"
-              className="tabular-nums"
             />
           </Field>
         </div>
@@ -413,25 +432,18 @@ function FormSocio({
         className="rounded-md border border-amber-200 bg-amber-50/30 p-3 space-y-2"
         disabled={!editavel}
       >
-        <legend className="px-1.5 text-xs font-medium text-navy-900">
-          Insumos individuais anuais (R$/ano)
-        </legend>
+        <GroupLegend titulo="Insumos individuais anuais (R$/ano)" impacto="afeta-calculo" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field
             label="Originação anual padrão"
             htmlFor={`or-${socio.id}`}
             hint="Alimenta a Comissão de Originação no engine NOVO."
           >
-            <Input
+            <MoneyField
               id={`or-${socio.id}`}
               name="originacaoAnualPadrao"
-              type="number"
-              step="10000"
-              min="0"
-              defaultValue={socio.originacaoAnualPadrao ?? ""}
-              key={`or-${socio.id}-${socio.originacaoAnualPadrao ?? "x"}`}
-              placeholder="0"
-              className="tabular-nums"
+              initial={socio.originacaoAnualPadrao}
+              placeholder="R$ 0"
             />
           </Field>
           {socio.isFundador ? (
@@ -440,16 +452,11 @@ function FormSocio({
               htmlFor={`ff-${socio.id}`}
               hint="Valor anual deduzido do LL e pago diretamente."
             >
-              <Input
+              <MoneyField
                 id={`ff-${socio.id}`}
                 name="fundingFundadorAnual"
-                type="number"
-                step="10000"
-                min="0"
-                defaultValue={socio.fundingFundadorAnual ?? ""}
-                key={`ff-${socio.id}-${socio.fundingFundadorAnual ?? "x"}`}
-                placeholder="0"
-                className="tabular-nums"
+                initial={socio.fundingFundadorAnual}
+                placeholder="R$ 0"
               />
             </Field>
           ) : (
@@ -466,8 +473,12 @@ function FormSocio({
       </fieldset>
 
       {/* Grupo 5: Observações + status salvamento */}
-      <div className="space-y-2">
-        <Field label="Observações" htmlFor={`ob-${socio.id}`}>
+      <fieldset
+        className="rounded-md border border-neutral-200 bg-white p-3 space-y-2"
+        disabled={!editavel}
+      >
+        <GroupLegend titulo="Observações" impacto="nao-afeta" />
+        <Field label="Texto livre" htmlFor={`ob-${socio.id}`}>
           <Textarea
             id={`ob-${socio.id}`}
             name="observacoes"
@@ -475,14 +486,44 @@ function FormSocio({
             key={`ob-${socio.id}-${socio.observacoes ?? "x"}`}
             maxLength={500}
             rows={2}
-            placeholder="Opcional"
-            disabled={!editavel}
+            placeholder="Opcional — anotações que NÃO afetam o cálculo."
           />
         </Field>
-        <div className="flex items-center justify-end h-4">
-          {editavel && <StatusSalvamento pending={pending} salvouAt={salvouAt} />}
-        </div>
+      </fieldset>
+
+      <div className="flex items-center justify-end h-4">
+        {editavel && <StatusSalvamento pending={pending} salvouAt={salvouAt} />}
       </div>
     </form>
   );
 }
+
+/** Legend padrão de fieldset com badge de impacto à direita. */
+function GroupLegend({
+  titulo,
+  impacto,
+}: {
+  titulo: string;
+  impacto: "afeta-calculo" | "override" | "nao-afeta";
+}) {
+  const config = {
+    "afeta-calculo": { label: "afeta cálculo", className: "bg-peri-50 text-peri-800 border-peri-200" },
+    "override": { label: "override por sócio", className: "bg-amber-50 text-amber-800 border-amber-200" },
+    "nao-afeta": { label: "não afeta cálculo", className: "bg-neutral-100 text-neutral-600 border-neutral-200" },
+  }[impacto];
+
+  return (
+    <legend className="px-1.5 inline-flex items-center gap-2">
+      <span className="text-xs font-medium text-navy-900">{titulo}</span>
+      <span
+        className={cn(
+          "text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded border",
+          config.className,
+        )}
+      >
+        {config.label}
+      </span>
+    </legend>
+  );
+}
+

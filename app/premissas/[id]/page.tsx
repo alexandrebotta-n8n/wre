@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
+import { MoneyField } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { StickyActions } from "@/components/cenario/sticky-actions";
@@ -171,7 +172,7 @@ export default async function PremissaEdit({
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Pró-labore mensal (R$)">
-                  <Input type="number" name="proLaboreMensal" defaultValue={params_.proLaboreMensal as number} step="100" required />
+                  <MoneyField name="proLaboreMensal" initial={Number(params_.proLaboreMensal ?? 0)} required />
                 </Field>
                 <Field label="Reserva sobre funding (%)" hint="0.05 = 5%">
                   <Input type="number" name="reservaPercentual" defaultValue={params_.reservaPercentual as number} step="0.01" required />

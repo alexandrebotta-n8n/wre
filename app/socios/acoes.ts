@@ -13,11 +13,16 @@
 //   - Schema Zod .strict() centraliza validação e bloqueia mass assignment.
 //   - requireRole(...) faz THROW em vez de return silencioso — logs ficam
 //     visíveis e UI mostra erro real.
+//
+// CASCATA: quando muda campo de cálculo do sócio (qualquer um exceto
+// observacoes), marca TODOS os cenários DRAFT como dirty para sinalizar
+// que precisam recalcular. Idempotente — recálculo é puro.
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireRole, AuthError } from "@/lib/auth/guards";
 import { logAudit } from "@/lib/audit";
 import { flashSuccess, flashError } from "@/lib/flash";
+import { marcarTodosDraftsComoDirty } from "@/lib/cenario-service";
 import {
   AtualizarSocioSchema,
   PUBLICOS_LIDER_DE_UNIDADE,
@@ -67,6 +72,41 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
   return { id, ...parsed };
 }
 
+// Campos cujo VALOR alimenta cálculo. Mudança em qualquer um desses → marca
+// DRAFTs como dirty. `observacoes` é só documentação — ignorado.
+const CAMPOS_DE_CALCULO = [
+  "areaPraticaId",
+  "publicoDefault",
+  "unidadeLideradaId",
+  "nivelCargo",
+  "faixaSalarial",
+  "percentualQuotasDefault",
+  "proLaboreMensal",
+  "remuneracaoGestaoMensal",
+  "originacaoAnualPadrao",
+  "fundingFundadorAnual",
+] as const;
+
+type CampoCalculo = typeof CAMPOS_DE_CALCULO[number];
+
+// Compara dois snapshots por campos relevantes. Tolerância pra float em
+// percentualQuotasDefault (form re-envia 14.871 → 0.14871 → reagregação).
+function algumCampoDeCalculoMudou(
+  antigo: Record<CampoCalculo, unknown>,
+  novo: Record<CampoCalculo, unknown>,
+): boolean {
+  for (const k of CAMPOS_DE_CALCULO) {
+    const a = antigo[k];
+    const b = novo[k];
+    if (typeof a === "number" && typeof b === "number") {
+      if (Math.abs(a - b) > 1e-9) return true;
+    } else if (a !== b) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function atualizarSocioAction(formData: FormData): Promise<void> {
   try {
     // Throw em vez de silent return — bug raiz do "Salvei e não persistiu".
@@ -78,6 +118,24 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
     const unidadeLideradaId = PUBLICOS_LIDER_DE_UNIDADE.has(input.publicoDefault)
       ? input.unidadeLideradaId
       : null;
+
+    // Snapshot ANTERIOR — pra decidir se algum campo de cálculo mudou.
+    const antigo = await prisma.socio.findUnique({
+      where: { id },
+      select: {
+        areaPraticaId: true,
+        publicoDefault: true,
+        unidadeLideradaId: true,
+        nivelCargo: true,
+        faixaSalarial: true,
+        percentualQuotasDefault: true,
+        proLaboreMensal: true,
+        remuneracaoGestaoMensal: true,
+        originacaoAnualPadrao: true,
+        fundingFundadorAnual: true,
+      },
+    });
+    if (!antigo) throw new Error("Sócio não encontrado");
 
     await prisma.socio.update({
       where: { id },
@@ -96,16 +154,42 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
       },
     });
 
+    // Marca DRAFTs como dirty SE algum campo de cálculo mudou. Edição só de
+    // observacoes não dispara recalc (idempotente seria ok, mas evita ruído
+    // no badge "● alterado" e no flash success).
+    const novo = {
+      areaPraticaId: input.areaPraticaId,
+      publicoDefault: input.publicoDefault,
+      unidadeLideradaId,
+      nivelCargo: input.nivelCargo,
+      faixaSalarial: input.faixaSalarial,
+      percentualQuotasDefault: input.percentualQuotasDefault,
+      proLaboreMensal: input.proLaboreMensal,
+      remuneracaoGestaoMensal: input.remuneracaoGestaoMensal,
+      originacaoAnualPadrao: input.originacaoAnualPadrao,
+      fundingFundadorAnual: input.fundingFundadorAnual,
+    };
+    let cenariosMarcadosDirty = 0;
+    if (algumCampoDeCalculoMudou(antigo, novo)) {
+      cenariosMarcadosDirty = await marcarTodosDraftsComoDirty();
+    }
+
     await logAudit({
       usuarioId: session.id,
       acao: "socio.atualizar",
       recurso: `Socio:${id}`,
       // Apenas a lista de campos alterados — sem PII (padrão hardening).
       // safeMeta já redige conteúdo sensível, mas evitamos enviar de partida.
-      meta: { campos: Object.keys(input) },
+      meta: { campos: Object.keys(input), cenariosMarcadosDirty },
     });
 
-    await flashSuccess("Sócio atualizado.");
+    if (cenariosMarcadosDirty > 0) {
+      await flashSuccess(
+        `Sócio atualizado. ${cenariosMarcadosDirty} cenário(s) DRAFT marcado(s) pra recalcular.`,
+      );
+    } else {
+      await flashSuccess("Sócio atualizado.");
+    }
     // layout-level revalida toda a subtree (mais robusto que path-level em
     // Next.js 16 quando o componente tem múltiplas queries em paralelo).
     revalidatePath("/socios", "layout");

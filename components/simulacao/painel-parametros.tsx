@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Settings2, ChevronDown, HelpCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input, NativeSelect } from "@/components/ui/input";
+import { MoneyField } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -193,7 +194,7 @@ function FormParamsAtual({
           }
           htmlFor={`pl-${cenarioId}`}
         >
-          <Input id={`pl-${cenarioId}`} type="number" name="proLaboreMensal" defaultValue={Number(parametros.proLaboreMensal ?? 5000)} step="100" required />
+          <MoneyField id={`pl-${cenarioId}`} name="proLaboreMensal" initial={Number(parametros.proLaboreMensal ?? 5000)} required />
           <ChipValor etapa="pro-labore" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         </Field>
         <Field

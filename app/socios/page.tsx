@@ -57,7 +57,7 @@ export default async function SociosPage({
   if (sp.tipo === "nao-fundadores") where.isFundador = false;
   if (sp.publico && sp.publico !== "todas") where.publicoDefault = sp.publico;
 
-  const [socios, areas, unidades] = await Promise.all([
+  const [socios, areas, unidades, cenariosDraftCount] = await Promise.all([
     prisma.socio.findMany({
       where,
       include: {
@@ -87,6 +87,9 @@ export default async function SociosPage({
           select: { id: true, codigo: true, nome: true },
         })
       : Promise.resolve([]),
+    // Contagem usada pelo banner de impacto na linha expandida do sócio.
+    // SOCIO restrito não vê esse banner — mas a query é leve, sempre roda.
+    prisma.cenario.count({ where: { status: "DRAFT" } }),
   ]);
 
   const semFiltros = !sp.q && !sp.area && !sp.tipo && !sp.publico;
@@ -196,6 +199,7 @@ export default async function SociosPage({
                   editavel={escopo.podeMutar}
                   modoNome={modoNome}
                   colSpan={TABLE_COLS}
+                  cenariosDraftCount={cenariosDraftCount}
                 />
               ))}
             </TBody>
