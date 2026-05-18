@@ -6,13 +6,14 @@
 // após 600ms de debounce. Sem botão "Aplicar parâmetros". Indicador
 // "Salvando…" aparece inline enquanto a action está em andamento.
 import * as React from "react";
-import { useState, useRef, useTransition } from "react";
-import { Settings2, ChevronDown, HelpCircle, Check, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Settings2, ChevronDown, HelpCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useAutoSubmit, StatusSalvamento } from "@/components/ui/use-auto-submit";
 import { SumValidator } from "@/components/premissa/sum-validator";
 import { MatrizPesosArea } from "@/components/premissa/matriz-pesos-area";
 import { PremissaChips } from "@/components/premissa/chips";
@@ -21,82 +22,6 @@ import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { AreaOption } from "./types";
-
-/** Hook para auto-submeter um form após N ms de inatividade.
- *  `salvouAt` é atualizado via callback do useTransition (não em useEffect). */
-function useAutoSubmit(delay = 600) {
-  const formRef = useRef<HTMLFormElement | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pending, start] = useTransition();
-  const [salvouAt, setSalvouAt] = useState<number>(0); // incrementa cada salvamento
-  // Detecta transição pending→idle via "adjusting state during render"
-  // (sem ler clock no render — incrementa contador puro).
-  const [prevPending, setPrevPending] = useState(false);
-  if (prevPending && !pending) {
-    setPrevPending(false);
-    setSalvouAt((n) => n + 1);
-  } else if (!prevPending && pending) {
-    setPrevPending(true);
-  }
-
-  const onAnyChange = React.useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      if (formRef.current) {
-        start(() => {
-          formRef.current?.requestSubmit();
-        });
-      }
-    }, delay);
-  }, [delay]);
-
-  React.useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  return { formRef, onAnyChange, pending, salvouAt };
-}
-
-/** Indicador "Salvando…" / "Salvo" inline. */
-function StatusSalvamento({
-  pending,
-  salvouAt,
-}: {
-  pending: boolean;
-  /** Contador incrementado a cada save completo (0 = nenhum save ainda). */
-  salvouAt: number;
-}) {
-  const [prevSalvouAt, setPrevSalvouAt] = React.useState(salvouAt);
-  const [mostraSalvo, setMostraSalvo] = React.useState(false);
-  if (salvouAt !== prevSalvouAt) {
-    setPrevSalvouAt(salvouAt);
-    setMostraSalvo(true);
-  }
-  React.useEffect(() => {
-    if (mostraSalvo) {
-      const t = setTimeout(() => setMostraSalvo(false), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [mostraSalvo]);
-
-  if (pending) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-peri-700">
-        <Loader2 className="h-3 w-3 animate-spin" /> Salvando…
-      </span>
-    );
-  }
-  if (mostraSalvo && salvouAt > 0) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-mint-700">
-        <Check className="h-3 w-3" /> Salvo
-      </span>
-    );
-  }
-  return null;
-}
 
 const TOL = 0.001;
 

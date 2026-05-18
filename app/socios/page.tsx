@@ -1,24 +1,28 @@
+// /socios — lista compacta com edição inline expandível (Notion-style).
+//
+// Substituiu o EditarSocioDialog (modal) por LinhaSocio (client component que
+// expande a linha embaixo com todos os 11 campos + auto-save com debounce).
+//
+// Tabela enxuta: chevron + sócio + cargo + quotas% + classificação + badges.
+// Outros campos (área, nível/faixa, overrides, originação, funding) entram
+// na expansão organizada em 4 grupos.
 import Link from "next/link";
 import { Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { escopoDe } from "@/lib/auth/escopo";
 import type { SessionUser } from "@/lib/auth/guards";
-import { nomeOuIniciais } from "@/lib/format";
 import { getModoNome } from "@/lib/preferencias";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Toolbar, SearchInput } from "@/components/ui/toolbar";
 import { NativeSelect } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
-import { TableShell, THead, TBody, TH, TR, TD } from "@/components/ui/data-table";
+import { TableShell, THead, TBody, TH } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { EditarSocioDialog } from "@/components/socios/editar-socio-dialog";
+import { LinhaSocio } from "@/components/socios/linha-socio";
 
-// Labels da classificação política DSF v1 — exibidos no badge da tabela.
-// Mesma fonte usada pelo modal (components/socios/editar-socio-dialog.tsx).
+// Labels da classificação política DSF v1 — exibidos no filtro.
 const PUBLICOS_LABEL: Record<string, string> = {
   SOCIO_CAPITAL: "Sócio de Capital",
   SOCIO_CAPITAL_GESTOR: "Sócio de Capital — Gestor",
@@ -29,6 +33,10 @@ const PUBLICOS_LABEL: Record<string, string> = {
   LIDER_TECNICO: "Líder Técnico (legado)",
   FUNDADOR: "Fundador",
 };
+
+// Número de colunas na tabela (chevron + 5 colunas visíveis). Usado pelo
+// colSpan da linha expandida (linha-socio.tsx).
+const TABLE_COLS = 6;
 
 export default async function SociosPage({
   searchParams,
@@ -53,7 +61,7 @@ export default async function SociosPage({
     prisma.socio.findMany({
       where,
       include: {
-        areaPratica: true,
+        areaPratica: { select: { nome: true } },
         unidadeLiderada: { select: { id: true, codigo: true, nome: true } },
       },
       orderBy: [
@@ -87,7 +95,7 @@ export default async function SociosPage({
     <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-6">
       <PageHeader
         title="Sócios e Líderes"
-        description={`${socios.length} pessoa(s) listada(s) — base do simulador`}
+        description={`${socios.length} pessoa(s) — clique na linha pra editar inline. Auto-save ao mudar.`}
       />
 
       <Card className="overflow-hidden">
@@ -152,93 +160,43 @@ export default async function SociosPage({
           <TableShell caption="Lista de sócios e líderes ativos">
             <THead>
               <tr>
-                <TH className="px-4">Sócio</TH>
+                <TH className="px-4 w-8" aria-label="Expandir" />
+                <TH className="px-2">Sócio</TH>
                 <TH>Cargo</TH>
-                <TH className="text-right">Quotas (default)</TH>
-                <TH>Nível · Faixa</TH>
-                <TH>Área de prática</TH>
+                <TH className="text-right">Quotas</TH>
                 <TH>Classificação (DSF v1)</TH>
-                <TH>Tipo</TH>
-                {escopo.podeMutar && <TH className="text-right pr-4">Ações</TH>}
+                <TH>Status</TH>
               </tr>
             </THead>
             <TBody>
               {socios.map((s) => (
-                <TR key={s.id}>
-                  <TD className="px-4 py-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Avatar nome={s.nome} seed={s.id} size="sm" />
-                      <div className="min-w-0">
-                        <div
-                          className="font-medium text-navy-900 truncate"
-                          title={modoNome === "iniciais" ? s.nome : undefined}
-                        >
-                          {nomeOuIniciais(s.nome, modoNome)}
-                        </div>
-                      </div>
-                    </div>
-                  </TD>
-                  <TD className="text-neutral-600">{s.cargo}</TD>
-                  <TD className="text-right tabular-nums text-neutral-700">
-                    {s.percentualQuotasDefault > 0
-                      ? (s.percentualQuotasDefault * 100).toFixed(4) + "%"
-                      : "—"}
-                  </TD>
-                  <TD className="text-neutral-600 text-xs">
-                    {s.nivelCargo ?? "—"} · {s.faixaSalarial ?? "—"}
-                  </TD>
-                  <TD>
-                    {s.areaPratica ? (
-                      <Badge variant="info" size="sm">{s.areaPratica.nome}</Badge>
-                    ) : (
-                      <span className="text-neutral-400 text-xs">—</span>
-                    )}
-                  </TD>
-                  <TD>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="info" size="sm">
-                        {PUBLICOS_LABEL[s.publicoDefault] ?? s.publicoDefault}
-                      </Badge>
-                      {s.unidadeLiderada && (
-                        <span className="text-xs text-neutral-500">
-                          · {s.unidadeLiderada.codigo}
-                        </span>
-                      )}
-                    </div>
-                  </TD>
-                  <TD>
-                    {s.isFundador ? (
-                      <Badge variant="success" size="sm">fundador</Badge>
-                    ) : (
-                      <span className="text-neutral-300">—</span>
-                    )}
-                  </TD>
-                  {escopo.podeMutar && (
-                    <TD className="text-right pr-4">
-                      <EditarSocioDialog
-                        socio={{
-                          id: s.id,
-                          nome: s.nome,
-                          cargo: s.cargo,
-                          isFundador: s.isFundador,
-                          areaPraticaId: s.areaPraticaId,
-                          publicoDefault: s.publicoDefault,
-                          unidadeLideradaId: s.unidadeLideradaId,
-                          nivelCargo: s.nivelCargo,
-                          faixaSalarial: s.faixaSalarial,
-                          percentualQuotasDefault: s.percentualQuotasDefault,
-                          proLaboreMensal: s.proLaboreMensal,
-                          remuneracaoGestaoMensal: s.remuneracaoGestaoMensal,
-                          originacaoAnualPadrao: s.originacaoAnualPadrao,
-                          fundingFundadorAnual: s.fundingFundadorAnual,
-                          observacoes: s.observacoes,
-                        }}
-                        areas={areas}
-                        unidades={unidades}
-                      />
-                    </TD>
-                  )}
-                </TR>
+                <LinhaSocio
+                  key={s.id}
+                  socio={{
+                    id: s.id,
+                    nome: s.nome,
+                    cargo: s.cargo,
+                    isFundador: s.isFundador,
+                    areaPraticaId: s.areaPraticaId,
+                    areaPraticaNome: s.areaPratica?.nome ?? null,
+                    publicoDefault: s.publicoDefault,
+                    unidadeLideradaId: s.unidadeLideradaId,
+                    unidadeLideradaCodigo: s.unidadeLiderada?.codigo ?? null,
+                    nivelCargo: s.nivelCargo,
+                    faixaSalarial: s.faixaSalarial,
+                    percentualQuotasDefault: s.percentualQuotasDefault,
+                    proLaboreMensal: s.proLaboreMensal,
+                    remuneracaoGestaoMensal: s.remuneracaoGestaoMensal,
+                    originacaoAnualPadrao: s.originacaoAnualPadrao,
+                    fundingFundadorAnual: s.fundingFundadorAnual,
+                    observacoes: s.observacoes,
+                  }}
+                  areas={areas}
+                  unidades={unidades}
+                  editavel={escopo.podeMutar}
+                  modoNome={modoNome}
+                  colSpan={TABLE_COLS}
+                />
               ))}
             </TBody>
           </TableShell>
