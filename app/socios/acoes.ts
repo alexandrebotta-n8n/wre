@@ -35,6 +35,7 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
 
   const areaPraticaIdRaw = String(formData.get("areaPraticaId") ?? "");
   const publicoDefault = String(formData.get("publicoDefault") ?? "");
+  const publicoAtualRaw = String(formData.get("publicoAtual") ?? "");
   const unidadeLideradaIdRaw = String(formData.get("unidadeLideradaId") ?? "");
   const nivelCargoRaw = String(formData.get("nivelCargo") ?? "");
   const faixaSalarialRaw = String(formData.get("faixaSalarial") ?? "");
@@ -56,6 +57,7 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
   const input = {
     areaPraticaId: areaPraticaIdRaw || null,
     publicoDefault,
+    publicoAtual: publicoAtualRaw || null,
     unidadeLideradaId: unidadeLideradaIdRaw || null,
     nivelCargo: nivelCargoRaw || null,
     faixaSalarial: faixaSalarialRaw || null,
@@ -77,6 +79,7 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
 const CAMPOS_DE_CALCULO = [
   "areaPraticaId",
   "publicoDefault",
+  "publicoAtual",
   "unidadeLideradaId",
   "nivelCargo",
   "faixaSalarial",
@@ -125,6 +128,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
       select: {
         areaPraticaId: true,
         publicoDefault: true,
+        publicoAtual: true,
         unidadeLideradaId: true,
         nivelCargo: true,
         faixaSalarial: true,
@@ -142,6 +146,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
       data: {
         areaPraticaId: input.areaPraticaId,
         publicoDefault: input.publicoDefault,
+        publicoAtual: input.publicoAtual,
         unidadeLideradaId,
         nivelCargo: input.nivelCargo,
         faixaSalarial: input.faixaSalarial,
@@ -160,6 +165,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
     const novo = {
       areaPraticaId: input.areaPraticaId,
       publicoDefault: input.publicoDefault,
+      publicoAtual: input.publicoAtual,
       unidadeLideradaId,
       nivelCargo: input.nivelCargo,
       faixaSalarial: input.faixaSalarial,

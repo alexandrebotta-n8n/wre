@@ -22,6 +22,19 @@ const PublicoEditavelEnum = z.enum([
   // controlada por Socio.isFundador (estrutural); LIDER_TECNICO é legado.
 ]);
 
+// publicoAtual aceita LIDER_TECNICO (categoria legado da política ATUAL).
+// Permite modelar caso onde um sócio é Líder Técnico CLT hoje (ATUAL) e
+// vira Sócio de Serviços PJ na nova política (publicoDefault).
+const PublicoAtualEnum = z.enum([
+  "SOCIO_CAPITAL",
+  "SOCIO_CAPITAL_GESTOR",
+  "SOCIO_CAPITAL_LIDER_UNIDADE",
+  "SOCIO_SERVICOS",
+  "SOCIO_SERVICOS_ESTRATEGICO",
+  "LIDER_UNIDADE_NON_EQUITY",
+  "LIDER_TECNICO",
+]);
+
 const NivelCargoEnum = z.enum(["A", "B", "C", "D"]);
 const FaixaSalarialEnum = z.enum(["INICIAL", "PLENO", "EXPERT"]);
 
@@ -34,6 +47,8 @@ export const AtualizarSocioSchema = z
   .object({
     areaPraticaId: z.string().min(1).nullable(),
     publicoDefault: PublicoEditavelEnum,
+    // Override para política ATUAL (legado). null = usa heurística por cargo.
+    publicoAtual: PublicoAtualEnum.nullable(),
     unidadeLideradaId: z.string().min(1).nullable(),
     nivelCargo: NivelCargoEnum.nullable(),
     faixaSalarial: FaixaSalarialEnum.nullable(),

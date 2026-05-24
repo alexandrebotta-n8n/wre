@@ -247,6 +247,7 @@ export default async function SociosPage({
                     areaPraticaId: s.areaPraticaId,
                     areaPraticaNome: s.areaPratica?.nome ?? null,
                     publicoDefault: s.publicoDefault,
+                    publicoAtual: s.publicoAtual,
                     unidadeLideradaId: s.unidadeLideradaId,
                     unidadeLideradaCodigo: s.unidadeLiderada?.codigo ?? null,
                     nivelCargo: s.nivelCargo,

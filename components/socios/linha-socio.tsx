@@ -51,6 +51,10 @@ export interface SocioRow {
   areaPraticaId: string | null;
   areaPraticaNome: string | null;
   publicoDefault: string;
+  /** Override de classificação para a política ATUAL (legado). null = usa
+   * heurística por cargo. Setado quando o sócio é Líder Técnico (CLT) hoje
+   * mas vira Sócio de Serviços PJ na nova política. */
+  publicoAtual: string | null;
   unidadeLideradaId: string | null;
   unidadeLideradaCodigo: string | null;
   nivelCargo: "A" | "B" | "C" | "D" | null;
@@ -78,6 +82,12 @@ const PUBLICOS_LABEL: Record<string, string> = Object.fromEntries(
 // (mesmo que não sejam selecionáveis no form).
 PUBLICOS_LABEL.FUNDADOR = "Fundador";
 PUBLICOS_LABEL.LIDER_TECNICO = "Líder Técnico (legado)";
+
+// Opções da classificação ATUAL (legado) — inclui LIDER_TECNICO.
+const PUBLICOS_ATUAL: Array<{ id: string; nome: string }> = [
+  ...PUBLICOS,
+  { id: "LIDER_TECNICO", nome: "Líder Técnico (legado CLT)" },
+];
 
 const PUBLICOS_LIDER = new Set(["SOCIO_CAPITAL_LIDER_UNIDADE", "LIDER_UNIDADE_NON_EQUITY"]);
 // Públicos que esperam nível+faixa cadastrados (alimentam rem. de gestão).
@@ -210,9 +220,19 @@ export function LinhaSocio({
           </span>
         </TD>
         <TD>
-          <Badge variant="info" size="sm">
-            {PUBLICOS_LABEL[socio.publicoDefault] ?? socio.publicoDefault}
-          </Badge>
+          <div className="flex items-center gap-1 flex-wrap">
+            <Badge variant="info" size="sm">
+              {PUBLICOS_LABEL[socio.publicoDefault] ?? socio.publicoDefault}
+            </Badge>
+            {socio.publicoAtual && socio.publicoAtual !== socio.publicoDefault && (
+              <span
+                className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 border border-neutral-200"
+                title={`Na política ATUAL: ${PUBLICOS_LABEL[socio.publicoAtual] ?? socio.publicoAtual}`}
+              >
+                ATUAL: {socio.publicoAtual === "LIDER_TECNICO" ? "Líd. Téc." : (PUBLICOS_LABEL[socio.publicoAtual] ?? socio.publicoAtual)}
+              </span>
+            )}
+          </div>
         </TD>
         <TD>
           <div className="flex items-center gap-1 flex-wrap">
@@ -344,7 +364,7 @@ function FormSocio({
             </NativeSelect>
           </Field>
 
-          <Field label="Classificação (DSF v1)" htmlFor={`pub-${socio.id}`}>
+          <Field label="Classificação (DSF v1 — política NOVA)" htmlFor={`pub-${socio.id}`}>
             <NativeSelect
               id={`pub-${socio.id}`}
               name="publicoDefault"
@@ -352,6 +372,24 @@ function FormSocio({
               onChange={(e) => setPublicoSelecionado(e.target.value)}
             >
               {PUBLICOS.map((p) => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </NativeSelect>
+          </Field>
+
+          <Field
+            label="Classificação ATUAL (legado)"
+            htmlFor={`pubat-${socio.id}`}
+            hint="vazio = usa a mesma da nova política · setar quando diferir (ex: Líder Técnico CLT hoje)"
+          >
+            <NativeSelect
+              id={`pubat-${socio.id}`}
+              name="publicoAtual"
+              defaultValue={socio.publicoAtual ?? ""}
+              key={`pubat-${socio.id}-${socio.publicoAtual ?? "x"}`}
+            >
+              <option value="">— usa a da nova política —</option>
+              {PUBLICOS_ATUAL.map((p) => (
                 <option key={p.id} value={p.id}>{p.nome}</option>
               ))}
             </NativeSelect>

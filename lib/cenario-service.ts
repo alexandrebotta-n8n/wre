@@ -306,6 +306,8 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
       publicosElegiveisPremio: params.publicosElegiveisPremio as Publico[] | undefined,
       fundingFundadoresAno,
       tabelaSalarial,
+      mesesAnualLiderTecnicoCLT:
+        params.mesesAnualLiderTecnicoCLT != null ? Number(params.mesesAnualLiderTecnicoCLT) : undefined,
     };
     resultado = calcularModeloAtual({
       periodo: periodoToInput(periodoAno.rotulo),
@@ -424,10 +426,13 @@ export async function criarCenarioComDefaults(args: {
       criadoPorId: args.criadoPorId,
       classificacoes: {
         create: sociosAtivos.map((s) => {
+          // ATUAL: prioridade ao publicoAtual cadastrado (override explícito);
+          // fallback pra heurística defaultPublico baseada em cargo.
+          // NOVO: usa publicoDefault direto.
           const publico =
             args.modelo === "NOVO"
               ? (s.publicoDefault as Publico)
-              : defaultPublico(s, args.modelo);
+              : ((s.publicoAtual as Publico | null) ?? defaultPublico(s, args.modelo));
           const unidadeId =
             args.modelo === "NOVO" && PUBLICOS_LIDER_NOVO.includes(publico) && s.unidadeLideradaId
               ? s.unidadeLideradaId

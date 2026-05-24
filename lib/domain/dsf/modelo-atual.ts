@@ -66,14 +66,19 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
 
   // ---------- Etapa 2: Remuneração de gestão por sócio ----------
   // Override individual (Socio.remuneracaoGestaoMensal) > tabela[nivel][faixa].
+  // Para LIDER_TECNICO (CLT legado) usamos fator anualizado (default 13.33 =
+  // 12 + 13º + ⅓ férias), proporcional ao período. Outros públicos usam meses.
+  const fatorCLTAnual = premissas.mesesAnualLiderTecnicoCLT ?? 13.33;
   const remGestaoPorSocio = new Map<string, number>();
+  const fatorLiderCLTPeriodo = fatorCLTAnual * (periodo.meses / 12);
   for (const s of socios) {
+    const fator = s.publico === "LIDER_TECNICO" ? fatorLiderCLTPeriodo : periodo.meses;
     const mensalOverride = s.remuneracaoGestaoMensalOverride;
     if (mensalOverride != null && mensalOverride > 0) {
-      remGestaoPorSocio.set(s.id, mensalOverride * periodo.meses);
+      remGestaoPorSocio.set(s.id, mensalOverride * fator);
     } else if (s.nivelCargo && s.faixaSalarial) {
       const mensal = premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0;
-      remGestaoPorSocio.set(s.id, mensal * periodo.meses);
+      remGestaoPorSocio.set(s.id, mensal * fator);
     }
   }
 
@@ -132,7 +137,21 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
     const premio = elegiveisPremio.includes(s) ? premioPorElegivel : 0;
 
     if (proLabore) trace.push({ etapa: "1.pro-labore", descricao: `${premissas.proLaboreMensal} × ${periodo.meses}m`, valor: proLabore });
-    if (remGestao) trace.push({ etapa: "2.gestao", descricao: `${s.nivelCargo}/${s.faixaSalarial}`, valor: remGestao });
+    if (remGestao) {
+      const ehLiderCLT = s.publico === "LIDER_TECNICO";
+      const base = s.remuneracaoGestaoMensalOverride ?? premissas.tabelaSalarial[s.nivelCargo!]?.[s.faixaSalarial!] ?? 0;
+      const fatorDesc = ehLiderCLT
+        ? `CLT × ${fatorCLTAnual.toFixed(2)}${periodo.meses !== 12 ? ` × (${periodo.meses}/12)` : ""}`
+        : `× ${periodo.meses} meses`;
+      const tabelaDesc = !s.remuneracaoGestaoMensalOverride && s.nivelCargo && s.faixaSalarial
+        ? ` (${s.nivelCargo}/${s.faixaSalarial})`
+        : "";
+      trace.push({
+        etapa: "2.gestao",
+        descricao: `R$ ${base.toLocaleString("pt-BR")}${tabelaDesc} ${fatorDesc}`,
+        valor: remGestao,
+      });
+    }
     if (remFundador) trace.push({ etapa: "3.fundador", descricao: `funding fundador individual (cadastro /socios)`, valor: remFundador });
     if (distSocio) trace.push({ etapa: "6.distribuicao", descricao: `${(s.percentualQuotas * 100).toFixed(4)}% / Σquotas × funding × ${(1 - premissas.reservaPercentual).toFixed(2)}`, valor: distSocio });
     if (premio) trace.push({ etapa: "7.premio", descricao: "reserva uniforme", valor: premio });

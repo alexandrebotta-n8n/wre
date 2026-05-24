@@ -202,8 +202,13 @@ model Socio {
 
   // Classificação default na nova política (Política DSF v1).
   // Obrigatório — é o ponto de partida ao criar uma ClassificacaoSocio em
-  // qualquer novo cenário. Pode ser sobreposto por cenário se necessário.
+  // qualquer novo cenário NOVO. Pode ser sobreposto por cenário se necessário.
   publicoDefault Publico  @default(SOCIO_SERVICOS)
+  // Classificação sob a política ATUAL (legado). null = usa a heurística por
+  // cargo + publicoDefault. Permite modelar caso onde um sócio tem público
+  // diferente entre ATUAL e NOVO — ex: Líder Técnico CLT hoje (LIDER_TECNICO)
+  // que vira Sócio de Serviços PJ (SOCIO_SERVICOS) na nova política.
+  publicoAtual Publico?
   // Unidade que este sócio lidera no cadastro permanente. Só faz sentido
   // quando publicoDefault ∈ {SOCIO_CAPITAL_LIDER_UNIDADE, LIDER_UNIDADE_NON_EQUITY}.
   unidadeLideradaId String?

@@ -168,6 +168,7 @@ function FormParamsAtual({
           unidadeMatriz: String(fd.get("unidadeMatriz")),
           reservaPercentual: Number(fd.get("reservaPercentual")),
           reservaViraPremio: fd.get("reservaViraPremio") === "on",
+          mesesAnualLiderTecnicoCLT: Number(fd.get("mesesAnualLiderTecnicoCLT")),
         };
         const erros: string[] = [];
         if (override.proLaboreMensal < 0) erros.push("Pró-labore não pode ser negativo");
@@ -175,6 +176,9 @@ function FormParamsAtual({
           erros.push(`Reserva (%) deve estar entre 0 e 1`);
         }
         if (!override.unidadeMatriz) erros.push("Unidade matriz não pode ser vazia");
+        if (override.mesesAnualLiderTecnicoCLT < 12 || override.mesesAnualLiderTecnicoCLT > 14) {
+          erros.push("Fator CLT (Líder Técnico) deve estar entre 12 e 14");
+        }
         if (erros.length > 0) {
           toast.error(erros.join(" · "), { duration: 6000 });
           return;
@@ -218,6 +222,26 @@ function FormParamsAtual({
         <input type="checkbox" name="reservaViraPremio" defaultChecked={Boolean(parametros.reservaViraPremio ?? true)} className="accent-peri-600" />
         <span>Reserva vira prêmio uniforme</span>
       </label>
+      <Field
+        label={
+          <LabelHelp ajuda="Multiplica o salário mensal dos sócios LIDER_TECNICO (CLT legado) para chegar ao custo anual. Default 13,33 = 12 meses + 13º + ⅓ de férias. Outros públicos sempre usam 12.">
+            Fator anualização CLT (Líder Técnico)
+          </LabelHelp>
+        }
+        htmlFor={`cltf-${cenarioId}`}
+        hint="12,00 = sem benefícios · 13,33 = CLT padrão"
+      >
+        <Input
+          id={`cltf-${cenarioId}`}
+          type="number"
+          name="mesesAnualLiderTecnicoCLT"
+          defaultValue={Number(parametros.mesesAnualLiderTecnicoCLT ?? 13.33)}
+          step="0.01"
+          min="12"
+          max="14"
+          required
+        />
+      </Field>
       <div className="flex justify-end pt-1 min-h-[18px]">
         <StatusSalvamento pending={pending} salvouAt={salvouAt} />
       </div>
