@@ -82,7 +82,8 @@ export function validarSobreposicao(
     publico === "SOCIO_CAPITAL_GESTOR" ||
     publico === "SOCIO_CAPITAL_LIDER_UNIDADE" ||
     publico === "SOCIO_SERVICOS" ||
-    publico === "SOCIO_SERVICOS_ESTRATEGICO";
+    publico === "SOCIO_SERVICOS_ESTRATEGICO" ||
+    publico === "LIDER_TECNICO"; // CLT recebe salário por design (engine ATUAL)
   if (tem(p.remuneracaoGestao) && !temFuncaoGestao) {
     alertas.push({
       severidade: "WARNING",
