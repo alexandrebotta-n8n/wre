@@ -21,7 +21,20 @@ const LIDERES = [
   { nome: "Luiza Moulin", salario: 13141 },
 ];
 
+// Área de prática default dos 7 — usado pelo rateio Bloco B modo POR_AREA
+// na nova política. Cível é o default; ajuste individual em /socios depois.
+const AREA_DEFAULT_CODIGO = "civel";
+
 async function main() {
+  // Área default — opcional. Se não existir, mantemos null.
+  const areaDefault = await prisma.areaPratica.findUnique({
+    where: { codigo: AREA_DEFAULT_CODIGO },
+    select: { id: true, nome: true },
+  });
+  if (!areaDefault) {
+    console.log(`⚠ Área "${AREA_DEFAULT_CODIGO}" não cadastrada — sócios ficarão sem área.`);
+  }
+
   // Caso 1: já migrado — busca pelos nomes reais e ajusta o que faltar.
   const jaExistem = await prisma.socio.findMany({
     where: { nome: { in: LIDERES.map((l) => l.nome) } },
@@ -39,10 +52,11 @@ async function main() {
           percentualQuotasDefault: 0,
           isFundador: false,
           ativo: true,
+          ...(areaDefault ? { areaPraticaId: areaDefault.id } : {}),
         },
       });
     }
-    console.log(`✓ ${LIDERES.length} líderes sincronizados.`);
+    console.log(`✓ ${LIDERES.length} líderes sincronizados${areaDefault ? ` (área = ${areaDefault.nome})` : ""}.`);
     await prisma.$disconnect();
     return;
   }
@@ -75,9 +89,10 @@ async function main() {
         percentualQuotasDefault: 0,
         isFundador: false,
         ativo: true,
+        ...(areaDefault ? { areaPraticaId: areaDefault.id } : {}),
       },
     });
-    console.log(`  ${g.nome} → ${l.nome} (R$ ${l.salario}/mês)`);
+    console.log(`  ${g.nome} → ${l.nome} (R$ ${l.salario}/mês${areaDefault ? `, área ${areaDefault.nome}` : ""})`);
   }
 
   // Desativa o 8º (e quaisquer outros remanescentes).
