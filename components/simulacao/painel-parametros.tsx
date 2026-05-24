@@ -325,6 +325,7 @@ function FormParamsNovo({
           faixaGestaoMax: fxGesMax,
           proRataMinMeses: Number(fd.get("proRataMinMeses")),
           distribuicaoBlocoB: distribuicao,
+          proLaboreMensal: Number(fd.get("proLaboreMensal")),
         };
         if (Object.keys(pesosOrganico).length > 0) {
           override.pesosPorArea = { mixOrganico, mixIncremental, pesosOrganico, pesosIncremental };
@@ -336,6 +337,27 @@ function FormParamsNovo({
       }}
       className="space-y-3"
     >
+      <Grupo
+        titulo="Remuneração fixa"
+        ajuda="Pró-labore mensal aplicado às 5 categorias da Política DSF v1 (todos exceto FUNDADOR). Rem. de gestão vem do cadastro do sócio ou da tabelaSalarial da Premissa."
+        defaultOpen
+      >
+        <Field
+          label={
+            <LabelHelp ajuda="Valor mensal × meses do período × N sócios elegíveis. Override individual por sócio em /socios prevalece.">
+              Pró-labore mensal (R$)
+            </LabelHelp>
+          }
+          htmlFor={`pl-novo-${cenarioId}`}
+        >
+          <MoneyField id={`pl-novo-${cenarioId}`} name="proLaboreMensal" initial={Number(parametros.proLaboreMensal ?? 0)} required />
+          <ChipValor etapa="pro-labore" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
+        </Field>
+        <p className="text-[11px] text-neutral-500 mt-2">
+          💡 <strong>Rem. de gestão</strong> vem do cadastro do sócio (<a href="/socios" className="underline text-peri-700 hover:text-peri-900">/socios</a> → campo &quot;Rem. de gestão mensal&quot;) ou da <em>tabelaSalarial</em> da Premissa por nível × faixa. Override individual prevalece.
+        </p>
+      </Grupo>
+
       <Grupo
         titulo="Blocos do RDA (somam 1.0)"
         ajuda="O RDA (Resultado Distribuível Ajustado) é o LL Matriz menos a remuneração de administração. Os 3 blocos somam 100% e disciplinam como o RDA é alocado: A institucional (capital), B performance, C estratégica."

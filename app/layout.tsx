@@ -39,13 +39,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const session = await auth();
   const modoNome = await getModoNome();
 
-  // Nav top enxuto: só fluxo principal (Simulação + Política).
-  //   - Sócios e Premissas viraram atalhos na barra de Globais da /simulacao
-  //     (vivem junto ao contexto onde são usados).
+  // Nav top: fluxo principal (Simulação + Sócios + Política).
+  //   - Sócios também é atalho na barra de Globais da /simulacao (contexto),
+  //     mas ganhou item dedicado no top nav pra acesso direto.
+  //   - Premissas continua só como atalho na /simulacao.
   //   - Usuários é admin-only e raríssimo — vive no dropdown do email.
   const navItems = session?.user
     ? [
         { href: "/simulacao", label: "Simulação" },
+        { href: "/socios", label: "Sócios" },
         { href: "/politica", label: "Política" },
       ]
     : [];
