@@ -225,6 +225,10 @@ function periodoToInput(rotulo: string): PeriodoInput {
  * Periodo ANO do ano do cenário.
  */
 export async function calcularCenario(args: { cenarioId: string }): Promise<ResultadoSimulacao> {
+  // Logs de tempo em dev — ajudam a validar otimizações sem ferramentas externas.
+  // Use `setup`, `engine` e `persist` para identificar onde está o gargalo.
+  const debug = process.env.NODE_ENV === "development";
+  const t0 = debug ? performance.now() : 0;
   const cenario = await prisma.cenario.findUnique({
     where: { id: args.cenarioId },
     include: {
@@ -245,27 +249,32 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
     );
   }
 
-  const periodoAno = await garantirPeriodoAno(cenario.ano);
-  const tabelaSalarial = await carregarTabelaSalarial();
-  const resultados = await carregarResultadosAno(cenario.ano);
+  // Paralelizar setup: 4 queries independentes em vez de cascata sequencial.
+  const [periodoAno, tabelaSalarial, resultados, originacaoEfetiva] = await Promise.all([
+    garantirPeriodoAno(cenario.ano),
+    carregarTabelaSalarial(),
+    carregarResultadosAno(cenario.ano),
+    carregarOriginacaoEfetivaAno(cenario.ano),
+  ]);
   if (resultados.length === 0) {
     throw new ApiError(`Nenhum ResultadoPeriodo cadastrado para ${cenario.ano}`, 400);
   }
   // Originação efetiva: novo padrão lê Socio.originacaoAnualPadrao (em
-  // classificacoesParaSocioInput). O fallback abaixo busca OriginacaoPeriodo
-  // ANO legado para sócios sem o novo campo preenchido.
-  const originacaoLegada = await carregarOriginacaoEfetivaAno(cenario.ano);
+  // classificacoesParaSocioInput). O fallback `originacaoEfetiva` busca
+  // OriginacaoPeriodo ANO legado para sócios sem o novo campo preenchido.
+  //
   // Modo de quotas: ORIGINAL (default) usa quotas como cadastradas.
   // REDISTRIBUIDA zera fundadores+SOCIO_SERVICOS e distribui pra capital remanescente.
   const socios = classificacoesParaSocioInput(
     cenario.classificacoes,
-    originacaoLegada,
+    originacaoEfetiva,
     cenario.modoQuotas,
   );
-
-  // Funding fundadores agora é per-sócio (Socio.fundingFundadorAnual),
-  // já propagado no SocioInput. Engine não precisa de parâmetro global.
+  // Funding fundadores agora é per-sócio (Socio.fundingFundadorAnual), já
+  // propagado em cada SocioInput. O parâmetro global foi mantido em 0 por
+  // compatibilidade com a interface do engine, mas não tem mais efeito.
   const fundingFundadoresAno = 0;
+  const tSetup = debug ? performance.now() : 0;
 
   // Override de parâmetros (Blocos %, pool, chave, etc.) ainda existe — é
   // só sobre os parâmetros da Premissa, não sobre os insumos globais.
@@ -326,61 +335,48 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
     });
   }
 
+  const tEngine = debug ? performance.now() : 0;
   // Persiste 1 RemuneracaoCalculada por sócio (Periodo ANO).
-  await prisma.cenario.update({
-    where: { id: args.cenarioId },
-    data: { parametrosDirty: false },
-  });
-  await prisma.$transaction(
-    resultado.pacotes.map((p) =>
-      prisma.remuneracaoCalculada.upsert({
-        where: {
-          cenarioId_socioId_periodoId: {
-            cenarioId: args.cenarioId,
-            socioId: p.socioId,
-            periodoId: periodoAno.id,
-          },
-        },
-        create: {
-          cenarioId: args.cenarioId,
-          socioId: p.socioId,
-          periodoId: periodoAno.id,
-          proLabore: p.proLabore,
-          remuneracaoGestao: p.remuneracaoGestao,
-          remuneracaoFundador: p.remuneracaoFundador,
-          blocoA: p.blocoA,
-          blocoB: p.blocoB,
-          blocoC: p.blocoC,
-          poolUnidade: p.poolUnidade,
-          creditoOriginacao: p.creditoOriginacao,
-          creditoExecucao: p.creditoExecucao,
-          creditoGestaoCP: p.creditoGestaoCP,
-          premio: p.premio,
-          ajustes: p.ajustes,
-          total: p.total,
-          alertas: p.alertasNaoSobreposicao as never,
-          trace: p.trace as never,
-        },
-        update: {
-          proLabore: p.proLabore,
-          remuneracaoGestao: p.remuneracaoGestao,
-          remuneracaoFundador: p.remuneracaoFundador,
-          blocoA: p.blocoA,
-          blocoB: p.blocoB,
-          blocoC: p.blocoC,
-          poolUnidade: p.poolUnidade,
-          creditoOriginacao: p.creditoOriginacao,
-          creditoExecucao: p.creditoExecucao,
-          creditoGestaoCP: p.creditoGestaoCP,
-          premio: p.premio,
-          ajustes: p.ajustes,
-          total: p.total,
-          alertas: p.alertasNaoSobreposicao as never,
-          trace: p.trace as never,
-        },
-      }),
-    ),
-  );
+  // Refatorado: em vez de N upserts serializados (1 query por sócio dentro
+  // de $transaction), fazemos deleteMany + createMany na mesma transação.
+  // Para 22 sócios: 22 round-trips → 3. Atomicidade garantida pela transação.
+  const dadosRemuneracoes = resultado.pacotes.map((p) => ({
+    cenarioId: args.cenarioId,
+    socioId: p.socioId,
+    periodoId: periodoAno.id,
+    proLabore: p.proLabore,
+    remuneracaoGestao: p.remuneracaoGestao,
+    remuneracaoFundador: p.remuneracaoFundador,
+    blocoA: p.blocoA,
+    blocoB: p.blocoB,
+    blocoC: p.blocoC,
+    poolUnidade: p.poolUnidade,
+    creditoOriginacao: p.creditoOriginacao,
+    creditoExecucao: p.creditoExecucao,
+    creditoGestaoCP: p.creditoGestaoCP,
+    premio: p.premio,
+    ajustes: p.ajustes,
+    total: p.total,
+    alertas: p.alertasNaoSobreposicao as never,
+    trace: p.trace as never,
+  }));
+  await prisma.$transaction([
+    prisma.cenario.update({
+      where: { id: args.cenarioId },
+      data: { parametrosDirty: false },
+    }),
+    prisma.remuneracaoCalculada.deleteMany({
+      where: { cenarioId: args.cenarioId, periodoId: periodoAno.id },
+    }),
+    prisma.remuneracaoCalculada.createMany({ data: dadosRemuneracoes }),
+  ]);
+
+  if (debug) {
+    const tPersist = performance.now();
+    console.log(
+      `[calcularCenario:${args.cenarioId}] setup=${(tSetup - t0).toFixed(0)}ms engine=${(tEngine - tSetup).toFixed(0)}ms persist=${(tPersist - tEngine).toFixed(0)}ms total=${(tPersist - t0).toFixed(0)}ms (${resultado.pacotes.length} pacotes)`,
+    );
+  }
 
   return resultado;
 }
@@ -578,6 +574,43 @@ export async function marcarTodosDraftsComoDirty(): Promise<number> {
     data: { parametrosDirty: true },
   });
   return result.count;
+}
+
+/**
+ * Batch helper: salva LL de várias unidades de uma vez no ano.
+ * Elimina o N+1 que existia ao chamar `salvarLLUnidadeAno` em loop —
+ * `garantirPeriodoAno` roda 1× (em vez de N) e `marcarDraftsDoAnoComoDirty`
+ * roda 1× no fim (em vez de N).
+ */
+export async function salvarLLUnidadesAno(args: {
+  ano: number;
+  unidades: Array<{
+    unidadeId: string;
+    lucroLiquido: number;
+    fonte?: string | null;
+  }>;
+}): Promise<void> {
+  if (args.unidades.length === 0) return;
+  const periodoAno = await garantirPeriodoAno(args.ano);
+  await prisma.$transaction(
+    args.unidades.map((u) =>
+      prisma.resultadoPeriodo.upsert({
+        where: { unidadeId_periodoId: { unidadeId: u.unidadeId, periodoId: periodoAno.id } },
+        create: {
+          unidadeId: u.unidadeId,
+          periodoId: periodoAno.id,
+          lucroLiquido: u.lucroLiquido,
+          ehReal: true,
+          fonte: u.fonte ?? "manual /simulacao",
+        },
+        update: {
+          lucroLiquido: u.lucroLiquido,
+          fonte: u.fonte ?? "manual /simulacao",
+        },
+      }),
+    ),
+  );
+  await marcarDraftsDoAnoComoDirty(args.ano);
 }
 
 function defaultPublico(s: { isFundador: boolean; cargo: string }, modelo: "ATUAL" | "NOVO"): Publico {

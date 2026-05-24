@@ -117,16 +117,11 @@ async function carregarCenarioCompleto(
   cenarioId: string,
   filtroSocio: Record<string, unknown>,
 ) {
-  // Carrega remunerações ANUAIS (tipo=ANO). APPLIED antigos podem ter
-  // entries trimestrais — para esses, o filtro tipo=ANO retorna vazio e
-  // o componente cai num fallback (lê snapshot ou agrega trimestres antigos).
-  // No MVP, apenas filtramos por ano (sem restringir tipo) e somamos no client
-  // — funciona tanto para 1 entrada ANO quanto 4 entradas TRIMESTRE legadas.
-  const meta = await prisma.cenario.findUnique({
-    where: { id: cenarioId },
-    select: { ano: true },
-  });
-  if (!meta) return null;
+  // Carrega o cenário completo com classificações e remunerações em UMA query.
+  // Antes eram 2 findUnique (primeiro só pra pegar `ano`, depois o pesado);
+  // agora consultamos todas as remunerações do cenário e filtramos pelo ano
+  // em memória — para um cenário típico isso traz 1 entrada ANO (+ no máximo
+  // 4 trimestres legacy de APPLIED antigos), custo desprezível.
   const c = await prisma.cenario.findUnique({
     where: { id: cenarioId },
     include: {
@@ -143,10 +138,7 @@ async function carregarCenarioCompleto(
         ],
       },
       remuneracoes: {
-        where: {
-          ...filtroSocio,
-          periodo: { ano: meta.ano },
-        },
+        where: filtroSocio,
         include: {
           socio: { select: { id: true, nome: true, isFundador: true } },
           periodo: true,
@@ -155,6 +147,9 @@ async function carregarCenarioCompleto(
       },
     },
   });
+  if (!c) return null;
+  // Filtra remunerações pelo ano do cenário (defensivo contra dados legacy).
+  c.remuneracoes = c.remuneracoes.filter((r) => r.periodo.ano === c.ano);
   return c;
 }
 

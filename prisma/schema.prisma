@@ -84,7 +84,10 @@ model AuditLog {
   @@index([ocorridoEm])
   @@index([acao])
   // Usado pelo rate-limit baseado em AuditLog (contagem por usuário+ação numa janela).
-  @@index([usuarioId, acao, ocorridoEm])
+  // Nome explícito pra bater com a migration `db_integrity_constraints`
+  // (Prisma geraria `AuditLog_usuarioId_acao_ocorridoEm_idx` por default; o
+  // banco já tem `AuditLog_usuario_acao_ocorrido_idx` desde aquela migration).
+  @@index([usuarioId, acao, ocorridoEm], map: "AuditLog_usuario_acao_ocorrido_idx")
 }
 
 // ============================================================================
