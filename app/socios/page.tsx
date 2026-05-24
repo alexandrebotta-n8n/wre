@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { TableShell, THead, TBody, TH } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinhaSocio } from "@/components/socios/linha-socio";
+import { redistribuirQuotas } from "@/lib/domain/dsf/quotas";
+import type { Publico } from "@/lib/domain/dsf";
 
 // Labels da classificação política DSF v1 — exibidos no filtro.
 const PUBLICOS_LABEL: Record<string, string> = {
@@ -91,6 +93,28 @@ export default async function SociosPage({
     // SOCIO restrito não vê esse banner — mas a query é leve, sempre roda.
     prisma.cenario.count({ where: { status: "DRAFT" } }),
   ]);
+
+  // Quotas redistribuídas — chip read-only ao lado do input de cada sócio.
+  // Cálculo é determinístico sobre o conjunto de sócios ativos (independe de
+  // cenário): zera fundadores + SOCIO_SERVICOS, capital remanescente absorve
+  // proporcional. Cenários decidem se USAM via Cenario.modoQuotas.
+  // Calculamos sobre TODOS os sócios (sem filtros) pra preservar a base global
+  // mesmo quando o filtro deixa só um subset visível.
+  const todosSociosAtivos = escopo.ehSocioRestrito
+    ? socios // SOCIO restrito só vê própria linha — redistribuir só com 1 sócio é meaningless
+    : await prisma.socio.findMany({
+        where: { ativo: true },
+        select: { id: true, publicoDefault: true, isFundador: true, percentualQuotasDefault: true },
+        take: 200,
+      });
+  const quotasRedistribuidasMap = redistribuirQuotas(
+    todosSociosAtivos.map((s) => ({
+      id: s.id,
+      publico: s.publicoDefault as Publico,
+      isFundador: s.isFundador,
+      percentualQuotas: s.percentualQuotasDefault,
+    })),
+  );
 
   const semFiltros = !sp.q && !sp.area && !sp.tipo && !sp.publico;
 
@@ -200,6 +224,7 @@ export default async function SociosPage({
                   modoNome={modoNome}
                   colSpan={TABLE_COLS}
                   cenariosDraftCount={cenariosDraftCount}
+                  quotaRedistribuida={quotasRedistribuidasMap.get(s.id) ?? s.percentualQuotasDefault}
                 />
               ))}
             </TBody>

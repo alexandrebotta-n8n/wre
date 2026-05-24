@@ -294,3 +294,79 @@ describe("Engine — pré-condições falham cedo", () => {
     expect(r.pacotes[0].proLabore).toBe(5000 * 12);
   });
 });
+
+// ============================================================================
+// Modo REDISTRIBUIDA — quotas zeradas pra fundadores/serviços, capital absorve
+// (helper redistribuirQuotas + engine consumindo SocioInput pré-processado).
+// ============================================================================
+
+describe("Modo REDISTRIBUIDA — engine consome quotas pré-redistribuídas", () => {
+  it("ATUAL: distribuição residual usa quotas redistribuídas; total inalterado", () => {
+    // 1 capital com quota original 50% e 1 capital com 50%. Sem fundadores/serv.
+    // Cenário A: modo ORIGINAL → 50%/50% direto.
+    // Cenário B: 1 fundador 30% + 1 serv 10% + 1 capital 30% + 1 capital 30%
+    //            ORIGINAL: capitais recebem 30/60 = 50% cada (do funding × 0.95).
+    //            REDISTRIBUIDA: quotas fundador=0, serv=0, capitais sobem
+    //            (30+30+10+30)=100% → cada cap recebe 50% também → MESMO total
+    //            pq o engine ATUAL já exclui fundadores; mas a diferença está
+    //            no peso do SOCIO_SERVICOS (que ANTES recebia, AGORA não).
+    //
+    // Em vez disso, validar que: modo REDIS muda a divisão entre capitais
+    // QUANDO eles têm quotas desiguais.
+    const sociosRedist: SocioInput[] = [
+      // Fundador: zera; mesmo cadastro como SOCIO_CAPITAL.
+      { id: "fund", nome: "F", cargo: "Fund", publico: "SOCIO_CAPITAL",
+        percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: true,
+        fundingFundadorAnual: 100_000 },
+      // Capital A: original 30% → redistribuído (30 + 30) / 60 × 30 = 30% (sozinho com B)
+      // Wait: 2 capitais original 30%/30%, fundador 30%, serviços 10% → soma cap = 60%
+      // Redistrib: cada cap recebe 30 × (60+40)/60 = 50%.
+      { id: "ca", nome: "Cap A", cargo: "Sócio", publico: "SOCIO_CAPITAL",
+        percentualQuotas: 0.50, originacaoEsperadaAnual: 0, isFundador: false },
+      { id: "cb", nome: "Cap B", cargo: "Sócio", publico: "SOCIO_CAPITAL",
+        percentualQuotas: 0.50, originacaoEsperadaAnual: 0, isFundador: false },
+    ];
+    // Esses SocioInputs já estão com quotas FINAIS (simula o que o service
+    // teria passado quando modoQuotas=REDISTRIBUIDA). Engine consome sem
+    // saber de modo — testa que o consumo funciona.
+    const r = calcularModeloAtual({
+      periodo: periodoAno, socios: sociosRedist,
+      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
+      premissas: baseAtual,
+    });
+    // Soma de quotas não-fund = 1.0 → distribuição residual rateia tudo entre A+B.
+    // funding residual = 1M - 100k (funding fund) = 900k. Distribuível = 900k × 0.95 = 855k.
+    // Cada cap recebe (0.5/1.0) × 855k = 427.5k.
+    const ca = r.pacotes.find((p) => p.socioId === "ca")!;
+    const cb = r.pacotes.find((p) => p.socioId === "cb")!;
+    expect(ca.blocoB).toBeCloseTo(427_500, 1);
+    expect(cb.blocoB).toBeCloseTo(427_500, 1);
+    // Fundador recebe só funding individual (100k), zero da distribuição.
+    const fund = r.pacotes.find((p) => p.socioId === "fund")!;
+    expect(fund.blocoB).toBe(0);
+    expect(fund.remuneracaoFundador).toBe(100_000);
+  });
+
+  it("NOVO: Bloco A usa quotas redistribuídas (capital remanescente absorve)", () => {
+    // 1 capital 60% + 1 serviços (redistribuído pra 0) → cap recebe 100% do Bloco A
+    // simulado: SocioInput vindo já com quotas finais (cap=1.0, serv=0).
+    const sociosRedist: SocioInput[] = [
+      { id: "cap", nome: "Cap", cargo: "Sócio", publico: "SOCIO_CAPITAL",
+        percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false },
+      { id: "serv", nome: "Serv", cargo: "Sócio Serv.", publico: "SOCIO_SERVICOS",
+        percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false },
+    ];
+    const r = calcularModeloNovo({
+      periodo: periodoAno, socios: sociosRedist,
+      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
+      premissas: baseNovo,
+    });
+    const cap = r.pacotes.find((p) => p.socioId === "cap")!;
+    const serv = r.pacotes.find((p) => p.socioId === "serv")!;
+    // RDA = 1M. Bloco A = 45% = 450k. Cap sozinho na base → recebe tudo.
+    expect(cap.blocoA).toBeCloseTo(450_000, 1);
+    // Serv: publico SOCIO_SERVICOS NÃO é capital → não entra em Bloco A
+    // (engine NOVO já filtra por PUBLICOS_CAPITAL). Quota=0 reforça.
+    expect(serv.blocoA).toBe(0);
+  });
+});

@@ -247,6 +247,7 @@ export function ColunaCenario({
           dirty={dirty}
           versao={cenario.versao}
           valoresPorEtapa={valoresPorEtapa}
+          modoQuotas={cenario.modoQuotas as "ORIGINAL" | "REDISTRIBUIDA"}
         />
       </div>
 

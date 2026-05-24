@@ -19,6 +19,8 @@ import {
   type NivelCargo,
   type FaixaSalarial,
 } from "@/lib/domain/dsf";
+import { redistribuirQuotas } from "@/lib/domain/dsf/quotas";
+import type { ModoQuotas } from "@prisma/client";
 import type {
   Cenario, ClassificacaoSocio, Socio, Unidade,
 } from "@prisma/client";
@@ -48,7 +50,22 @@ interface ClassificacaoComSocio extends ClassificacaoSocio {
 function classificacoesParaSocioInput(
   classificacoes: ClassificacaoComSocio[],
   originacaoLegadaPorSocio: Map<string, number>,
+  modoQuotas: ModoQuotas = "ORIGINAL",
 ): SocioInput[] {
+  // Pré-processamento: se modo REDISTRIBUIDA, calcula novas quotas com base
+  // no conjunto de sócios. Helper puro (lib/domain/dsf/quotas.ts).
+  const quotasFinais =
+    modoQuotas === "REDISTRIBUIDA"
+      ? redistribuirQuotas(
+          classificacoes.map((c) => ({
+            id: c.socioId,
+            publico: c.publico as Publico,
+            isFundador: c.socio.isFundador,
+            percentualQuotas: c.percentualQuotas,
+          })),
+        )
+      : null;
+
   return classificacoes.map((c) => {
     // Originação efetiva: prioridade ao novo campo Socio.originacaoAnualPadrao
     // (cadastro em /socios). Fallback: OriginacaoPeriodo legado por ano
@@ -58,13 +75,15 @@ function classificacoesParaSocioInput(
       origPadrao != null && origPadrao > 0
         ? origPadrao
         : originacaoLegadaPorSocio.get(c.socioId) ?? 0;
+    // Quota efetiva: redistribuída se modo for REDISTRIBUIDA, senão a do cenário.
+    const quotaEfetiva = quotasFinais?.get(c.socioId) ?? c.percentualQuotas;
     return {
       id: c.socioId,
       nome: c.socio.nome,
       cargo: c.socio.cargo,
       publico: c.publico as Publico,
       unidadeCodigo: c.unidade?.codigo,
-      percentualQuotas: c.percentualQuotas,
+      percentualQuotas: quotaEfetiva,
       originacaoEsperadaAnual: c.originacaoEsperada,
       originacaoEfetiva: origEfetiva,
       pesoBlocoB: c.pesoBlocoB ?? undefined,
@@ -236,7 +255,13 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
   // classificacoesParaSocioInput). O fallback abaixo busca OriginacaoPeriodo
   // ANO legado para sócios sem o novo campo preenchido.
   const originacaoLegada = await carregarOriginacaoEfetivaAno(cenario.ano);
-  const socios = classificacoesParaSocioInput(cenario.classificacoes, originacaoLegada);
+  // Modo de quotas: ORIGINAL (default) usa quotas como cadastradas.
+  // REDISTRIBUIDA zera fundadores+SOCIO_SERVICOS e distribui pra capital remanescente.
+  const socios = classificacoesParaSocioInput(
+    cenario.classificacoes,
+    originacaoLegada,
+    cenario.modoQuotas,
+  );
 
   // Funding fundadores agora é per-sócio (Socio.fundingFundadorAnual),
   // já propagado no SocioInput. Engine não precisa de parâmetro global.

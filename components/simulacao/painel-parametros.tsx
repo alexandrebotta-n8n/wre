@@ -40,6 +40,7 @@ export function PainelParametros({
   dirty,
   versao,
   valoresPorEtapa = {},
+  modoQuotas,
 }: {
   cenarioId: string;
   modelo: "ATUAL" | "NOVO";
@@ -53,6 +54,8 @@ export function PainelParametros({
   versao: number;
   /** Soma do `trace[].valor` por chave de etapa (ex "bloco-A"). Alimenta os chips. */
   valoresPorEtapa?: Record<string, number>;
+  /** Modo de quotas do cenário (ORIGINAL ou REDISTRIBUIDA). */
+  modoQuotas: "ORIGINAL" | "REDISTRIBUIDA";
 }) {
   const [aberto, setAberto] = useState(editavel);
 
@@ -63,6 +66,9 @@ export function PainelParametros({
         <div className="flex items-center gap-2 text-xs text-neutral-600">
           <Settings2 className="h-3.5 w-3.5" />
           <span>Parâmetros em uso{temOverride ? " (customizados)" : ""}</span>
+          {modoQuotas === "REDISTRIBUIDA" && (
+            <Badge variant="warning" size="sm">quotas redistribuídas</Badge>
+          )}
         </div>
         <PremissaChips modelo={modelo} parametros={parametros} />
       </div>
@@ -71,7 +77,9 @@ export function PainelParametros({
 
   // Modo editável
   return (
-    <Collapsible open={aberto} onOpenChange={setAberto}>
+    <div className="space-y-3">
+      <ModoQuotasToggle cenarioId={cenarioId} modoQuotas={modoQuotas} />
+      <Collapsible open={aberto} onOpenChange={setAberto}>
       <CollapsibleTrigger asChild>
         <button
           className="w-full flex items-center justify-between text-left rounded hover:bg-neutral-50 px-1 py-1 transition-colors"
@@ -96,7 +104,75 @@ export function PainelParametros({
           <FormParamsNovo key={`novo-${cenarioId}-${versao}`} cenarioId={cenarioId} parametros={parametros} areas={areas} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         )}
       </CollapsibleContent>
-    </Collapsible>
+      </Collapsible>
+    </div>
+  );
+}
+
+/** Toggle "Modo de quotas" — radio compacto que auto-salva ao mudar.
+ *  Vive ACIMA do Collapsible de parâmetros (campo independente do cenário). */
+function ModoQuotasToggle({
+  cenarioId,
+  modoQuotas,
+}: {
+  cenarioId: string;
+  modoQuotas: "ORIGINAL" | "REDISTRIBUIDA";
+}) {
+  const { formRef, onAnyChange, pending, salvouAt } = useAutoSubmit({ delay: 200 });
+  return (
+    <form
+      ref={formRef}
+      onChange={onAnyChange}
+      action={async (fd) => {
+        const { atualizarModoQuotasAction } = await import("@/app/simulacao/acoes");
+        await atualizarModoQuotasAction(fd);
+      }}
+      className="rounded-md border border-neutral-200 bg-white p-2.5 space-y-1.5"
+    >
+      <input type="hidden" name="cenarioId" value={cenarioId} />
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-navy-900">
+          Modo de quotas
+          <Tooltip
+            side="top"
+            content={
+              <>
+                <strong>Originais</strong>: usa as quotas como cadastradas em /socios.
+                <br /><strong>Redistribuídas</strong>: zera as quotas de fundadores e Sócios
+                de Serviços; o saldo é repassado proporcionalmente aos Sócios de Capital
+                remanescentes (Capital, Capital Gestor, Capital Líder de Unidade).
+                <br />Afeta Bloco A (NOVO) e distribuição residual (ATUAL).
+              </>
+            }
+          >
+            <HelpCircle className="h-3 w-3 text-neutral-400 cursor-help" />
+          </Tooltip>
+        </span>
+        <StatusSalvamento pending={pending} salvouAt={salvouAt} />
+      </div>
+      <div className="flex gap-3 text-xs">
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="radio"
+            name="modoQuotas"
+            value="ORIGINAL"
+            defaultChecked={modoQuotas === "ORIGINAL"}
+            className="accent-peri-600"
+          />
+          <span>Originais</span>
+        </label>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="radio"
+            name="modoQuotas"
+            value="REDISTRIBUIDA"
+            defaultChecked={modoQuotas === "REDISTRIBUIDA"}
+            className="accent-peri-600"
+          />
+          <span>Redistribuídas <span className="text-neutral-500">(zera fundadores + S. Serviços)</span></span>
+        </label>
+      </div>
+    </form>
   );
 }
 
