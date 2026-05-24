@@ -62,6 +62,9 @@ export const AtualizarSocioSchema = z
     // Funding fundador é deduzido do LL antes do RDA/funding residual.
     originacaoAnualPadrao: z.number().min(0).nullable(),
     fundingFundadorAnual: z.number().min(0).nullable(),
+    // Alvo Bloco B em nº salários (modo ALVO_NUM_SALARIOS do engine NOVO).
+    // 0 ou null = não participa.
+    blocoBNumSalariosAlvo: z.number().int().min(0).max(50).nullable(),
     observacoes: z.string().max(500).nullable(),
   })
   .strict();

@@ -18,7 +18,13 @@ export const ParamsAtualSchema = z.object({
 }).strict();
 export type ParamsAtualInput = z.infer<typeof ParamsAtualSchema>;
 
-export const DistribuicaoBlocoBEnum = z.enum(["UNIFORME", "PESO_INDIVIDUAL", "ORIGINACAO", "POR_AREA"]);
+export const DistribuicaoBlocoBEnum = z.enum([
+  "UNIFORME",
+  "PESO_INDIVIDUAL",
+  "ORIGINACAO",
+  "POR_AREA",
+  "ALVO_NUM_SALARIOS",
+]);
 
 export const PesosPorAreaSchema = z.object({
   mixOrganico: z.number().min(0).max(1),

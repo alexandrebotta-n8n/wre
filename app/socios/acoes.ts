@@ -44,12 +44,18 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
   const remGestaoRaw = String(formData.get("remuneracaoGestaoMensal") ?? "");
   const originacaoRaw = String(formData.get("originacaoAnualPadrao") ?? "");
   const fundingFundRaw = String(formData.get("fundingFundadorAnual") ?? "");
+  const blocoBAlvoRaw = String(formData.get("blocoBNumSalariosAlvo") ?? "");
   const observacoesRaw = String(formData.get("observacoes") ?? "");
 
   // Helper: string vazia / inválida → null (= "usa default da premissa/tabela").
   const parseOptNumber = (v: string): number | null => {
     if (v.trim() === "") return null;
     const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const parseOptInt = (v: string): number | null => {
+    if (v.trim() === "") return null;
+    const n = Math.round(Number(v));
     return Number.isFinite(n) && n >= 0 ? n : null;
   };
 
@@ -67,6 +73,7 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
     remuneracaoGestaoMensal: parseOptNumber(remGestaoRaw),
     originacaoAnualPadrao: parseOptNumber(originacaoRaw),
     fundingFundadorAnual: parseOptNumber(fundingFundRaw),
+    blocoBNumSalariosAlvo: parseOptInt(blocoBAlvoRaw),
     observacoes: observacoesRaw.trim() || null,
   };
 
@@ -88,6 +95,7 @@ const CAMPOS_DE_CALCULO = [
   "remuneracaoGestaoMensal",
   "originacaoAnualPadrao",
   "fundingFundadorAnual",
+  "blocoBNumSalariosAlvo",
 ] as const;
 
 type CampoCalculo = typeof CAMPOS_DE_CALCULO[number];
@@ -137,6 +145,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
         remuneracaoGestaoMensal: true,
         originacaoAnualPadrao: true,
         fundingFundadorAnual: true,
+        blocoBNumSalariosAlvo: true,
       },
     });
     if (!antigo) throw new Error("Sócio não encontrado");
@@ -155,6 +164,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
         remuneracaoGestaoMensal: input.remuneracaoGestaoMensal,
         originacaoAnualPadrao: input.originacaoAnualPadrao,
         fundingFundadorAnual: input.fundingFundadorAnual,
+        blocoBNumSalariosAlvo: input.blocoBNumSalariosAlvo,
         observacoes: input.observacoes,
       },
     });
@@ -174,6 +184,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
       remuneracaoGestaoMensal: input.remuneracaoGestaoMensal,
       originacaoAnualPadrao: input.originacaoAnualPadrao,
       fundingFundadorAnual: input.fundingFundadorAnual,
+      blocoBNumSalariosAlvo: input.blocoBNumSalariosAlvo,
     };
     let cenariosMarcadosDirty = 0;
     if (algumCampoDeCalculoMudou(antigo, novo)) {

@@ -46,7 +46,13 @@ export interface SocioInput {
   // Valor anual arbitrário (R$) — só fundadores. Engine soma estes valores
   // de todos isFundador=true e deduz do LL antes do RDA/distribuição residual.
   // Cada fundador recebe esse valor direto (sem rateio por quotas).
+  // NOTA: usado apenas pelo engine ATUAL. Engine NOVO ignora (fundadores
+  // não recebem remuneração na nova política).
   fundingFundadorAnual?: number;
+  // Alvo de Bloco B em nº de salários (engine NOVO modo ALVO_NUM_SALARIOS).
+  // Ex: CEO=20, Diretores=15, Sócios de Serviço/Líderes Técnicos=10.
+  // null/0 = não participa.
+  blocoBNumSalariosAlvo?: number;
 }
 
 export interface ResultadoUnidade {
@@ -124,7 +130,15 @@ export interface PremissasModeloAtual {
 //               Cada sócio com areaPraticaCodigo recebe peso proporcional a
 //               (mixOrganico × pesoOrganico[area]) + (mixIncremental × pesoIncremental[area]).
 //               Sócios sem área recebem 0.
-export type DistribuicaoBlocoB = "UNIFORME" | "PESO_INDIVIDUAL" | "ORIGINACAO" | "POR_AREA";
+// ALVO_NUM_SALARIOS: cada elegível recebe (rem.gestão_mensal + pró-labore_mensal)
+// × `blocoBNumSalariosAlvo`. Se Σ alvos > Bloco B disponível, faz pro-rata.
+// Se Σ alvos ≤ Bloco B, cada um recebe seu alvo exato (sobra vira reserva).
+export type DistribuicaoBlocoB =
+  | "UNIFORME"
+  | "PESO_INDIVIDUAL"
+  | "ORIGINACAO"
+  | "POR_AREA"
+  | "ALVO_NUM_SALARIOS";
 
 // Configuração de pesos por área (planilha 1T2026).
 //   mixOrganico/mixIncremental: 0.76 / 0.24

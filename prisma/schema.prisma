@@ -209,6 +209,11 @@ model Socio {
   // diferente entre ATUAL e NOVO — ex: Líder Técnico CLT hoje (LIDER_TECNICO)
   // que vira Sócio de Serviços PJ (SOCIO_SERVICOS) na nova política.
   publicoAtual Publico?
+  // Alvo de Bloco B em número de salários (modelo NOVO, modo ALVO_NUM_SALARIOS).
+  // Salário base = rem.gestão mensal + pró-labore mensal. Alvo em R$ = base × n.
+  // Ex: CEO=20, Diretores=15, Sócios de Serviço/Líderes Técnicos=10. null/0 =
+  // não participa do Bloco B nesse modo.
+  blocoBNumSalariosAlvo Int?
   // Unidade que este sócio lidera no cadastro permanente. Só faz sentido
   // quando publicoDefault ∈ {SOCIO_CAPITAL_LIDER_UNIDADE, LIDER_UNIDADE_NON_EQUITY}.
   unidadeLideradaId String?

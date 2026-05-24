@@ -447,7 +447,7 @@ function FormParamsNovo({
 
       <Grupo
         titulo="Distribuição do Bloco B + Pesos por área"
-        ajuda="O Bloco B (35%) pode ser distribuído por: UNIFORME (igual entre elegíveis), PESO_INDIVIDUAL, ORIGINACAO ou POR_AREA (mix orgânico/incremental por área de prática)."
+        ajuda="O Bloco B (35%) pode ser distribuído por: UNIFORME (igual entre elegíveis), PESO_INDIVIDUAL, ORIGINACAO, POR_AREA (mix orgânico/incremental por área), ou ALVO_NUM_SALARIOS (cada sócio recebe salário_mensal × nº alvos cadastrado em /socios; pro-rata se total estourar)."
       >
         <Field label="Distribuição" htmlFor={`db-${cenarioId}`}>
           <NativeSelect id={`db-${cenarioId}`} name="distribuicaoBlocoB" defaultValue={distribAtual}>
@@ -455,8 +455,14 @@ function FormParamsNovo({
             <option value="PESO_INDIVIDUAL">Por peso individual</option>
             <option value="ORIGINACAO">Por originação</option>
             <option value="POR_AREA">Por área de prática</option>
+            <option value="ALVO_NUM_SALARIOS">Por alvo em nº de salários</option>
           </NativeSelect>
         </Field>
+        {distribAtual === "ALVO_NUM_SALARIOS" && (
+          <p className="text-[11px] text-neutral-600 mt-2 bg-peri-50/50 border border-peri-200 rounded px-2 py-1.5">
+            💡 Cada sócio recebe <strong>(rem.gestão mensal + pró-labore mensal) × nº alvos</strong> cadastrado em <a href="/socios" className="underline text-peri-700">/socios</a>. Se Σ alvos &gt; Bloco B disponível, faz pro-rata proporcional ao alvo.
+          </p>
+        )}
         {areas.length > 0 && (
           <div className="mt-3">
             <MatrizPesosArea

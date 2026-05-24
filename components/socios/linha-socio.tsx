@@ -64,6 +64,10 @@ export interface SocioRow {
   remuneracaoGestaoMensal: number | null;
   originacaoAnualPadrao: number | null;
   fundingFundadorAnual: number | null;
+  /** Alvo Bloco B em nº de salários (modo ALVO_NUM_SALARIOS do engine NOVO).
+   * Default null = não participa. Valores típicos: CEO=20, Diretores=15,
+   * Sócios de Serviço/Líderes Técnicos=10. */
+  blocoBNumSalariosAlvo: number | null;
   observacoes: string | null;
 }
 
@@ -521,9 +525,9 @@ function FormSocio({
           </Field>
           {socio.isFundador ? (
             <Field
-              label="Funding fundador anual"
+              label="Funding fundador anual (ATUAL)"
               htmlFor={`ff-${socio.id}`}
-              hint="Valor anual deduzido do LL e pago diretamente."
+              hint="Valor anual deduzido do LL e pago diretamente. Usado APENAS na política ATUAL — engine NOVO ignora (fundadores não recebem)."
             >
               <MoneyField
                 id={`ff-${socio.id}`}
@@ -537,6 +541,23 @@ function FormSocio({
             // (estrutural — só via script — mas defensivo).
             <input type="hidden" name="fundingFundadorAnual" value="" />
           )}
+          <Field
+            label="Alvo Bloco B (nº salários)"
+            htmlFor={`bba-${socio.id}`}
+            hint="Engine NOVO modo ALVO_NUM_SALARIOS. Valor = (rem.gestão + pró-labore) × nº. Típico: CEO=20, Diretores=15, S. Serviços/CLT=10. Vazio = não participa."
+          >
+            <Input
+              id={`bba-${socio.id}`}
+              type="number"
+              name="blocoBNumSalariosAlvo"
+              defaultValue={socio.blocoBNumSalariosAlvo ?? ""}
+              key={`bba-${socio.id}-${socio.blocoBNumSalariosAlvo ?? "x"}`}
+              min="0"
+              max="50"
+              step="1"
+              placeholder="—"
+            />
+          </Field>
         </div>
         {!socio.isFundador && (
           <p className="text-[11px] text-neutral-500">

@@ -95,6 +95,7 @@ function classificacoesParaSocioInput(
       proLaboreMensalOverride: c.socio.proLaboreMensal ?? undefined,
       remuneracaoGestaoMensalOverride: c.socio.remuneracaoGestaoMensal ?? undefined,
       fundingFundadorAnual: c.socio.fundingFundadorAnual ?? undefined,
+      blocoBNumSalariosAlvo: c.socio.blocoBNumSalariosAlvo ?? undefined,
     };
   });
 }
@@ -234,6 +235,9 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
     include: {
       premissa: true,
       classificacoes: {
+        // Filtra classificações de sócios inativos — eles não devem aparecer
+        // no cálculo (ex: ex-Líder Técnico desativado pelo script de migração).
+        where: { socio: { ativo: true } },
         include: {
           socio: { include: { areaPratica: { select: { codigo: true } } } },
           unidade: true,

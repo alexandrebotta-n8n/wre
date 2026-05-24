@@ -257,6 +257,7 @@ export default async function SociosPage({
                     remuneracaoGestaoMensal: s.remuneracaoGestaoMensal,
                     originacaoAnualPadrao: s.originacaoAnualPadrao,
                     fundingFundadorAnual: s.fundingFundadorAnual,
+                    blocoBNumSalariosAlvo: s.blocoBNumSalariosAlvo,
                     observacoes: s.observacoes,
                   }}
                   areas={areas}

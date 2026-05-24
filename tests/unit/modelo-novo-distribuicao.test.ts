@@ -172,7 +172,11 @@ describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", ()
       percentualQuotas: 0.10, originacaoEsperadaAnual: 0, isFundador: false },
   ];
 
-  it("fundador com valorDiscricionario recebe o valor e fica fora do Bloco A", () => {
+  it("fundador no NOVO recebe ZERO (engine ignora fundingFundadorAnual); Bloco A vai pros não-fund", () => {
+    // Mudança intencional (Política DSF v1 - de/para planilha):
+    // Engine NOVO ignora fundingFundadorAnual. Campo só vale pra engine ATUAL.
+    // RDA = LL − admin = 1.000.000 (sem desconto de fundador).
+    // Bloco A = 450.000 distribuído entre s2 + s3 (soma quotas não-fund = 0.30).
     const V = 100_000;
     const sociosV = sociosComFundador.map((s) =>
       s.id === "s1" ? { ...s, fundingFundadorAnual: V } : s,
@@ -184,20 +188,13 @@ describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", ()
     const fund = r.pacotes.find((p) => p.socioId === "s1")!;
     const s2 = r.pacotes.find((p) => p.socioId === "s2")!;
     const s3 = r.pacotes.find((p) => p.socioId === "s3")!;
-    // Fundador: recebe V em remuneracaoFundador, zero de Bloco A.
-    expect(fund.remuneracaoFundador).toBeCloseTo(V, 1);
+    expect(fund.remuneracaoFundador).toBe(0);
     expect(fund.blocoA).toBe(0);
-    // RDA ajustado = LL − admin (0) − V = 1.000.000 − 100.000 = 900.000.
-    // Bloco A = 900.000 × 0.45 = 405.000. Soma de quotas (não-fund) = 0.30.
-    // s2: 405.000 × (0.20 / 0.30) = 270.000
-    // s3: 405.000 × (0.10 / 0.30) = 135.000
-    expect(s2.blocoA).toBeCloseTo(270_000, 1);
-    expect(s3.blocoA).toBeCloseTo(135_000, 1);
-    // Soma do Bloco A = 45% do RDA ajustado.
-    expect(s2.blocoA + s3.blocoA).toBeCloseTo(405_000, 1);
-    // Trace do fundador contém a etapa de remuneração de fundador; trace do não-fundador, o Bloco A.
-    expect(fund.trace.find((t) => t.etapa === "3.fundador")?.valor).toBeCloseTo(V, 1);
-    expect(s2.trace.find((t) => t.etapa === "8.bloco-A")?.valor).toBeCloseTo(270_000, 1);
+    expect(s2.blocoA).toBeCloseTo(300_000, 1); // 450k × 0.20/0.30
+    expect(s3.blocoA).toBeCloseTo(150_000, 1); // 450k × 0.10/0.30
+    expect(s2.blocoA + s3.blocoA).toBeCloseTo(450_000, 1);
+    // Trace do fundador NÃO contém a etapa de remuneração de fundador.
+    expect(fund.trace.find((t) => t.etapa === "3.fundador")).toBeUndefined();
   });
 
   it("sem discricionário (V=0), fundador continua fora do Bloco A (mudança intencional)", () => {

@@ -157,10 +157,10 @@ describe("Modelo NOVO — Pool da Unidade (líder recebe 30%)", () => {
 // ============================================================================
 
 describe("Modelo NOVO — cenário 100% fundadores (sem não-fund)", () => {
-  it("não crasha; fundadores com publico=FUNDADOR ficam fora de A/B; recebem só funding", () => {
-    // Caso realista: fundadores cadastrados como publico=FUNDADOR (legado do
-    // Modelo ATUAL) — naturalmente excluídos de PUBLICOS_CAPITAL e PUBLICOS_BLOCO_B
-    // no engine NOVO. Recebem apenas o funding individual.
+  it("fundadores no NOVO recebem ZERO em tudo (engine NOVO ignora fundingFundadorAnual)", () => {
+    // Política DSF v1: fundadores "Não considerar" — engine NOVO ignora
+    // fundingFundadorAnual (planilha de/para confirma). Campo continua
+    // existindo no Socio e alimenta APENAS o engine ATUAL.
     const socios: SocioInput[] = [
       { id: "f1", nome: "F1", cargo: "Fund", publico: "FUNDADOR",
         percentualQuotas: 0.5, originacaoEsperadaAnual: 0, isFundador: true,
@@ -174,16 +174,13 @@ describe("Modelo NOVO — cenário 100% fundadores (sem não-fund)", () => {
       resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
       premissas: baseNovo,
     });
-    // Cada fundador recebe 100k de funding + 0 de blocos (publico FUNDADOR
-    // não está em PUBLICOS_CAPITAL nem PUBLICOS_BLOCO_B).
     for (const p of r.pacotes) {
-      expect(p.remuneracaoFundador).toBe(100_000);
+      expect(p.remuneracaoFundador).toBe(0);
       expect(p.blocoA).toBe(0);
       expect(p.blocoB).toBe(0);
+      expect(p.total).toBe(0);
     }
-    expect(r.pacotes[0].total).toBeCloseTo(100_000, 1);
-    // Total distribuído = 200k (2 × 100k); RDA residual fica retido como Bloco C.
-    expect(r.totalDistribuido).toBeCloseTo(200_000, 1);
+    expect(r.totalDistribuido).toBe(0);
   });
 });
 

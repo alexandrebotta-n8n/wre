@@ -96,6 +96,9 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   let totalAdmin = 0;
   const adminPorSocio = new Map<string, number>();
   for (const s of socios) {
+    // Política DSF v1: fundadores "Não considerar" — engine NOVO os exclui de
+    // tudo (planilha de/para confirma). Apenas isFundador=false participa.
+    if (s.isFundador) continue;
     if (!PUBLICOS_REM_ADMIN.includes(s.publico)) continue;
     let valor = 0;
     if (s.remuneracaoGestaoMensalOverride != null && s.remuneracaoGestaoMensalOverride > 0) {
@@ -120,24 +123,17 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     // Implementação completa do retorno ao RDA fica para iteração futura.
   }
 
-  // Etapa 3.5 — Funding fundadores (discricionário, cadastrado por sócio
-  // em /socios via Socio.fundingFundadorAnual). Cada fundador recebe seu
-  // valor próprio (não rateio por quotas). Deduzido do LL antes do RDA.
-  const fundadores = socios.filter((s) => s.isFundador);
+  // Etapa 3.5 — Funding fundadores: REMOVIDO da política NOVA.
+  // Fundadores não recebem na Política DSF v1 (conforme planilha "Dados Sócios
+  // para Simulador.xlsx" — coluna "Nova Política" = Não considerar). O campo
+  // Socio.fundingFundadorAnual continua existindo no DB mas só alimenta o
+  // engine ATUAL. RDA central preserva esse valor (não deduz).
   const remFundadorPorSocio = new Map<string, number>();
-  let totalFundadores = 0;
-  for (const s of fundadores) {
-    const v = Math.max(0, s.fundingFundadorAnual ?? 0);
-    if (v > 0) {
-      remFundadorPorSocio.set(s.id, v);
-      totalFundadores += v;
-    }
-  }
 
   // Etapa 7 — RDA central
-  // RDA = LL_matriz − admin − fundadores (admin e fundadores já são deduções).
+  // RDA = LL_matriz − admin (fundadores não são deduzidos no NOVO).
   // Simplificação MVP: matriz já é consolidada.
-  const rda = Math.max(0, llMatriz - totalAdmin - totalFundadores);
+  const rda = Math.max(0, llMatriz - totalAdmin);
 
   // Etapa 8 — Blocos A/B/C
   const totalBlocoA = rda * premissas.percentualBlocoA;
@@ -154,29 +150,65 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
 
   // Distribuição Bloco B — modo configurável (default: UNIFORME)
   const distribuicaoB = premissas.distribuicaoBlocoB ?? "UNIFORME";
-  const elegiveisB = socios.filter((s) => PUBLICOS_BLOCO_B.includes(s.publico));
+  // Bloco B: também exclui fundadores (Política DSF v1 — "Não considerar").
+  const elegiveisB = socios.filter((s) => !s.isFundador && PUBLICOS_BLOCO_B.includes(s.publico));
   // Pesos por categoria (multiplicador aplicado ao peso-base). Default 1.
   const pesoCat = premissas.pesoCategoria ?? {};
-  // Mapa peso efetivo por sócio elegível, conforme modo:
-  //   UNIFORME: peso = 1
-  //   PESO_INDIVIDUAL: peso = pesoBlocoB ?? 1
-  //   ORIGINACAO: peso = originacaoEsperadaAnual (zero exclui)
-  //   POR_AREA: peso = (mixOrg × pesoOrgArea) + (mixInc × pesoIncArea); sem área → 0
-  // Em todos os modos, o peso final é multiplicado por pesoCategoria[publico] ?? 1.
-  const pesosBlocoB = new Map<string, number>();
-  for (const s of elegiveisB) {
-    let peso = 1;
-    if (distribuicaoB === "PESO_INDIVIDUAL") peso = s.pesoBlocoB ?? 1;
-    else if (distribuicaoB === "ORIGINACAO") peso = s.originacaoEsperadaAnual ?? 0;
-    else if (distribuicaoB === "POR_AREA") peso = pesoPorArea(s.areaPraticaCodigo, premissas.pesosPorArea);
-    peso *= pesoCat[s.publico] ?? 1;
-    pesosBlocoB.set(s.id, peso);
-  }
-  const somaPesosB = Array.from(pesosBlocoB.values()).reduce((acc, v) => acc + v, 0);
-
   // Pró-labore: aplicado a todas as 6 categorias da Política DSF v1, proporcional
   // ao período (3 meses para trimestre, 12 para ano).
   const proLaboreMensal = premissas.proLaboreMensal ?? 0;
+
+  // Modo ALVO_NUM_SALARIOS: cada elegível recebe um VALOR direto em R$.
+  // Não é peso proporcional — é alvo absoluto. valorBlocoBAbsoluto guarda
+  // o R$ final por sócio (após eventual pro-rata se Σ alvos > totalBlocoB).
+  // Para os outros modos, usamos pesos relativos em `pesosBlocoB`.
+  const valorBlocoBAbsoluto = new Map<string, number>();
+  const pesosBlocoB = new Map<string, number>();
+
+  if (distribuicaoB === "ALVO_NUM_SALARIOS") {
+    // Calcula salário base mensal por sócio (rem.gestão + pró-labore).
+    // Rem.gestão: override individual > tabela[nível][faixa].
+    // Pró-labore: override individual > global da premissa, só se elegível.
+    for (const s of elegiveisB) {
+      const n = s.blocoBNumSalariosAlvo ?? 0;
+      if (n <= 0) continue;
+      const remGestaoMensal =
+        s.remuneracaoGestaoMensalOverride ??
+        (s.nivelCargo && s.faixaSalarial
+          ? premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0
+          : 0);
+      const proLaboreMensalSocio = PUBLICOS_PRO_LABORE.includes(s.publico)
+        ? (s.proLaboreMensalOverride ?? proLaboreMensal)
+        : 0;
+      const baseSalario = remGestaoMensal + proLaboreMensalSocio;
+      valorBlocoBAbsoluto.set(s.id, baseSalario * n);
+    }
+    const somaAlvos = Array.from(valorBlocoBAbsoluto.values()).reduce((a, v) => a + v, 0);
+    // Pro-rata se Σ alvos > Bloco B disponível.
+    const fator = somaAlvos > totalBlocoB && somaAlvos > 0 ? totalBlocoB / somaAlvos : 1;
+    if (fator !== 1) {
+      for (const [id, alvo] of valorBlocoBAbsoluto) {
+        valorBlocoBAbsoluto.set(id, alvo * fator);
+      }
+    }
+  } else {
+    // Mapa peso efetivo por sócio elegível, conforme modo:
+    //   UNIFORME: peso = 1
+    //   PESO_INDIVIDUAL: peso = pesoBlocoB ?? 1
+    //   ORIGINACAO: peso = originacaoEsperadaAnual (zero exclui)
+    //   POR_AREA: peso = (mixOrg × pesoOrgArea) + (mixInc × pesoIncArea); sem área → 0
+    // Em todos os modos, o peso final é multiplicado por pesoCategoria[publico] ?? 1.
+    for (const s of elegiveisB) {
+      let peso = 1;
+      if (distribuicaoB === "PESO_INDIVIDUAL") peso = s.pesoBlocoB ?? 1;
+      else if (distribuicaoB === "ORIGINACAO") peso = s.originacaoEsperadaAnual ?? 0;
+      else if (distribuicaoB === "POR_AREA") peso = pesoPorArea(s.areaPraticaCodigo, premissas.pesosPorArea);
+      peso *= pesoCat[s.publico] ?? 1;
+      pesosBlocoB.set(s.id, peso);
+    }
+  }
+  const somaPesosB = Array.from(pesosBlocoB.values()).reduce((acc, v) => acc + v, 0);
+
   const taxaComissao = premissas.taxaComissaoOriginacao ?? 0;
 
   const pacotes: PacoteRemuneracao[] = [];
@@ -186,8 +218,9 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     const trace: TraceItem[] = [];
     // Pró-labore — aplicado às 5 categorias elegíveis da Política DSF v1.
     // Override individual (Socio.proLaboreMensal) > global da Premissa.
+    // Fundadores são excluídos (Política DSF v1 — "Não considerar").
     const mensalEfetivo = s.proLaboreMensalOverride ?? proLaboreMensal;
-    const proLabore = PUBLICOS_PRO_LABORE.includes(s.publico)
+    const proLabore = !s.isFundador && PUBLICOS_PRO_LABORE.includes(s.publico)
       ? mensalEfetivo * periodo.meses
       : 0;
     if (proLabore > 0) {
@@ -221,9 +254,21 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       });
     }
 
-    // Bloco B — distribuído pelo peso do sócio (modo configurável)
+    // Bloco B — distribuído pelo modo configurável.
+    // Modo ALVO_NUM_SALARIOS: valor absoluto direto (já pro-ratado se preciso).
+    // Outros modos: peso relativo × Bloco B disponível.
     let blocoB = 0;
-    if (PUBLICOS_BLOCO_B.includes(s.publico) && somaPesosB > 0) {
+    if (distribuicaoB === "ALVO_NUM_SALARIOS") {
+      blocoB = valorBlocoBAbsoluto.get(s.id) ?? 0;
+      if (blocoB > 0) {
+        const n = s.blocoBNumSalariosAlvo ?? 0;
+        trace.push({
+          etapa: "8.bloco-B",
+          descricao: `${n} salários × base (alvo individual)`,
+          valor: blocoB,
+        });
+      }
+    } else if (PUBLICOS_BLOCO_B.includes(s.publico) && somaPesosB > 0) {
       const meuPeso = pesosBlocoB.get(s.id) ?? 0;
       blocoB = (meuPeso / somaPesosB) * totalBlocoB;
       if (blocoB > 0) {
@@ -253,7 +298,7 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     // por trimestre é deixado a cargo do dado de origem (originacaoEfetiva é
     // somada para o período relevante antes de chegar aqui).
     let creditoOriginacao = 0;
-    if (taxaComissao > 0 && (s.originacaoEfetiva ?? 0) > 0) {
+    if (!s.isFundador && taxaComissao > 0 && (s.originacaoEfetiva ?? 0) > 0) {
       creditoOriginacao = (s.originacaoEfetiva ?? 0) * taxaComissao;
       trace.push({
         etapa: "5.comissao-orig",
