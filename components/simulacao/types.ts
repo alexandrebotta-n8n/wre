@@ -57,6 +57,8 @@ export interface TraceItem {
 export interface LinhaComparativa {
   socioId: string;
   nome: string;
+  /** Classificação (público) — preferir o do cenário B (NOVO); fallback A. */
+  publico: string;
   isFundador: boolean;
   /** Total anual. null se sócio não tem nenhuma remuneração no cenário. */
   totalA: number | null;

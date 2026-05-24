@@ -44,12 +44,12 @@ describe("Bloco B — modo ALVO_NUM_SALARIOS", () => {
     const r = calcularModeloNovo({
       periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
       socios: [
-        // Alessandro: rem.gestão 9600 + pró-labore 5000 = 14600; alvo 20 = R$ 292.000
+        // Alessandro (Capital-Gestor): rem.gestão 9600 + pró-labore 5000 = 14600; alvo 20 = R$ 292.000
         { id: "ale", nome: "Alessandro", cargo: "CEO", publico: "SOCIO_CAPITAL_GESTOR",
           percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false,
           nivelCargo: "A", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 20 },
-        // Bárbara: rem.gestão 11400 + pró-labore 5000 = 16400; alvo 10 = R$ 164.000
-        // Nota: SOCIO_SERVICOS recebe pró-labore (está em PUBLICOS_PRO_LABORE)
+        // Bárbara (SOCIO_SERVICOS): só rem.gestão 11400 (sem pró-labore — Política DSF v1
+        // exclui Sócios de Serviço de PUBLICOS_PRO_LABORE); alvo 10 = R$ 114.000
         { id: "bar", nome: "Bárbara", cargo: "Gestora", publico: "SOCIO_SERVICOS",
           percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false,
           remuneracaoGestaoMensalOverride: 11400, blocoBNumSalariosAlvo: 10 },
@@ -58,13 +58,15 @@ describe("Bloco B — modo ALVO_NUM_SALARIOS", () => {
       premissas: premissasBase,
     });
     expect(r.pacotes[0].blocoB).toBe(292_000);
-    expect(r.pacotes[1].blocoB).toBe(164_000);
+    expect(r.pacotes[1].blocoB).toBe(114_000);
   });
 
   it("Σ alvos > Bloco B: pro-rata proporcional ao alvo", () => {
-    // LL = 500k. Admin (anual): Alessandro 9600×12=115200 + Bárbara 11400×12=136800
-    //   → total 252000. RDA = 500000 − 252000 = 248000. Bloco B = 35% × 248000 = 86800.
-    // Σ alvos = 292000 + 164000 = 456000 > 86800 → pro-rata.
+    // LL = 500k. RDA = LL diretamente (admin é despesa contábil já no LL líquido).
+    // Bloco B = 35% × 500000 = 175000.
+    // Alessandro: alvo = 14600 × 20 = 292000 (com pró-labore — Capital-Gestor).
+    // Bárbara: alvo = 11400 × 10 = 114000 (sem pró-labore — Sócio de Serviço).
+    // Σ alvos = 406000 > 175000 → pro-rata.
     const r = calcularModeloNovo({
       periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
       socios: [
@@ -78,11 +80,11 @@ describe("Bloco B — modo ALVO_NUM_SALARIOS", () => {
       resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 500_000 }],
       premissas: premissasBase,
     });
-    const totalBlocoB = 86_800;
-    const somaAlvos = 456_000;
+    const totalBlocoB = 175_000;
+    const somaAlvos = 292_000 + 114_000;
     const fator = totalBlocoB / somaAlvos;
     expect(r.pacotes[0].blocoB).toBeCloseTo(292_000 * fator, 1);
-    expect(r.pacotes[1].blocoB).toBeCloseTo(164_000 * fator, 1);
+    expect(r.pacotes[1].blocoB).toBeCloseTo(114_000 * fator, 1);
     expect(r.pacotes[0].blocoB + r.pacotes[1].blocoB).toBeCloseTo(totalBlocoB, 0);
   });
 

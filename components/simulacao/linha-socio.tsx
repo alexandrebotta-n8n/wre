@@ -34,6 +34,19 @@ export function LinhaSocio({
 
   const temAlgumTrace = l.traceA.length > 0 || l.traceB.length > 0;
 
+  // Labels curtos das classificações DSF v1 — combinam bem na largura
+  // limitada da coluna na tabela.
+  const PUBLICOS_LABEL: Record<string, string> = {
+    SOCIO_CAPITAL: "Sócio de Capital",
+    SOCIO_CAPITAL_GESTOR: "Sócio de Capital — Gestor",
+    SOCIO_CAPITAL_LIDER_UNIDADE: "Sócio de Capital — Líder Un.",
+    SOCIO_SERVICOS: "Sócio de Serviços",
+    SOCIO_SERVICOS_ESTRATEGICO: "Sócio de Serviços Estratégico",
+    LIDER_UNIDADE_NON_EQUITY: "Líder de Un. Non-Equity",
+    LIDER_TECNICO: "Líder Técnico (legado)",
+    FUNDADOR: "Fundador",
+  };
+
   return (
     <>
       <TR className={cn(aberto && "bg-peri-50/30")}>
@@ -62,6 +75,11 @@ export function LinhaSocio({
               {l.isFundador && <Badge variant="success" size="sm">fundador</Badge>}
             </span>
           )}
+        </TD>
+        <TD>
+          <Badge variant="info" size="sm" title={PUBLICOS_LABEL[l.publico] ?? l.publico}>
+            {PUBLICOS_LABEL[l.publico] ?? l.publico}
+          </Badge>
         </TD>
         {singleLado ? (
           <TD className="text-right tabular-nums">

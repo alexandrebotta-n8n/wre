@@ -176,8 +176,8 @@ function FormParamsAtual({
           erros.push(`Reserva (%) deve estar entre 0 e 1`);
         }
         if (!override.unidadeMatriz) erros.push("Unidade matriz não pode ser vazia");
-        if (override.mesesAnualLiderTecnicoCLT < 12 || override.mesesAnualLiderTecnicoCLT > 14) {
-          erros.push("Fator CLT (Líder Técnico) deve estar entre 12 e 14");
+        if (override.mesesAnualLiderTecnicoCLT < 12 || override.mesesAnualLiderTecnicoCLT > 15) {
+          erros.push("Fator CLT (Líder Técnico) deve estar entre 12 e 15");
         }
         if (erros.length > 0) {
           toast.error(erros.join(" · "), { duration: 6000 });
@@ -224,21 +224,21 @@ function FormParamsAtual({
       </label>
       <Field
         label={
-          <LabelHelp ajuda="Multiplica o salário mensal dos sócios LIDER_TECNICO (CLT legado) para chegar ao custo anual. Default 13,33 = 12 meses + 13º + ⅓ de férias. Outros públicos sempre usam 12.">
+          <LabelHelp ajuda="Multiplica o salário mensal dos sócios LIDER_TECNICO (CLT legado) para chegar ao custo anual. Default 14,4 = 12 + 13º + ⅓ férias + FGTS médio (~0,96/ano). Use 13,33 sem FGTS. Outros públicos sempre usam 12.">
             Fator anualização CLT (Líder Técnico)
           </LabelHelp>
         }
         htmlFor={`cltf-${cenarioId}`}
-        hint="12,00 = sem benefícios · 13,33 = CLT padrão"
+        hint="12 = sem benefícios · 13,33 = CLT sem FGTS · 14,4 = CLT completo com FGTS"
       >
         <Input
           id={`cltf-${cenarioId}`}
           type="number"
           name="mesesAnualLiderTecnicoCLT"
-          defaultValue={Number(parametros.mesesAnualLiderTecnicoCLT ?? 13.33)}
+          defaultValue={Number(parametros.mesesAnualLiderTecnicoCLT ?? 14.4)}
           step="0.01"
           min="12"
-          max="14"
+          max="15"
           required
         />
       </Field>

@@ -67,8 +67,10 @@ const PUBLICOS_BLOCO_B: Publico[] = [
   "SOCIO_SERVICOS",
   "SOCIO_SERVICOS_ESTRATEGICO",
 ];
-// Pró-labore: mesmas 5 categorias. Líder Non-Equity NÃO recebe.
-const PUBLICOS_PRO_LABORE: Publico[] = [...PUBLICOS_BLOCO_B];
+// Pró-labore: APENAS Sócios de Capital (3 categorias). Sócios de Serviço/
+// Líderes Técnicos não recebem pró-labore na Política DSF v1 (planilha
+// "Dados Sócios para Simulador.xlsx" — coluna P.Lab. dos E é zero).
+const PUBLICOS_PRO_LABORE: Publico[] = [...PUBLICOS_CAPITAL];
 // Remuneração de Administração: 4 categorias.
 //   Default: SOCIO_CAPITAL_GESTOR, SOCIO_SERVICOS
 //   Condicionado: SOCIO_CAPITAL_LIDER_UNIDADE, SOCIO_SERVICOS_ESTRATEGICO
@@ -131,14 +133,16 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const remFundadorPorSocio = new Map<string, number>();
 
   // Etapa 7 — RDA central
-  // RDA = LL_matriz − admin (fundadores não são deduzidos no NOVO).
-  // Simplificação MVP: matriz já é consolidada.
-  const rda = Math.max(0, llMatriz - totalAdmin);
+  // RDA = LL_matriz direto. Admin é despesa contábil já refletida no LL
+  // líquido (planilha de/para confirma: LL 8.001.970 já é "líquido após
+  // despesas"). Não dedupla aqui.
+  const rda = Math.max(0, llMatriz);
+  void totalAdmin; // mantido como métrica auxiliar p/ inspeção futura
 
   // Etapa 8 — Blocos A/B/C
   const totalBlocoA = rda * premissas.percentualBlocoA;
   const totalBlocoB = rda * premissas.percentualBlocoB;
-  // const totalBlocoC = rda * premissas.percentualBlocoC; // mantido como reserva estratégica
+  const totalBlocoC = rda * premissas.percentualBlocoC;
 
   // Distribuição Bloco A — proporcional a quotas entre Sócios de Capital
   // NÃO-fundadores. Fundadores recebem só o funding individual (etapa 3.5);
@@ -159,16 +163,19 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const proLaboreMensal = premissas.proLaboreMensal ?? 0;
 
   // Modo ALVO_NUM_SALARIOS: cada elegível recebe um VALOR direto em R$.
-  // Não é peso proporcional — é alvo absoluto. valorBlocoBAbsoluto guarda
-  // o R$ final por sócio (após eventual pro-rata se Σ alvos > totalBlocoB).
+  // Não é peso proporcional — é alvo absoluto. valorBlocoBAbsoluto/valorBlocoCAbsoluto
+  // guardam o R$ final por sócio (após eventual pro-rata se Σ alvos > disponível).
   // Para os outros modos, usamos pesos relativos em `pesosBlocoB`.
   const valorBlocoBAbsoluto = new Map<string, number>();
+  const valorBlocoCAbsoluto = new Map<string, number>();
   const pesosBlocoB = new Map<string, number>();
 
   if (distribuicaoB === "ALVO_NUM_SALARIOS") {
     // Calcula salário base mensal por sócio (rem.gestão + pró-labore).
     // Rem.gestão: override individual > tabela[nível][faixa].
-    // Pró-labore: override individual > global da premissa, só se elegível.
+    // Pró-labore: override individual > global da premissa, só se elegível
+    // (Sócios de Capital — Política DSF v1 exclui Sócios de Serviço).
+    const baseMensalPorSocio = new Map<string, number>();
     for (const s of elegiveisB) {
       const n = s.blocoBNumSalariosAlvo ?? 0;
       if (n <= 0) continue;
@@ -180,17 +187,24 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       const proLaboreMensalSocio = PUBLICOS_PRO_LABORE.includes(s.publico)
         ? (s.proLaboreMensalOverride ?? proLaboreMensal)
         : 0;
-      const baseSalario = remGestaoMensal + proLaboreMensalSocio;
-      valorBlocoBAbsoluto.set(s.id, baseSalario * n);
+      baseMensalPorSocio.set(s.id, remGestaoMensal + proLaboreMensalSocio);
     }
-    const somaAlvos = Array.from(valorBlocoBAbsoluto.values()).reduce((a, v) => a + v, 0);
-    // Pro-rata se Σ alvos > Bloco B disponível.
-    const fator = somaAlvos > totalBlocoB && somaAlvos > 0 ? totalBlocoB / somaAlvos : 1;
-    if (fator !== 1) {
-      for (const [id, alvo] of valorBlocoBAbsoluto) {
-        valorBlocoBAbsoluto.set(id, alvo * fator);
+    // Helper: distribui um total (B ou C) pelos alvos individuais, com pro-rata.
+    const distribuirPorAlvo = (total: number, destino: Map<string, number>) => {
+      for (const s of elegiveisB) {
+        const n = s.blocoBNumSalariosAlvo ?? 0;
+        const base = baseMensalPorSocio.get(s.id) ?? 0;
+        if (n <= 0 || base <= 0) continue;
+        destino.set(s.id, base * n);
       }
-    }
+      const soma = Array.from(destino.values()).reduce((a, v) => a + v, 0);
+      const fator = soma > total && soma > 0 ? total / soma : 1;
+      if (fator !== 1) {
+        for (const [id, alvo] of destino) destino.set(id, alvo * fator);
+      }
+    };
+    distribuirPorAlvo(totalBlocoB, valorBlocoBAbsoluto);
+    distribuirPorAlvo(totalBlocoC, valorBlocoCAbsoluto);
   } else {
     // Mapa peso efetivo por sócio elegível, conforme modo:
     //   UNIFORME: peso = 1
@@ -258,14 +272,24 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     // Modo ALVO_NUM_SALARIOS: valor absoluto direto (já pro-ratado se preciso).
     // Outros modos: peso relativo × Bloco B disponível.
     let blocoB = 0;
+    let blocoC = 0;
     if (distribuicaoB === "ALVO_NUM_SALARIOS") {
       blocoB = valorBlocoBAbsoluto.get(s.id) ?? 0;
+      blocoC = valorBlocoCAbsoluto.get(s.id) ?? 0;
       if (blocoB > 0) {
         const n = s.blocoBNumSalariosAlvo ?? 0;
         trace.push({
           etapa: "8.bloco-B",
           descricao: `${n} salários × base (alvo individual)`,
           valor: blocoB,
+        });
+      }
+      if (blocoC > 0) {
+        const n = s.blocoBNumSalariosAlvo ?? 0;
+        trace.push({
+          etapa: "8.bloco-C",
+          descricao: `${n} salários × base (alvo individual, mesmo Bloco B)`,
+          valor: blocoC,
         });
       }
     } else if (PUBLICOS_BLOCO_B.includes(s.publico) && somaPesosB > 0) {
@@ -307,7 +331,7 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       });
     }
 
-    const total = proLabore + remGestao + remFundador + blocoA + blocoB + poolUnidade + creditoOriginacao;
+    const total = proLabore + remGestao + remFundador + blocoA + blocoB + blocoC + poolUnidade + creditoOriginacao;
     totalDistribuido += total;
 
     const pacote: PacoteRemuneracao = {
@@ -319,7 +343,9 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       remuneracaoFundador: remFundador,
       blocoA,
       blocoB,
-      blocoC: 0, // Bloco C retido como reserva estratégica — sem distribuição individual no MVP
+      // Bloco C: distribuído via mesma fórmula do Bloco B quando modo é
+      // ALVO_NUM_SALARIOS (Política DSF v1). Outros modos: retido (0).
+      blocoC,
       poolUnidade,
       creditoOriginacao,
       creditoExecucao: 0,
@@ -342,13 +368,21 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     alertasGlobais.push("Soma do Pool (sociedade+líder+equipe) não é 100%.");
   }
 
+  // Reserva central = Bloco C que NÃO foi distribuído. Quando modo é
+  // ALVO_NUM_SALARIOS, Bloco C distribui pelos sócios → reserva = sobra
+  // (totalBlocoC − Σ blocoC distribuído). Outros modos: reserva = totalBlocoC.
+  const blocoCDistribuido =
+    distribuicaoB === "ALVO_NUM_SALARIOS"
+      ? Array.from(valorBlocoCAbsoluto.values()).reduce((a, v) => a + v, 0)
+      : 0;
+  const reservaCentral = totalBlocoC - blocoCDistribuido;
   return {
     modelo: "NOVO",
     periodo,
     pacotes,
     totalDistribuido,
-    totalReservaCentral: rda * premissas.percentualBlocoC, // Bloco C retido como reserva estratégica no MVP
-    totalNaoAlocado: llMatriz - totalDistribuido - rda * premissas.percentualBlocoC,
+    totalReservaCentral: reservaCentral,
+    totalNaoAlocado: llMatriz - totalDistribuido - reservaCentral,
     alertasGlobais,
   };
 }

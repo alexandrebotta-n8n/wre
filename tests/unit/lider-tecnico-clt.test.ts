@@ -24,8 +24,8 @@ const resultadosBase = [
   { unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 },
 ];
 
-describe("Política ATUAL — Líder Técnico CLT (fator 13.33)", () => {
-  it("rem. de gestão anual = mensal × 13.33 quando público=LIDER_TECNICO", () => {
+describe("Política ATUAL — Líder Técnico CLT (fator default 14.4)", () => {
+  it("rem. de gestão anual = mensal × 14.4 quando público=LIDER_TECNICO", () => {
     const input: InputModeloAtual = {
       periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
       socios: [{
@@ -42,8 +42,8 @@ describe("Política ATUAL — Líder Técnico CLT (fator 13.33)", () => {
       premissas: premissasAtualBase,
     };
     const r = calcularModeloAtual(input);
-    // 10405 × 13.33 = 138.698,65 (10405×13 + 10405×0.33)
-    expect(r.pacotes[0].remuneracaoGestao).toBeCloseTo(138_698.65, 2);
+    // 10405 × 14.4 = 149.832 (default CLT completo com FGTS)
+    expect(r.pacotes[0].remuneracaoGestao).toBeCloseTo(149_832, 2);
   });
 
   it("fator CLT é configurável via mesesAnualLiderTecnicoCLT (ex: 12 = sem benefícios)", () => {
@@ -104,7 +104,7 @@ describe("Política ATUAL — Líder Técnico CLT (fator 13.33)", () => {
     expect(r.pacotes[1].blocoB).toBeGreaterThan(0); // Sócio A absorve tudo
   });
 
-  it("período TRIMESTRE proporcionaliza o fator CLT (13.33 × 3/12 = 3.3325)", () => {
+  it("período TRIMESTRE proporcionaliza o fator CLT (default 14.4 × 3/12 = 3.6)", () => {
     const input: InputModeloAtual = {
       periodo: { rotulo: "1T2026", tipo: "TRIMESTRE", meses: 3 },
       socios: [{
@@ -121,8 +121,8 @@ describe("Política ATUAL — Líder Técnico CLT (fator 13.33)", () => {
       premissas: premissasAtualBase,
     };
     const r = calcularModeloAtual(input);
-    // 7480 × 13.33 × 3/12 = 7480 × 3.3325 = 24.927,10
-    expect(r.pacotes[0].remuneracaoGestao).toBeCloseTo(7_480 * 13.33 * 3 / 12, 2);
+    // 7480 × 14.4 × 3/12 = 7480 × 3.6 = 26.928
+    expect(r.pacotes[0].remuneracaoGestao).toBeCloseTo(7_480 * 14.4 * 3 / 12, 2);
   });
 });
 

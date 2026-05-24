@@ -11,10 +11,10 @@ export const ParamsAtualSchema = z.object({
   reservaPercentual: z.number().min(0).max(1),
   reservaViraPremio: z.boolean(),
   publicosElegiveisPremio: z.array(z.string()).optional(),
-  // Fator de anualização CLT para LIDER_TECNICO (default 13.33 = 12 + 13º + ⅓ férias).
-  // Aplicado em vez de meses na rem. gestão de sócios LIDER_TECNICO. Range permite
-  // ajustar de 12 (sem benefícios) até ~14 (incluindo extras).
-  mesesAnualLiderTecnicoCLT: z.number().min(12).max(14).optional(),
+  // Fator de anualização CLT para LIDER_TECNICO (default 14,4 = 12 + 13º + ⅓
+  // férias + FGTS médio). Aplicado em vez de meses na rem. gestão.
+  // Range 12 (sem benefícios) a 15 (com tudo).
+  mesesAnualLiderTecnicoCLT: z.number().min(12).max(15).optional(),
 }).strict();
 export type ParamsAtualInput = z.infer<typeof ParamsAtualSchema>;
 

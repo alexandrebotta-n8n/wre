@@ -111,7 +111,8 @@ export interface PremissasModeloAtual {
   // Tabela de remuneração de gestão (mensal por nível × faixa)
   tabelaSalarial: TabelaSalarial;
   // Fator de anualização CLT para sócios LIDER_TECNICO (legado).
-  // Default 13.33 = 12 meses + 13º + ⅓ de férias. Aplicado em vez de meses.
+  // Default 14,4 = 12 + 13º + ⅓ férias + FGTS médio (~0,96 mês/ano).
+  // Use 13,33 se não quiser FGTS. Aplicado em vez de meses no engine ATUAL.
   // Outros públicos sempre usam periodo.meses (12 anual). Proporcional ao
   // período: trimestral = mesesAnualLiderTecnicoCLT × (periodo.meses / 12).
   mesesAnualLiderTecnicoCLT?: number;

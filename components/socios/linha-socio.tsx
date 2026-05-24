@@ -223,6 +223,11 @@ export function LinhaSocio({
             )}
           </span>
         </TD>
+        <TD className="text-center tabular-nums text-sm">
+          {socio.blocoBNumSalariosAlvo != null && socio.blocoBNumSalariosAlvo > 0
+            ? socio.blocoBNumSalariosAlvo
+            : <span className="text-neutral-300">—</span>}
+        </TD>
         <TD>
           <div className="flex items-center gap-1 flex-wrap">
             <Badge variant="info" size="sm">

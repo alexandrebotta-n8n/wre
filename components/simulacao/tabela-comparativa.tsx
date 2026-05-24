@@ -36,9 +36,9 @@ export function TabelaComparativa({
   const nomeUnico = lado === "a" ? nomeA : lado === "b" ? nomeB : undefined;
   const totalUnico = lado === "a" ? totalA : totalB;
 
-  // Modo comparativo: Sócio + Total A + Total B + Δ R$ + Δ %  → 5
-  // Modo single:     Sócio + Total                            → 2
-  const colSpan = single ? 2 : 1 + 2 + (podeCompararDiff ? 2 : 0);
+  // Modo comparativo: Sócio + Classif + Total A + Total B + Δ R$ + Δ %  → 6
+  // Modo single:     Sócio + Classif + Total                            → 3
+  const colSpan = single ? 3 : 2 + 2 + (podeCompararDiff ? 2 : 0);
 
   return (
     <Card className="overflow-hidden">
@@ -80,6 +80,7 @@ export function TabelaComparativa({
         <THead>
           <tr>
             <TH className="px-4">Sócio</TH>
+            <TH>Classificação</TH>
             {single ? (
               <TH className="text-right">Total</TH>
             ) : (
@@ -114,6 +115,7 @@ export function TabelaComparativa({
           {linhas.length > 0 && (
             <tr className="bg-neutral-50 font-semibold">
               <td className="px-4 py-2.5">Total geral</td>
+              <td />
               {single ? (
                 <td className="px-3 py-2.5 text-right tabular-nums">{brl(totalUnico, true)}</td>
               ) : (

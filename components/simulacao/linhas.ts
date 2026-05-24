@@ -1,7 +1,6 @@
 // Construção das linhas comparativas alinhadas por sócio entre A e B.
 // Visão ANUAL única — agrega todas as linhas de RemuneracaoCalculada do
 // cenário (1 por sócio no novo sistema; pode ter até 4 em APPLIED antigos).
-import { nomeOuIniciais } from "@/lib/format";
 import type { CenarioCompleto, LinhaComparativa, TraceItem } from "./types";
 
 type RemuneracaoRow = NonNullable<CenarioCompleto>["remuneracoes"][number];
@@ -43,10 +42,17 @@ function agregar(rows: RemuneracaoRow[] | undefined): Map<string, AggSocio> {
 export function construirLinhasComparativas(
   a: CenarioCompleto | null,
   b: CenarioCompleto | null,
-  modoNome: "completo" | "iniciais",
+  _modoNome: "completo" | "iniciais",
 ): LinhaComparativa[] {
+  // Nome completo sempre na tabela de pacotes — facilita identificação e
+  // o waterfall já mostra detalhes. modoNome continua afetando outras telas.
+  void _modoNome;
   const mapA = agregar(a?.remuneracoes);
   const mapB = agregar(b?.remuneracoes);
+  // Classificações por sócio — preferir o cenário B (NOVO), fallback A.
+  const publicoPorSocio = new Map<string, string>();
+  for (const c of a?.classificacoes ?? []) publicoPorSocio.set(c.socioId, c.publico);
+  for (const c of b?.classificacoes ?? []) publicoPorSocio.set(c.socioId, c.publico);
   const ids = Array.from(new Set([...mapA.keys(), ...mapB.keys()]));
   const linhas: LinhaComparativa[] = ids.map((sid) => {
     const ra = mapA.get(sid);
@@ -58,7 +64,8 @@ export function construirLinhasComparativas(
     const diffPct = totalA && totalA !== 0 ? diff / totalA : null;
     return {
       socioId: sid,
-      nome: nomeOuIniciais(nomeOriginal, modoNome),
+      nome: nomeOriginal,
+      publico: publicoPorSocio.get(sid) ?? "—",
       isFundador: ra?.isFundador ?? rb?.isFundador ?? false,
       totalA,
       totalB,

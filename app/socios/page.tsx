@@ -37,10 +37,10 @@ const PUBLICOS_LABEL: Record<string, string> = {
   FUNDADOR: "Fundador",
 };
 
-// Número de colunas na tabela (chevron + 6 colunas visíveis: sócio, cargo,
-// quota original, quota redistribuída, classificação, status). Usado pelo
-// colSpan da linha expandida (linha-socio.tsx).
-const TABLE_COLS = 7;
+// Número de colunas na tabela (chevron + 7 colunas visíveis: sócio, cargo,
+// quota original, quota redistribuída, n° sal. B, classificação, status).
+// Usado pelo colSpan da linha expandida (linha-socio.tsx).
+const TABLE_COLS = 8;
 
 export default async function SociosPage({
   searchParams,
@@ -230,6 +230,9 @@ export default async function SociosPage({
                       <span className="text-[9px] uppercase tracking-wider font-medium px-1 py-0.5 rounded bg-peri-700 text-white">em uso</span>
                     )}
                   </span>
+                </TH>
+                <TH className="text-center" title="Alvo do Bloco B em número de salários (modo ALVO_NUM_SALARIOS no engine NOVO). Calibrável por sócio.">
+                  Nº Sal. B
                 </TH>
                 <TH>Classificação (DSF v1)</TH>
                 <TH>Status</TH>

@@ -68,7 +68,9 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
   // Override individual (Socio.remuneracaoGestaoMensal) > tabela[nivel][faixa].
   // Para LIDER_TECNICO (CLT legado) usamos fator anualizado (default 13.33 =
   // 12 + 13º + ⅓ férias), proporcional ao período. Outros públicos usam meses.
-  const fatorCLTAnual = premissas.mesesAnualLiderTecnicoCLT ?? 13.33;
+  // Default 14,4 = 12 + 13º + ⅓ férias + FGTS médio (~0,96 mês/ano).
+  // Use 13,33 se não quiser FGTS. Configurável na premissa.
+  const fatorCLTAnual = premissas.mesesAnualLiderTecnicoCLT ?? 14.4;
   const remGestaoPorSocio = new Map<string, number>();
   const fatorLiderCLTPeriodo = fatorCLTAnual * (periodo.meses / 12);
   for (const s of socios) {
