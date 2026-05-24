@@ -206,3 +206,61 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
     console.error("[socios.atualizar] falhou:", e);
   }
 }
+
+// ============================================================================
+// Modo de quotas (GLOBAL por ano) — vive em ConfiguracaoAno.
+// Trocar marca todos cenários DRAFT do ano como dirty + sincroniza
+// Cenario.modoQuotas. APPLIED preserva (snapshot imutável).
+// ============================================================================
+
+export async function salvarModoQuotasAction(formData: FormData): Promise<void> {
+  try {
+    const session = await requireRole("ADMIN", "CONSULTOR");
+    const ano = Number(formData.get("ano"));
+    const modo = String(formData.get("modoQuotas") ?? "");
+    if (!ano || ano < 2000 || ano > 2100) {
+      await flashError("Ano inválido."); return;
+    }
+    if (modo !== "ORIGINAL" && modo !== "REDISTRIBUIDA") {
+      await flashError("Modo de quotas inválido."); return;
+    }
+
+    await prisma.configuracaoAno.upsert({
+      where: { ano },
+      create: { ano, modoQuotas: modo, atualizadoPorId: session.id },
+      update: { modoQuotas: modo, atualizadoPorId: session.id },
+    });
+
+    // Cascata: marca DRAFTs do ano como dirty + sincroniza Cenario.modoQuotas.
+    const r = await prisma.cenario.updateMany({
+      where: { ano, status: "DRAFT" },
+      data: { modoQuotas: modo, parametrosDirty: true },
+    });
+
+    await logAudit({
+      usuarioId: session.id,
+      acao: "configuracao-ano.modo-quotas.atualizar",
+      recurso: `ConfiguracaoAno:${ano}`,
+      meta: { modo, cenariosMarcadosDirty: r.count },
+    });
+
+    const label = modo === "REDISTRIBUIDA" ? "REDISTRIBUÍDA" : "ORIGINAL";
+    if (r.count > 0) {
+      await flashSuccess(
+        `Modo de quotas: ${label}. ${r.count} cenário(s) DRAFT do ano ${ano} marcado(s) pra recalcular.`,
+      );
+    } else {
+      await flashSuccess(`Modo de quotas: ${label}.`);
+    }
+    revalidatePath("/socios", "layout");
+    revalidatePath("/simulacao", "layout");
+  } catch (e) {
+    if (e instanceof AuthError) {
+      await flashError(e.message);
+      return;
+    }
+    const msg = e instanceof Error ? e.message : "Erro ao salvar modo de quotas";
+    await flashError(msg);
+    console.error("[socios.modo-quotas] falhou:", e);
+  }
+}

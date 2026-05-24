@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { TableShell, THead, TBody, TH } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinhaSocio } from "@/components/socios/linha-socio";
+import { ModoQuotasGlobalCard } from "@/components/socios/modo-quotas-global-card";
 import { redistribuirQuotas } from "@/lib/domain/dsf/quotas";
 import type { Publico } from "@/lib/domain/dsf";
 
@@ -36,16 +37,20 @@ const PUBLICOS_LABEL: Record<string, string> = {
   FUNDADOR: "Fundador",
 };
 
-// Número de colunas na tabela (chevron + 5 colunas visíveis). Usado pelo
+// Número de colunas na tabela (chevron + 6 colunas visíveis: sócio, cargo,
+// quota original, quota redistribuída, classificação, status). Usado pelo
 // colSpan da linha expandida (linha-socio.tsx).
-const TABLE_COLS = 6;
+const TABLE_COLS = 7;
 
 export default async function SociosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; area?: string; tipo?: string; publico?: string }>;
+  searchParams: Promise<{ q?: string; area?: string; tipo?: string; publico?: string; ano?: string }>;
 }) {
   const sp = await searchParams;
+  // Ano de referência pro toggle global de modo de quotas. Pega da query
+  // string OU usa o ano corrente (compat: hoje só existe 2026 em uso).
+  const anoRef = sp.ano ? Number(sp.ano) : new Date().getFullYear();
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
   const modoNome = await getModoNome();
@@ -94,6 +99,17 @@ export default async function SociosPage({
     prisma.cenario.count({ where: { status: "DRAFT" } }),
   ]);
 
+  // Modo de quotas global do ano + contagem de DRAFTs DO ano (usados pelo
+  // toggle no topo de /socios). Default ORIGINAL se ano ainda não tem config.
+  const [configAno, draftsDoAnoCount] = escopo.podeMutar
+    ? await Promise.all([
+        prisma.configuracaoAno.findUnique({ where: { ano: anoRef }, select: { modoQuotas: true } }),
+        prisma.cenario.count({ where: { status: "DRAFT", ano: anoRef } }),
+      ])
+    : [null, 0];
+  const modoQuotasGlobal: "ORIGINAL" | "REDISTRIBUIDA" =
+    (configAno?.modoQuotas as "ORIGINAL" | "REDISTRIBUIDA") ?? "ORIGINAL";
+
   // Quotas redistribuídas — chip read-only ao lado do input de cada sócio.
   // Cálculo é determinístico sobre o conjunto de sócios ativos (independe de
   // cenário): zera fundadores + SOCIO_SERVICOS, capital remanescente absorve
@@ -124,6 +140,15 @@ export default async function SociosPage({
         title="Sócios e Líderes"
         description={`${socios.length} pessoa(s) — clique na linha pra editar inline. Auto-save ao mudar.`}
       />
+
+      {escopo.podeMutar && (
+        <ModoQuotasGlobalCard
+          ano={anoRef}
+          modo={modoQuotasGlobal}
+          draftsCount={draftsDoAnoCount}
+          editavel={escopo.podeMutar}
+        />
+      )}
 
       <Card className="overflow-hidden">
         {escopo.podeMutar && (
@@ -190,7 +215,22 @@ export default async function SociosPage({
                 <TH className="px-4 w-8" aria-label="Expandir" />
                 <TH className="px-2">Sócio</TH>
                 <TH>Cargo</TH>
-                <TH className="text-right">Quotas</TH>
+                <TH className={"text-right " + (modoQuotasGlobal === "ORIGINAL" ? "bg-peri-50/70" : "")}>
+                  <span className="inline-flex items-center gap-1.5">
+                    Quota Original
+                    {modoQuotasGlobal === "ORIGINAL" && (
+                      <span className="text-[9px] uppercase tracking-wider font-medium px-1 py-0.5 rounded bg-peri-700 text-white">em uso</span>
+                    )}
+                  </span>
+                </TH>
+                <TH className={"text-right " + (modoQuotasGlobal === "REDISTRIBUIDA" ? "bg-peri-50/70" : "")}>
+                  <span className="inline-flex items-center gap-1.5">
+                    Quota Redistribuída
+                    {modoQuotasGlobal === "REDISTRIBUIDA" && (
+                      <span className="text-[9px] uppercase tracking-wider font-medium px-1 py-0.5 rounded bg-peri-700 text-white">em uso</span>
+                    )}
+                  </span>
+                </TH>
                 <TH>Classificação (DSF v1)</TH>
                 <TH>Status</TH>
               </tr>
@@ -225,6 +265,7 @@ export default async function SociosPage({
                   colSpan={TABLE_COLS}
                   cenariosDraftCount={cenariosDraftCount}
                   quotaRedistribuida={quotasRedistribuidasMap.get(s.id) ?? s.percentualQuotasDefault}
+                  modoQuotasGlobal={modoQuotasGlobal}
                 />
               ))}
             </TBody>

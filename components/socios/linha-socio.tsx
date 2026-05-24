@@ -101,6 +101,7 @@ export function LinhaSocio({
   colSpan,
   cenariosDraftCount,
   quotaRedistribuida,
+  modoQuotasGlobal,
 }: {
   socio: SocioRow;
   areas: AreaOption[];
@@ -111,9 +112,10 @@ export function LinhaSocio({
   colSpan: number;
   /** Quantos cenários DRAFT existem hoje. Banner de impacto usa essa contagem. */
   cenariosDraftCount: number;
-  /** Quota redistribuída deste sócio (já calculada server-side, considerando
-   *  todos os sócios). Usada pra exibir chip read-only ao lado da quota original. */
+  /** Quota redistribuída deste sócio (calculada server-side com todos os sócios). */
   quotaRedistribuida: number;
+  /** Modo global ATIVO do ano. Usado pra destacar a coluna em uso na tabela. */
+  modoQuotasGlobal: "ORIGINAL" | "REDISTRIBUIDA";
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -122,10 +124,17 @@ export function LinhaSocio({
     PUBLICOS_EXIGEM_NIVEL.has(socio.publicoDefault) &&
     (!socio.nivelCargo || !socio.faixaSalarial);
 
-  const quotasFmt =
-    socio.percentualQuotasDefault > 0
-      ? (socio.percentualQuotasDefault * 100).toFixed(4) + "%"
-      : "—";
+  const fmtPct = (v: number) => (v > 0 ? (v * 100).toFixed(4) + "%" : "—");
+  const quotaOriginalFmt = fmtPct(socio.percentualQuotasDefault);
+  const quotaRedistFmt = fmtPct(quotaRedistribuida);
+  // Razão pela qual a redistribuída ficou diferente (informativo).
+  const motivoRedist = (() => {
+    if (quotaRedistribuida === socio.percentualQuotasDefault) return null;
+    if (quotaRedistribuida === 0) {
+      return socio.isFundador ? "fundador" : "S. Serviços";
+    }
+    return "absorveu";
+  })();
 
   return (
     <>
@@ -177,7 +186,29 @@ export function LinhaSocio({
         <TD className="text-neutral-600 truncate max-w-[240px]" title={socio.cargo}>
           {socio.cargo}
         </TD>
-        <TD className="text-right tabular-nums text-neutral-700">{quotasFmt}</TD>
+        <TD
+          className={cn(
+            "text-right tabular-nums text-neutral-700",
+            modoQuotasGlobal === "ORIGINAL" && "bg-peri-50/40 font-medium text-navy-900",
+          )}
+        >
+          {quotaOriginalFmt}
+        </TD>
+        <TD
+          className={cn(
+            "text-right tabular-nums text-neutral-700",
+            modoQuotasGlobal === "REDISTRIBUIDA" && "bg-peri-50/40 font-medium text-navy-900",
+          )}
+        >
+          <span className="inline-flex items-center gap-1 justify-end">
+            {quotaRedistFmt}
+            {motivoRedist && (
+              <span className="text-[9px] text-neutral-500 uppercase tracking-wide">
+                ({motivoRedist})
+              </span>
+            )}
+          </span>
+        </TD>
         <TD>
           <Badge variant="info" size="sm">
             {PUBLICOS_LABEL[socio.publicoDefault] ?? socio.publicoDefault}
@@ -208,7 +239,6 @@ export function LinhaSocio({
               unidades={unidades}
               editavel={editavel}
               cenariosDraftCount={cenariosDraftCount}
-              quotaRedistribuida={quotaRedistribuida}
             />
           </td>
         </tr>
@@ -224,14 +254,12 @@ function FormSocio({
   unidades,
   editavel,
   cenariosDraftCount,
-  quotaRedistribuida,
 }: {
   socio: SocioRow;
   areas: AreaOption[];
   unidades: UnidadeOption[];
   editavel: boolean;
   cenariosDraftCount: number;
-  quotaRedistribuida: number;
 }) {
   const { formRef, onAnyChange, pending, salvouAt } = useAutoSubmit();
 
@@ -400,11 +428,6 @@ function FormSocio({
               key={`q-${socio.id}-${socio.percentualQuotasDefault}`}
               className="tabular-nums"
             />
-            <QuotaRedistribuidaChip
-              socio={socio}
-              quotaOriginal={socio.percentualQuotasDefault}
-              quotaRedistribuida={quotaRedistribuida}
-            />
           </Field>
         </div>
       </fieldset>
@@ -507,59 +530,6 @@ function FormSocio({
         {editavel && <StatusSalvamento pending={pending} salvouAt={salvouAt} />}
       </div>
     </form>
-  );
-}
-
-/** Chip read-only ao lado do input de quotas: mostra a quota redistribuída
- *  (calculada server-side, zera fundadores+SOCIO_SERVICOS e repassa pra
- *  capital remanescente). Só aparece quando a redistribuída difere da original.
- *  Cenários com `modoQuotas=REDISTRIBUIDA` usam esse valor no cálculo. */
-function QuotaRedistribuidaChip({
-  socio,
-  quotaOriginal,
-  quotaRedistribuida,
-}: {
-  socio: SocioRow;
-  quotaOriginal: number;
-  quotaRedistribuida: number;
-}) {
-  // Se idênticas (diferença abaixo de 0.0001%), não mostra — evita ruído.
-  const diff = Math.abs(quotaOriginal - quotaRedistribuida);
-  if (diff < 1e-6) return null;
-
-  const fmt = (v: number) => (v * 100).toFixed(4) + "%";
-  const zerou = quotaRedistribuida === 0;
-  const motivo = zerou
-    ? socio.isFundador
-      ? "fundador"
-      : "Sócio de Serviços"
-    : "absorveu de fundadores/serviços";
-
-  return (
-    <Tooltip
-      side="bottom"
-      content={
-        <>
-          <strong>Quota redistribuída</strong>: usada por cenários com modo
-          &quot;Redistribuídas&quot;. Zera fundadores + Sócios de Serviços e repassa
-          proporcional aos Sócios de Capital remanescentes.
-          <br />Original: {fmt(quotaOriginal)} → Redistribuída: {fmt(quotaRedistribuida)}.
-        </>
-      }
-    >
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 text-[10px] tabular-nums mt-1 px-1.5 py-0.5 rounded border cursor-help",
-          zerou
-            ? "bg-neutral-100 text-neutral-600 border-neutral-200"
-            : "bg-peri-50 text-peri-800 border-peri-200",
-        )}
-      >
-        <span className="opacity-70">redistrib.:</span>
-        <strong>{fmt(quotaRedistribuida)}</strong>
-        <span className="opacity-70">({motivo})</span>
-      </span>
-    </Tooltip>
   );
 }
 

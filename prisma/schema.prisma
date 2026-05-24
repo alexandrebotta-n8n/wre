@@ -228,8 +228,13 @@ model Socio {
 // A remuneração dos fundadores agora é definida CASO A CASO em
 // ClassificacaoSocio.valorDiscricionario (BRL por sócio, por cenário).
 model ConfiguracaoAno {
-  ano                  Int      @id
-  atualizadoEm         DateTime @updatedAt
+  ano                  Int          @id
+  // Modo de quotas global do ano. Vale pra TODOS cenários DRAFT do ano.
+  // Trocar via action `salvarModoQuotasAction` marca os DRAFTs como dirty
+  // + sincroniza `Cenario.modoQuotas` neles. Cenários APPLIED preservam
+  // o modo do snapshot (não tocados).
+  modoQuotas           ModoQuotas   @default(ORIGINAL)
+  atualizadoEm         DateTime     @updatedAt
   atualizadoPorId      String?
 }
 

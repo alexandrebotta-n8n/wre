@@ -280,44 +280,6 @@ export async function excluirCenarioAction(formData: FormData) {
 // Override de parâmetros
 // ============================================================================
 
-// Toggle do modo de quotas (ORIGINAL ↔ REDISTRIBUIDA). Marca cenário como
-// dirty automaticamente — usuário vê badge "● alterado" e clica Recalcular.
-export async function atualizarModoQuotasAction(formData: FormData) {
-  const session = await auth();
-  const escopo = escopoDe(session?.user as SessionUser | undefined);
-  const cenarioId = String(formData.get("cenarioId"));
-  if (!escopo.podeMutar) {
-    await logPermissionDenied(session?.user?.id, "cenario.modo-quotas", `Cenario:${cenarioId}`);
-    return;
-  }
-  const modo = String(formData.get("modoQuotas") ?? "");
-  if (modo !== "ORIGINAL" && modo !== "REDISTRIBUIDA") {
-    await flashError("Modo de quotas inválido.");
-    return;
-  }
-  try {
-    await prisma.cenario.update({
-      where: { id: cenarioId },
-      data: { modoQuotas: modo, parametrosDirty: true },
-    });
-    await logAudit({
-      usuarioId: session?.user?.id,
-      acao: "cenario.modo-quotas.atualizar",
-      recurso: `Cenario:${cenarioId}`,
-      meta: { modo },
-    });
-    await flashSuccess(
-      modo === "REDISTRIBUIDA"
-        ? "Modo de quotas: REDISTRIBUÍDA — clique em Recalcular."
-        : "Modo de quotas: ORIGINAL — clique em Recalcular.",
-    );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Falha ao atualizar modo";
-    await flashError(msg);
-  }
-  rev();
-}
-
 export async function atualizarOverrideAction(formData: FormData) {
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);

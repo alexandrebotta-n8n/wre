@@ -263,12 +263,25 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
   // classificacoesParaSocioInput). O fallback `originacaoEfetiva` busca
   // OriginacaoPeriodo ANO legado para sócios sem o novo campo preenchido.
   //
-  // Modo de quotas: ORIGINAL (default) usa quotas como cadastradas.
+  // Modo de quotas: vive em ConfiguracaoAno (config GLOBAL por ano). Cenário
+  // espelha o valor em Cenario.modoQuotas pra snapshot APPLIED preservar.
+  // ORIGINAL (default) usa quotas como cadastradas.
   // REDISTRIBUIDA zera fundadores+SOCIO_SERVICOS e distribui pra capital remanescente.
+  const cfgAno = await prisma.configuracaoAno.findUnique({
+    where: { ano: cenario.ano },
+    select: { modoQuotas: true },
+  });
+  const modoEfetivo = cfgAno?.modoQuotas ?? "ORIGINAL";
+  if (cenario.modoQuotas !== modoEfetivo) {
+    await prisma.cenario.update({
+      where: { id: cenario.id },
+      data: { modoQuotas: modoEfetivo },
+    });
+  }
   const socios = classificacoesParaSocioInput(
     cenario.classificacoes,
     originacaoEfetiva,
-    cenario.modoQuotas,
+    modoEfetivo,
   );
   // Funding fundadores agora é per-sócio (Socio.fundingFundadorAnual), já
   // propagado em cada SocioInput. O parâmetro global foi mantido em 0 por
