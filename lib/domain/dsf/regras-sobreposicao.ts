@@ -72,9 +72,17 @@ export function validarSobreposicao(
     });
   }
 
-  // Remuneração de Gestão para público sem função formal de gestão
+  // Remuneração de Administração — categorias que recebem na Política DSF v1.
+  // Atualizado pra incluir SOCIO_SERVICOS e SOCIO_CAPITAL_LIDER_UNIDADE (planilha
+  // de/para "Dados Sócios para Simulador.xlsx" confirma: tabela salarial E é
+  // cadastrada também pra Sócios de Serviço puros — categoria E).
+  // FUNDADOR, SOCIO_CAPITAL, LIDER_UNIDADE_NON_EQUITY, LIDER_TECNICO ficam de
+  // fora: se receberem rem.gestão, o alerta permanece útil pra revisão.
   const temFuncaoGestao =
-    publico === "SOCIO_CAPITAL_GESTOR" || publico === "SOCIO_SERVICOS_ESTRATEGICO";
+    publico === "SOCIO_CAPITAL_GESTOR" ||
+    publico === "SOCIO_CAPITAL_LIDER_UNIDADE" ||
+    publico === "SOCIO_SERVICOS" ||
+    publico === "SOCIO_SERVICOS_ESTRATEGICO";
   if (tem(p.remuneracaoGestao) && !temFuncaoGestao) {
     alertas.push({
       severidade: "WARNING",
