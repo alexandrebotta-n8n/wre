@@ -65,6 +65,9 @@ export const AtualizarSocioSchema = z
     // Alvo Bloco B em nº salários (modo ALVO_NUM_SALARIOS do engine NOVO).
     // 0 ou null = não participa.
     blocoBNumSalariosAlvo: z.number().int().min(0).max(50).nullable(),
+    // Valor anual do Bloco C — Política DSF v1 item 3.3.4 (excepcional).
+    // null/0 = não recebe. Engine NOVO usa proporcional ao período.
+    blocoCValorManualAno: z.number().min(0).nullable(),
     observacoes: z.string().max(500).nullable(),
   })
   .strict();

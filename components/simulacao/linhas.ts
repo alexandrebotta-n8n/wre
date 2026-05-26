@@ -50,9 +50,17 @@ export function construirLinhasComparativas(
   const mapA = agregar(a?.remuneracoes);
   const mapB = agregar(b?.remuneracoes);
   // Classificações por sócio — preferir o cenário B (NOVO), fallback A.
+  // Também coletamos quotas para ordenação por equity.
   const publicoPorSocio = new Map<string, string>();
-  for (const c of a?.classificacoes ?? []) publicoPorSocio.set(c.socioId, c.publico);
-  for (const c of b?.classificacoes ?? []) publicoPorSocio.set(c.socioId, c.publico);
+  const quotaPorSocio = new Map<string, number>();
+  for (const c of a?.classificacoes ?? []) {
+    publicoPorSocio.set(c.socioId, c.publico);
+    quotaPorSocio.set(c.socioId, c.percentualQuotas ?? 0);
+  }
+  for (const c of b?.classificacoes ?? []) {
+    publicoPorSocio.set(c.socioId, c.publico);
+    quotaPorSocio.set(c.socioId, c.percentualQuotas ?? 0);
+  }
   const ids = Array.from(new Set([...mapA.keys(), ...mapB.keys()]));
   const linhas: LinhaComparativa[] = ids.map((sid) => {
     const ra = mapA.get(sid);
@@ -67,6 +75,7 @@ export function construirLinhasComparativas(
       nome: nomeOriginal,
       publico: publicoPorSocio.get(sid) ?? "—",
       isFundador: ra?.isFundador ?? rb?.isFundador ?? false,
+      quota: quotaPorSocio.get(sid) ?? 0,
       totalA,
       totalB,
       diff,
@@ -81,7 +90,34 @@ export function construirLinhasComparativas(
   if (single) {
     linhas.sort((x, y) => Math.max(y.totalA ?? 0, y.totalB ?? 0) - Math.max(x.totalA ?? 0, x.totalB ?? 0));
   } else {
-    linhas.sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff));
+    // Ordenação hierárquica (modo comparativo):
+    //   1. Fundadores no topo (entre si: por quota desc).
+    //   2. Sócios de Capital (SOCIO_CAPITAL, SOCIO_CAPITAL_GESTOR,
+    //      SOCIO_CAPITAL_LIDER_UNIDADE) por quota desc.
+    //   3. Demais (SOCIO_SERVICOS, SOCIO_SERVICOS_ESTRATEGICO,
+    //      LIDER_UNIDADE_NON_EQUITY, LIDER_TECNICO, etc.) por nome alfabético (pt-BR).
+    linhas.sort((x, y) => {
+      const cx = categoriaOrdem(x.publico, x.isFundador);
+      const cy = categoriaOrdem(y.publico, y.isFundador);
+      if (cx !== cy) return cx - cy;
+      // Mesma categoria: capital usa quota desc; serviços/líderes usam nome asc.
+      if (cx <= 1) {
+        if (y.quota !== x.quota) return y.quota - x.quota;
+        return x.nome.localeCompare(y.nome, "pt-BR");
+      }
+      return x.nome.localeCompare(y.nome, "pt-BR");
+    });
   }
   return linhas;
+}
+
+// 0 = fundadores · 1 = sócios de capital · 2 = serviços/líderes/outros.
+function categoriaOrdem(publico: string, isFundador: boolean): 0 | 1 | 2 {
+  if (isFundador) return 0;
+  if (
+    publico === "SOCIO_CAPITAL" ||
+    publico === "SOCIO_CAPITAL_GESTOR" ||
+    publico === "SOCIO_CAPITAL_LIDER_UNIDADE"
+  ) return 1;
+  return 2;
 }

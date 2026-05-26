@@ -149,7 +149,7 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
         ? ` (${s.nivelCargo}/${s.faixaSalarial})`
         : "";
       trace.push({
-        etapa: "2.gestao",
+        etapa: "2.rem-gestao",
         descricao: `R$ ${base.toLocaleString("pt-BR")}${tabelaDesc} ${fatorDesc}`,
         valor: remGestao,
       });

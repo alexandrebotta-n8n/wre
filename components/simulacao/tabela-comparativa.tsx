@@ -17,6 +17,7 @@ export function TabelaComparativa({
   nomeA,
   nomeB,
   drawerHref,
+  reservaB,
 }: {
   linhas: LinhaComparativa[];
   temA: boolean;
@@ -24,6 +25,10 @@ export function TabelaComparativa({
   nomeA?: string;
   nomeB?: string;
   drawerHref?: string;
+  /** Reserva central (Bloco C não distribuído) do cenário B/NOVO. Quando
+   *  presente, é exibida abaixo do "Diff total (B−A)" como contrapeso —
+   *  ajuda o leitor a contextualizar o gap negativo (parte vai pra reserva). */
+  reservaB?: number | null;
 }) {
   const totalA = linhas.reduce((acc, l) => acc + (l.totalA ?? 0), 0);
   const totalB = linhas.reduce((acc, l) => acc + (l.totalB ?? 0), 0);
@@ -57,7 +62,8 @@ export function TabelaComparativa({
               </>
             ) : (
               <>
-                Linhas alinhadas por sócio. Ordenado por |Δ| decrescente.
+                Linhas alinhadas por sócio. Ordem: fundadores → sócios de capital
+                (por equity desc) → serviços/líderes (alfabético).
                 <span className="text-neutral-400"> · </span>
                 Clique no nome para abrir a composição passo-a-passo.
               </>
@@ -73,6 +79,12 @@ export function TabelaComparativa({
                 <span className="ml-2 font-normal text-xs">({diffTotal >= 0 ? "+" : ""}{pct(diffPctTotal)})</span>
               )}
             </div>
+            {reservaB != null && reservaB > 0 && (
+              <div className="text-[11px] text-neutral-500 mt-1">
+                Reserva (NOVO): <span className="font-medium text-navy-900 tabular-nums">{brl(reservaB, true)}</span>
+                <span className="ml-1 text-neutral-400">— Bloco C não distribuído</span>
+              </div>
+            )}
           </div>
         )}
       </CardHeader>

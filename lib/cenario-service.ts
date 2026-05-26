@@ -96,6 +96,7 @@ function classificacoesParaSocioInput(
       remuneracaoGestaoMensalOverride: c.socio.remuneracaoGestaoMensal ?? undefined,
       fundingFundadorAnual: c.socio.fundingFundadorAnual ?? undefined,
       blocoBNumSalariosAlvo: c.socio.blocoBNumSalariosAlvo ?? undefined,
+      blocoCValorManualAno: c.socio.blocoCValorManualAno ?? undefined,
     };
   });
 }
@@ -382,7 +383,11 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
   await prisma.$transaction([
     prisma.cenario.update({
       where: { id: args.cenarioId },
-      data: { parametrosDirty: false },
+      // Cache do resultado.totalReservaCentral (Bloco C não distribuído no
+      // NOVO; reserva 5% do ATUAL quando reservaViraPremio=false). UI lê
+      // direto sem recalcular — usado em /simulacao para mostrar "Reserva
+      // 20% (NOVO)" abaixo do diff total.
+      data: { parametrosDirty: false, totalReservaCentral: resultado.totalReservaCentral },
     }),
     prisma.remuneracaoCalculada.deleteMany({
       where: { cenarioId: args.cenarioId, periodoId: periodoAno.id },

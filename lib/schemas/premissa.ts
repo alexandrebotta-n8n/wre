@@ -69,6 +69,9 @@ export const ParamsNovoSchema = z.object({
   proLaboreMensal: z.number().min(0).optional(),         // R$/mês — aplicado a todas as 6 categorias
   taxaComissaoOriginacao: z.number().min(0).max(1).optional(), // ex: 0.05 = 5%
   pesoCategoria: z.record(PublicoEnum, z.number().min(0).max(5)).optional(),
+  // Fator de anualização CLT para LIDER_TECNICO — unificado com ATUAL.
+  // Default 14,4 (12 + 13º + ⅓ férias + FGTS médio). Range 12 a 15.
+  mesesAnualLiderTecnicoCLT: z.number().min(12).max(15).optional(),
 })
   .strict()
   .refine(

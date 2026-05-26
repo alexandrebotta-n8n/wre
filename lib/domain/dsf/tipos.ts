@@ -53,6 +53,10 @@ export interface SocioInput {
   // Ex: CEO=20, Diretores=15, Sócios de Serviço/Líderes Técnicos=10.
   // null/0 = não participa.
   blocoBNumSalariosAlvo?: number;
+  // Valor anual do Bloco C (R$) — Política DSF v1, projetos excepcionais.
+  // null/0 = não recebe. Engine NOVO usa direto (proporcional ao período),
+  // independente do modo de distribuição do Bloco B.
+  blocoCValorManualAno?: number;
 }
 
 export interface ResultadoUnidade {
@@ -199,6 +203,12 @@ export interface PremissasModeloNovo {
   // Deduzido do LL da matriz ANTES de formar o RDA central. Vem da ConfiguracaoAno
   // do ano do cenário. Default 0 → fundadores não recebem e o RDA é preservado.
   fundingFundadoresAno?: number;
+
+  // Fator de anualização CLT para sócios LIDER_TECNICO (legado).
+  // Mesma semântica do modelo ATUAL — mantemos campo aqui para unificar a
+  // regra de "Rem. de Gestão" entre os 2 engines. Default 14,4 (12 + 13º +
+  // ⅓ férias + FGTS médio). Proporcional ao período.
+  mesesAnualLiderTecnicoCLT?: number;
 
   // Tabela salarial de gestão
   tabelaSalarial: TabelaSalarial;

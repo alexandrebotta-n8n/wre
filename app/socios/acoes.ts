@@ -45,6 +45,7 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
   const originacaoRaw = String(formData.get("originacaoAnualPadrao") ?? "");
   const fundingFundRaw = String(formData.get("fundingFundadorAnual") ?? "");
   const blocoBAlvoRaw = String(formData.get("blocoBNumSalariosAlvo") ?? "");
+  const blocoCManualRaw = String(formData.get("blocoCValorManualAno") ?? "");
   const observacoesRaw = String(formData.get("observacoes") ?? "");
 
   // Helper: string vazia / inválida → null (= "usa default da premissa/tabela").
@@ -74,6 +75,7 @@ function parseFormData(formData: FormData): AtualizarSocioInput & { id: string }
     originacaoAnualPadrao: parseOptNumber(originacaoRaw),
     fundingFundadorAnual: parseOptNumber(fundingFundRaw),
     blocoBNumSalariosAlvo: parseOptInt(blocoBAlvoRaw),
+    blocoCValorManualAno: parseOptNumber(blocoCManualRaw),
     observacoes: observacoesRaw.trim() || null,
   };
 
@@ -96,6 +98,7 @@ const CAMPOS_DE_CALCULO = [
   "originacaoAnualPadrao",
   "fundingFundadorAnual",
   "blocoBNumSalariosAlvo",
+  "blocoCValorManualAno",
 ] as const;
 
 type CampoCalculo = typeof CAMPOS_DE_CALCULO[number];
@@ -146,6 +149,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
         originacaoAnualPadrao: true,
         fundingFundadorAnual: true,
         blocoBNumSalariosAlvo: true,
+        blocoCValorManualAno: true,
       },
     });
     if (!antigo) throw new Error("Sócio não encontrado");
@@ -165,6 +169,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
         originacaoAnualPadrao: input.originacaoAnualPadrao,
         fundingFundadorAnual: input.fundingFundadorAnual,
         blocoBNumSalariosAlvo: input.blocoBNumSalariosAlvo,
+        blocoCValorManualAno: input.blocoCValorManualAno,
         observacoes: input.observacoes,
       },
     });
@@ -185,6 +190,7 @@ export async function atualizarSocioAction(formData: FormData): Promise<void> {
       originacaoAnualPadrao: input.originacaoAnualPadrao,
       fundingFundadorAnual: input.fundingFundadorAnual,
       blocoBNumSalariosAlvo: input.blocoBNumSalariosAlvo,
+      blocoCValorManualAno: input.blocoCValorManualAno,
     };
     let cenariosMarcadosDirty = 0;
     if (algumCampoDeCalculoMudou(antigo, novo)) {

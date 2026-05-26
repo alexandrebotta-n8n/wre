@@ -68,6 +68,9 @@ export interface SocioRow {
    * Default null = não participa. Valores típicos: CEO=20, Diretores=15,
    * Sócios de Serviço/Líderes Técnicos=10. */
   blocoBNumSalariosAlvo: number | null;
+  /** Valor anual do Bloco C (R$). null/0 = não recebe. Política DSF v1 item
+   *  3.3.4: Bloco C é excepcional, requer deliberação estratégica formal. */
+  blocoCValorManualAno: number | null;
   observacoes: string | null;
 }
 
@@ -314,6 +317,7 @@ function FormSocio({
       "remuneracaoGestaoMensal",
       "originacaoAnualPadrao",
       "fundingFundadorAnual",
+      "blocoCValorManualAno",
     ];
     for (const k of negativos) {
       const v = String(formData.get(k) ?? "").trim();
@@ -561,6 +565,18 @@ function FormSocio({
               max="50"
               step="1"
               placeholder="—"
+            />
+          </Field>
+          <Field
+            label="Bloco C anual (R$)"
+            htmlFor={`bcm-${socio.id}`}
+            hint="Política DSF v1 item 3.3.4 — excepcional, requer deliberação estratégica. Vazio/0 = não recebe. Engine NOVO usa proporcional ao período."
+          >
+            <MoneyField
+              id={`bcm-${socio.id}`}
+              name="blocoCValorManualAno"
+              initial={socio.blocoCValorManualAno}
+              placeholder="R$ 0"
             />
           </Field>
         </div>

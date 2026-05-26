@@ -71,18 +71,11 @@ const PUBLICOS_BLOCO_B: Publico[] = [
 // Líderes Técnicos não recebem pró-labore na Política DSF v1 (planilha
 // "Dados Sócios para Simulador.xlsx" — coluna P.Lab. dos E é zero).
 const PUBLICOS_PRO_LABORE: Publico[] = [...PUBLICOS_CAPITAL];
-// Remuneração de Administração: 4 categorias.
-//   Default: SOCIO_CAPITAL_GESTOR, SOCIO_SERVICOS
-//   Condicionado: SOCIO_CAPITAL_LIDER_UNIDADE, SOCIO_SERVICOS_ESTRATEGICO
-// O engine aplica em qualquer um dos 4 desde que tenha nivelCargo+faixaSalarial
-// cadastrados — para os 2 "Default", o cadastro espera-se sempre presente;
-// para os 2 "Condicionado", só vem preenchido quando há cargo formal de admin.
-const PUBLICOS_REM_ADMIN: Publico[] = [
-  "SOCIO_CAPITAL_GESTOR",
-  "SOCIO_CAPITAL_LIDER_UNIDADE",
-  "SOCIO_SERVICOS",
-  "SOCIO_SERVICOS_ESTRATEGICO",
-];
+// "Rem. de Gestão" (antes "Rem. de Administração") — UNIFICADA com o
+// modelo ATUAL: qualquer sócio com nivelCargo+faixaSalarial (ou override
+// individual) recebe. Antes existia constante PUBLICOS_REM_ADMIN restrita
+// a 4 categorias; foi removida para padronizar o cálculo entre os 2
+// modelos e evitar confusão na UI. Veja modelo-atual.ts:67–85.
 
 export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const { periodo, socios, resultados, premissas } = input;
@@ -90,24 +83,25 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const unidades = resultados.filter((r) => !r.isMatriz);
   const llMatriz = matriz?.lucroLiquido ?? 0;
 
-  // Etapa 3 — Remuneração de Administração (calculada antes; é custo).
-  // Aplica às 4 categorias da matriz oficial (Default + Condicionado).
-  // Default vs Condicionado fica codificado pela presença de nivelCargo+faixaSalarial
-  // OU de remuneracaoGestaoMensalOverride no cadastro do sócio.
-  // Override individual (Socio.remuneracaoGestaoMensal) > tabela[nivel][faixa].
+  // Etapa 3 — Rem. de Gestão (custo). Regra UNIFICADA com o modelo ATUAL:
+  //   - Elegível: todos com nivelCargo+faixaSalarial (ou override individual).
+  //     Inclui fundadores com cargo. Não filtra por publico.
+  //   - Override individual (Socio.remuneracaoGestaoMensal) > tabela[nivel][faixa].
+  //   - Fator: LIDER_TECNICO usa mesesAnualLiderTecnicoCLT (default 14,4)
+  //     proporcional ao período; demais usam periodo.meses.
+  //   - NÃO é deduzido do RDA — admin é custo já refletido no LL líquido.
+  const fatorCLTAnual = premissas.mesesAnualLiderTecnicoCLT ?? 14.4;
+  const fatorLiderCLTPeriodo = fatorCLTAnual * (periodo.meses / 12);
   let totalAdmin = 0;
   const adminPorSocio = new Map<string, number>();
   for (const s of socios) {
-    // Política DSF v1: fundadores "Não considerar" — engine NOVO os exclui de
-    // tudo (planilha de/para confirma). Apenas isFundador=false participa.
-    if (s.isFundador) continue;
-    if (!PUBLICOS_REM_ADMIN.includes(s.publico)) continue;
+    const fator = s.publico === "LIDER_TECNICO" ? fatorLiderCLTPeriodo : periodo.meses;
     let valor = 0;
     if (s.remuneracaoGestaoMensalOverride != null && s.remuneracaoGestaoMensalOverride > 0) {
-      valor = s.remuneracaoGestaoMensalOverride * periodo.meses;
+      valor = s.remuneracaoGestaoMensalOverride * fator;
     } else if (s.nivelCargo && s.faixaSalarial) {
       const mensal = premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0;
-      valor = mensal * periodo.meses;
+      valor = mensal * fator;
     }
     if (valor > 0) {
       adminPorSocio.set(s.id, valor);
@@ -245,7 +239,22 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       });
     }
     const remGestao = adminPorSocio.get(s.id) ?? 0;
-    if (remGestao > 0) trace.push({ etapa: "3.admin", descricao: "rem. de administração", valor: remGestao });
+    if (remGestao > 0) {
+      const ehLiderCLT = s.publico === "LIDER_TECNICO";
+      const base = s.remuneracaoGestaoMensalOverride
+        ?? (s.nivelCargo && s.faixaSalarial ? premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0 : 0);
+      const fatorDesc = ehLiderCLT
+        ? `CLT × ${fatorCLTAnual.toFixed(2)}${periodo.meses !== 12 ? ` × (${periodo.meses}/12)` : ""}`
+        : `× ${periodo.meses} meses`;
+      const tabelaDesc = !s.remuneracaoGestaoMensalOverride && s.nivelCargo && s.faixaSalarial
+        ? ` (${s.nivelCargo}/${s.faixaSalarial})`
+        : "";
+      trace.push({
+        etapa: "3.rem-gestao",
+        descricao: `R$ ${base.toLocaleString("pt-BR")}${tabelaDesc} ${fatorDesc}`,
+        valor: remGestao,
+      });
+    }
 
     // Funding fundador individual (cadastrado em /socios)
     const remFundador = remFundadorPorSocio.get(s.id) ?? 0;
@@ -302,6 +311,20 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
           valor: blocoB,
         });
       }
+    }
+
+    // Bloco C — VALOR MANUAL por sócio (cadastro /socios). Quando setado,
+    // sobrescreve o que veio do modo de distribuição. Pro-rata pelo período
+    // (× meses/12). Política DSF v1, item 3.3.4: "Bloco C é excepcional —
+    // depende de deliberação estratégica formal para cada sócio".
+    const manualAno = s.blocoCValorManualAno;
+    if (manualAno != null && manualAno > 0) {
+      blocoC = manualAno * (periodo.meses / 12);
+      trace.push({
+        etapa: "9.bloco-C",
+        descricao: `valor manual: R$ ${manualAno.toLocaleString("pt-BR")}/ano${periodo.meses !== 12 ? ` × (${periodo.meses}/12)` : ""}`,
+        valor: blocoC,
+      });
     }
 
     // Pool de unidade — apenas líderes
@@ -368,14 +391,11 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     alertasGlobais.push("Soma do Pool (sociedade+líder+equipe) não é 100%.");
   }
 
-  // Reserva central = Bloco C que NÃO foi distribuído. Quando modo é
-  // ALVO_NUM_SALARIOS, Bloco C distribui pelos sócios → reserva = sobra
-  // (totalBlocoC − Σ blocoC distribuído). Outros modos: reserva = totalBlocoC.
-  const blocoCDistribuido =
-    distribuicaoB === "ALVO_NUM_SALARIOS"
-      ? Array.from(valorBlocoCAbsoluto.values()).reduce((a, v) => a + v, 0)
-      : 0;
-  const reservaCentral = totalBlocoC - blocoCDistribuido;
+  // Reserva central = Bloco C que NÃO foi distribuído. Em todos os modos,
+  // somamos o blocoC efetivo de cada pacote (já inclui ALVO_NUM_SALARIOS +
+  // valores manuais por sócio). Reserva = totalBlocoC − Σ distribuído.
+  const blocoCDistribuido = pacotes.reduce((a, p) => a + p.blocoC, 0);
+  const reservaCentral = Math.max(0, totalBlocoC - blocoCDistribuido);
   return {
     modelo: "NOVO",
     periodo,

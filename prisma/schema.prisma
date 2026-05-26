@@ -214,6 +214,13 @@ model Socio {
   // Ex: CEO=20, Diretores=15, Sócios de Serviço/Líderes Técnicos=10. null/0 =
   // não participa do Bloco B nesse modo.
   blocoBNumSalariosAlvo Int?
+  // Valor anual do Bloco C (Política DSF v1) — projeto/categoria excepcional.
+  // null/0 = não recebe Bloco C. Editado individualmente em /socios. Hoje
+  // todos partem zerados; é preenchido caso-a-caso quando há deliberação
+  // estratégica formal para um sócio específico (texto Política, item 3.3.4).
+  // Engine NOVO usa este valor direto (proporcional ao período), independente
+  // do modo de distribuição do Bloco B.
+  blocoCValorManualAno  Float?
   // Unidade que este sócio lidera no cadastro permanente. Só faz sentido
   // quando publicoDefault ∈ {SOCIO_CAPITAL_LIDER_UNIDADE, LIDER_UNIDADE_NON_EQUITY}.
   unidadeLideradaId String?
@@ -420,6 +427,10 @@ model Cenario {
   modoQuotas         ModoQuotas    @default(ORIGINAL)
   // Optimistic locking: incrementa em cada update de DRAFT.
   versao          Int            @default(1)
+  // Reserva central (Bloco C não distribuído) do último cálculo. Apenas para
+  // cenários NOVO. Persistido para que a UI possa mostrar abaixo do diff
+  // total (B−A) sem recalcular. Null = cenário ainda não calculado ou ATUAL.
+  totalReservaCentral Float?
   criadoPorId     String?
   criadoPor       Usuario?       @relation("CenarioCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   criadoEm        DateTime       @default(now())

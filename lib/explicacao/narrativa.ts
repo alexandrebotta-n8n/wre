@@ -59,7 +59,8 @@ export function gerarNarrativa(input: NarrativaInput): string[] {
     const blocoB = somas["bloco-B"] ?? 0;
     const blocoC = somas["bloco-C"] ?? 0;
     const remFundador = somas["fundador"] ?? 0;
-    const admin = (somas["pro-labore"] ?? 0) + (somas["admin"] ?? 0);
+    // "rem-gestao" é a chave unificada (antes "admin"); soma do trace "3.rem-gestao".
+    const admin = (somas["pro-labore"] ?? 0) + (somas["rem-gestao"] ?? 0);
     const rda = blocoA + blocoB + blocoC;
     const nFundadoresPagos = remuneracoes.filter(
       (r) => r.socio.isFundador && r.total > 0,
@@ -68,8 +69,8 @@ export function gerarNarrativa(input: NarrativaInput): string[] {
       const partes: string[] = [];
       const detalheAdmin =
         remFundador > 0
-          ? `administração **${brl(admin)}** (pró-labore + gestão) e remuneração aos fundadores **${brl(remFundador)}** (funding anual + discricionário, abatidos do LL antes do RDA)`
-          : `**${brl(admin)}** para administração (pró-labore + gestão)`;
+          ? `pró-labore + rem. de gestão **${brl(admin)}** e remuneração aos fundadores **${brl(remFundador)}** (funding anual + discricionário, abatidos do LL antes do RDA)`
+          : `**${brl(admin)}** para pró-labore + rem. de gestão`;
       partes.push(`Após reservar ${detalheAdmin}, o RDA disponível foi de **${brl(rda)}**.`);
       partes.push(
         `Distribuição: **Bloco A (${pct(blocoA / rda)})** — ${brl(blocoA)} entre Sócios de Capital **não-fundadores**, proporcional às quotas; ` +
@@ -85,12 +86,12 @@ export function gerarNarrativa(input: NarrativaInput): string[] {
     }
   } else {
     const proLabore = somas["pro-labore"] ?? 0;
-    const gestao = somas["gestao"] ?? 0;
+    const gestao = somas["rem-gestao"] ?? 0;
     const fundador = somas["fundador"] ?? 0;
     const distribuicao = somas["distribuicao"] ?? 0;
     const premio = somas["premio"] ?? 0;
     paragrafos.push(
-      `Composição (modelo ATUAL): pró-labore **${brl(proLabore)}**, gestão **${brl(gestao)}**, ` +
+      `Composição (modelo ATUAL): pró-labore **${brl(proLabore)}**, rem. de gestão **${brl(gestao)}**, ` +
         `funding fundadores **${brl(fundador)}**, distribuição por quotas **${brl(distribuicao)}**` +
         (premio > 0 ? `, prêmio uniforme **${brl(premio)}**` : "") +
         `.`,

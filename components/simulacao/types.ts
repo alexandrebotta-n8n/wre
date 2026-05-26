@@ -60,6 +60,9 @@ export interface LinhaComparativa {
   /** Classificação (público) — preferir o do cenário B (NOVO); fallback A. */
   publico: string;
   isFundador: boolean;
+  /** Percentual de quotas do sócio (0..1) — preferir B; fallback A; senão 0.
+   *  Usado pelo sort: capital por equity desc, serviços por nome alfabético. */
+  quota: number;
   /** Total anual. null se sócio não tem nenhuma remuneração no cenário. */
   totalA: number | null;
   totalB: number | null;
