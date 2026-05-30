@@ -11,13 +11,12 @@ import { ModeloBadge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input, NativeSelect, Textarea } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { MoneyField } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { StickyActions } from "@/components/cenario/sticky-actions";
 import { SumValidator } from "@/components/premissa/sum-validator";
-import { MatrizPesosArea } from "@/components/premissa/matriz-pesos-area";
 import { atualizarPremissaComSnapshot } from "@/lib/premissa-service";
 import { flashError, flashSuccess } from "@/lib/flash";
 import { escopoDe } from "@/lib/auth/escopo";
@@ -44,14 +43,9 @@ async function salvarAction(formData: FormData) {
         reservaViraPremio: formData.get("reservaViraPremio") === "on",
       });
     } else {
-      const pesosOrganico: Record<string, number> = {};
-      const pesosIncremental: Record<string, number> = {};
-      for (const [k, v] of formData.entries()) {
-        if (k.startsWith("pesoOrg-")) pesosOrganico[k.slice(8)] = Number(v) || 0;
-        else if (k.startsWith("pesoInc-")) pesosIncremental[k.slice(8)] = Number(v) || 0;
-      }
-      const mixOrganico = Number(formData.get("mixOrganico") ?? 0);
-      const mixIncremental = Number(formData.get("mixIncremental") ?? 0);
+      // Bloco B usa regra única (nº salários × base por sócio). Campos
+      // distribuicaoBlocoB / pesosPorArea / proRataMinMeses / pesoCategoria
+      // foram REMOVIDOS do schema — não são lidos do form.
       parametros = ParamsNovoSchema.parse({
         percentualBlocoA: Number(formData.get("percentualBlocoA")),
         percentualBlocoB: Number(formData.get("percentualBlocoB")),
@@ -68,11 +62,6 @@ async function salvarAction(formData: FormData) {
         faixaExecMax: Number(formData.get("faixaExecMax")),
         faixaGestaoMin: Number(formData.get("faixaGestaoMin")),
         faixaGestaoMax: Number(formData.get("faixaGestaoMax")),
-        proRataMinMeses: Number(formData.get("proRataMinMeses")),
-        distribuicaoBlocoB: String(formData.get("distribuicaoBlocoB")) as "UNIFORME" | "PESO_INDIVIDUAL" | "ORIGINACAO" | "POR_AREA",
-        pesosPorArea: Object.keys(pesosOrganico).length > 0
-          ? { mixOrganico, mixIncremental, pesosOrganico, pesosIncremental }
-          : undefined,
       });
     }
   } catch (e) {
@@ -111,9 +100,7 @@ export default async function PremissaEdit({
   const p = await prisma.premissa.findUnique({ where: { id } });
   if (!p) notFound();
   const params_ = p.parametros as Record<string, unknown>;
-  const areas = p.modelo === "NOVO"
-    ? await prisma.areaPratica.findMany({ where: { ativa: true }, orderBy: [{ ordem: "asc" }], take: 50 })
-    : [];
+  // (Antes carregávamos `areas` para o <MatrizPesosArea>; campo removido.)
 
   return (
     <main className="mx-auto max-w-4xl px-4 sm:px-6 py-8 pb-4 space-y-6">
@@ -272,42 +259,18 @@ export default async function PremissaEdit({
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Distribuição do Bloco B + Pro-rata</CardTitle>
-                  <CardDescription>Como ratear performance e o mínimo de meses para entrar no rateio.</CardDescription>
+                  <CardTitle>Distribuição do Bloco B</CardTitle>
+                  <CardDescription>
+                    Regra única (Política DSF v1): cada sócio recebe
+                    <strong> nº salários × (pró-labore + rem. de gestão)</strong>.
+                    Configuração do número de salários por sócio fica em <Link href="/socios" className="underline">/socios</Link>.
+                  </CardDescription>
                 </div>
               </CardHeader>
-              <div className="p-5 grid grid-cols-2 gap-4">
-                <Field label="Distribuição do Bloco B" hint="como ratear performance">
-                  <NativeSelect name="distribuicaoBlocoB" defaultValue={String(params_.distribuicaoBlocoB ?? "UNIFORME")}>
-                    <option value="UNIFORME">Uniforme — partes iguais</option>
-                    <option value="PESO_INDIVIDUAL">Por peso individual</option>
-                    <option value="ORIGINACAO">Por originação esperada</option>
-                    <option value="POR_AREA">Por área de prática (planilha 1T2026)</option>
-                  </NativeSelect>
-                </Field>
-                <Field label="Pro-rata mínimo (meses)">
-                  <Input type="number" name="proRataMinMeses" defaultValue={params_.proRataMinMeses as number} step="1" min="0" max="12" required />
-                </Field>
-              </div>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div>
-                  <CardTitle>Pesos por área de prática</CardTitle>
-                  <CardDescription>Aplicado quando a distribuição do Bloco B for &quot;Por área&quot;.</CardDescription>
-                </div>
-              </CardHeader>
-              <div className="p-5">
-                <MatrizPesosArea
-                  areas={areas.map((a) => ({ codigo: a.codigo, nome: a.nome }))}
-                  defaults={params_.pesosPorArea as {
-                    mixOrganico: number;
-                    mixIncremental: number;
-                    pesosOrganico: Record<string, number>;
-                    pesosIncremental: Record<string, number>;
-                  } | undefined}
-                />
+              <div className="p-5 text-xs text-neutral-600">
+                Se a soma dos alvos individuais ultrapassar o Bloco B disponível
+                (35% do RDA por padrão), o engine aplica pro-rata proporcional.
+                Sócios sem alvo (vazio ou 0) ficam fora.
               </div>
             </Card>
           </>

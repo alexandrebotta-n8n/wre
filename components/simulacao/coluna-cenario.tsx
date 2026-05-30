@@ -18,20 +18,18 @@ import { KpiAlertasButton } from "./kpi-alertas-button";
 import { RecalcularButton } from "./recalcular-button";
 import { StickyHeaderColuna } from "./sticky-header-coluna";
 import { gerarNarrativa } from "@/lib/explicacao/narrativa";
-import type { CenarioCompleto, AreaOption } from "./types";
+import type { CenarioCompleto } from "./types";
 
 export function ColunaCenario({
   slot,
   cenario,
   outroCenarioId,
-  areas,
   podeMutar,
   modoNome,
 }: {
   slot: "a" | "b";
   cenario: CenarioCompleto;
   outroCenarioId: string;
-  areas: AreaOption[];
   podeMutar: boolean;
   modoNome: "completo" | "iniciais";
 }) {
@@ -242,7 +240,6 @@ export function ColunaCenario({
           parametros={paramsEfetivos}
           temOverride={cenario.parametrosOverride !== null}
           editavel={editavel}
-          areas={areas}
           dirty={dirty}
           versao={cenario.versao}
           valoresPorEtapa={valoresPorEtapa}

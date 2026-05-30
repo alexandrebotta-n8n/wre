@@ -23,18 +23,8 @@ import type {
   ResultadoSimulacao,
   TraceItem,
   Publico,
-  PesosPorArea,
 } from "./tipos";
 import { validarSobreposicao, mensagensDeAlerta } from "./regras-sobreposicao";
-
-// Peso efetivo de um sócio quando o modo é POR_AREA.
-// Sócios sem área (fundadores, líderes técnicos) → peso 0 (não recebem Bloco B).
-function pesoPorArea(areaCodigo: string | undefined, p?: PesosPorArea): number {
-  if (!areaCodigo || !p) return 0;
-  const wOrg = p.pesosOrganico[areaCodigo] ?? 0;
-  const wInc = p.pesosIncremental[areaCodigo] ?? 0;
-  return p.mixOrganico * wOrg + p.mixIncremental * wInc;
-}
 
 export interface InputModeloNovo {
   periodo: PeriodoInput;
@@ -146,76 +136,53 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   );
   const somaQuotasA = elegiveisA.reduce((acc, s) => acc + s.percentualQuotas, 0);
 
-  // Distribuição Bloco B — modo configurável (default: UNIFORME)
-  const distribuicaoB = premissas.distribuicaoBlocoB ?? "UNIFORME";
-  // Bloco B: também exclui fundadores (Política DSF v1 — "Não considerar").
+  // Distribuição Bloco B — regra ÚNICA da Política DSF v1: cada sócio
+  // elegível recebe um valor direto em R$ igual a:
+  //   ValorBlocoB = blocoBNumSalariosAlvo × (proLaboreMensal + remGestaoMensal)
+  // Antes existiam 5 modos (UNIFORME / PESO_INDIVIDUAL / ORIGINACAO /
+  // POR_AREA / ALVO_NUM_SALARIOS) configuráveis na Premissa. Foram removidos
+  // — a regra "nº salários" é a única acordada com DSF. Mais simples + sem
+  // dropdown na UI. Pro-rata é aplicado quando Σ alvos > totalBlocoB.
+  // Bloco B: exclui fundadores (Política DSF v1 — "Não considerar").
   const elegiveisB = socios.filter((s) => !s.isFundador && PUBLICOS_BLOCO_B.includes(s.publico));
-  // Pesos por categoria (multiplicador aplicado ao peso-base). Default 1.
-  const pesoCat = premissas.pesoCategoria ?? {};
-  // Pró-labore: aplicado a todas as 6 categorias da Política DSF v1, proporcional
-  // ao período (3 meses para trimestre, 12 para ano).
+  // Pró-labore base — aplicado às 6 categorias elegíveis (proporcional ao período).
   const proLaboreMensal = premissas.proLaboreMensal ?? 0;
 
-  // Modo ALVO_NUM_SALARIOS: cada elegível recebe um VALOR direto em R$.
-  // Não é peso proporcional — é alvo absoluto. valorBlocoBAbsoluto/valorBlocoCAbsoluto
-  // guardam o R$ final por sócio (após eventual pro-rata se Σ alvos > disponível).
-  // Para os outros modos, usamos pesos relativos em `pesosBlocoB`.
+  // Salário-base mensal por sócio = rem.gestão + pró-labore (com overrides
+  // individuais). Pró-labore só conta para Sócios de Capital (Política DSF v1).
+  const baseMensalPorSocio = new Map<string, number>();
+  for (const s of elegiveisB) {
+    const n = s.blocoBNumSalariosAlvo ?? 0;
+    if (n <= 0) continue;
+    const remGestaoMensal =
+      s.remuneracaoGestaoMensalOverride ??
+      (s.nivelCargo && s.faixaSalarial
+        ? premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0
+        : 0);
+    const proLaboreMensalSocio = PUBLICOS_PRO_LABORE.includes(s.publico)
+      ? (s.proLaboreMensalOverride ?? proLaboreMensal)
+      : 0;
+    baseMensalPorSocio.set(s.id, remGestaoMensal + proLaboreMensalSocio);
+  }
+
+  // Distribui o total (B ou C) pelos alvos individuais, com pro-rata.
   const valorBlocoBAbsoluto = new Map<string, number>();
   const valorBlocoCAbsoluto = new Map<string, number>();
-  const pesosBlocoB = new Map<string, number>();
-
-  if (distribuicaoB === "ALVO_NUM_SALARIOS") {
-    // Calcula salário base mensal por sócio (rem.gestão + pró-labore).
-    // Rem.gestão: override individual > tabela[nível][faixa].
-    // Pró-labore: override individual > global da premissa, só se elegível
-    // (Sócios de Capital — Política DSF v1 exclui Sócios de Serviço).
-    const baseMensalPorSocio = new Map<string, number>();
+  const distribuirPorAlvo = (total: number, destino: Map<string, number>) => {
     for (const s of elegiveisB) {
       const n = s.blocoBNumSalariosAlvo ?? 0;
-      if (n <= 0) continue;
-      const remGestaoMensal =
-        s.remuneracaoGestaoMensalOverride ??
-        (s.nivelCargo && s.faixaSalarial
-          ? premissas.tabelaSalarial[s.nivelCargo]?.[s.faixaSalarial] ?? 0
-          : 0);
-      const proLaboreMensalSocio = PUBLICOS_PRO_LABORE.includes(s.publico)
-        ? (s.proLaboreMensalOverride ?? proLaboreMensal)
-        : 0;
-      baseMensalPorSocio.set(s.id, remGestaoMensal + proLaboreMensalSocio);
+      const base = baseMensalPorSocio.get(s.id) ?? 0;
+      if (n <= 0 || base <= 0) continue;
+      destino.set(s.id, base * n);
     }
-    // Helper: distribui um total (B ou C) pelos alvos individuais, com pro-rata.
-    const distribuirPorAlvo = (total: number, destino: Map<string, number>) => {
-      for (const s of elegiveisB) {
-        const n = s.blocoBNumSalariosAlvo ?? 0;
-        const base = baseMensalPorSocio.get(s.id) ?? 0;
-        if (n <= 0 || base <= 0) continue;
-        destino.set(s.id, base * n);
-      }
-      const soma = Array.from(destino.values()).reduce((a, v) => a + v, 0);
-      const fator = soma > total && soma > 0 ? total / soma : 1;
-      if (fator !== 1) {
-        for (const [id, alvo] of destino) destino.set(id, alvo * fator);
-      }
-    };
-    distribuirPorAlvo(totalBlocoB, valorBlocoBAbsoluto);
-    distribuirPorAlvo(totalBlocoC, valorBlocoCAbsoluto);
-  } else {
-    // Mapa peso efetivo por sócio elegível, conforme modo:
-    //   UNIFORME: peso = 1
-    //   PESO_INDIVIDUAL: peso = pesoBlocoB ?? 1
-    //   ORIGINACAO: peso = originacaoEsperadaAnual (zero exclui)
-    //   POR_AREA: peso = (mixOrg × pesoOrgArea) + (mixInc × pesoIncArea); sem área → 0
-    // Em todos os modos, o peso final é multiplicado por pesoCategoria[publico] ?? 1.
-    for (const s of elegiveisB) {
-      let peso = 1;
-      if (distribuicaoB === "PESO_INDIVIDUAL") peso = s.pesoBlocoB ?? 1;
-      else if (distribuicaoB === "ORIGINACAO") peso = s.originacaoEsperadaAnual ?? 0;
-      else if (distribuicaoB === "POR_AREA") peso = pesoPorArea(s.areaPraticaCodigo, premissas.pesosPorArea);
-      peso *= pesoCat[s.publico] ?? 1;
-      pesosBlocoB.set(s.id, peso);
+    const soma = Array.from(destino.values()).reduce((a, v) => a + v, 0);
+    const fator = soma > total && soma > 0 ? total / soma : 1;
+    if (fator !== 1) {
+      for (const [id, alvo] of destino) destino.set(id, alvo * fator);
     }
-  }
-  const somaPesosB = Array.from(pesosBlocoB.values()).reduce((acc, v) => acc + v, 0);
+  };
+  distribuirPorAlvo(totalBlocoB, valorBlocoBAbsoluto);
+  distribuirPorAlvo(totalBlocoC, valorBlocoCAbsoluto);
 
   const taxaComissao = premissas.taxaComissaoOriginacao ?? 0;
 
@@ -277,40 +244,25 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       });
     }
 
-    // Bloco B — distribuído pelo modo configurável.
-    // Modo ALVO_NUM_SALARIOS: valor absoluto direto (já pro-ratado se preciso).
-    // Outros modos: peso relativo × Bloco B disponível.
-    let blocoB = 0;
-    let blocoC = 0;
-    if (distribuicaoB === "ALVO_NUM_SALARIOS") {
-      blocoB = valorBlocoBAbsoluto.get(s.id) ?? 0;
-      blocoC = valorBlocoCAbsoluto.get(s.id) ?? 0;
-      if (blocoB > 0) {
-        const n = s.blocoBNumSalariosAlvo ?? 0;
-        trace.push({
-          etapa: "8.bloco-B",
-          descricao: `${n} salários × base (alvo individual)`,
-          valor: blocoB,
-        });
-      }
-      if (blocoC > 0) {
-        const n = s.blocoBNumSalariosAlvo ?? 0;
-        trace.push({
-          etapa: "8.bloco-C",
-          descricao: `${n} salários × base (alvo individual, mesmo Bloco B)`,
-          valor: blocoC,
-        });
-      }
-    } else if (PUBLICOS_BLOCO_B.includes(s.publico) && somaPesosB > 0) {
-      const meuPeso = pesosBlocoB.get(s.id) ?? 0;
-      blocoB = (meuPeso / somaPesosB) * totalBlocoB;
-      if (blocoB > 0) {
-        trace.push({
-          etapa: "8.bloco-B",
-          descricao: `${distribuicaoB.toLowerCase()} (peso ${meuPeso.toFixed(2)} / Σ ${somaPesosB.toFixed(2)})`,
-          valor: blocoB,
-        });
-      }
+    // Bloco B — valor absoluto direto: nº salários × (pró-labore + rem.gestão).
+    // Já pro-ratado pelo `distribuirPorAlvo` quando Σ alvos > totalBlocoB.
+    const blocoB = valorBlocoBAbsoluto.get(s.id) ?? 0;
+    let blocoC = valorBlocoCAbsoluto.get(s.id) ?? 0;
+    if (blocoB > 0) {
+      const n = s.blocoBNumSalariosAlvo ?? 0;
+      trace.push({
+        etapa: "8.bloco-B",
+        descricao: `${n} salários × base (pró-labore + rem. gestão)`,
+        valor: blocoB,
+      });
+    }
+    if (blocoC > 0) {
+      const n = s.blocoBNumSalariosAlvo ?? 0;
+      trace.push({
+        etapa: "8.bloco-C",
+        descricao: `${n} salários × base (mesma fórmula do Bloco B)`,
+        valor: blocoC,
+      });
     }
 
     // Bloco C — VALOR MANUAL por sócio (cadastro /socios). Quando setado,

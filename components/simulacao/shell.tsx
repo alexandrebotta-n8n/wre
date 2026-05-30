@@ -112,7 +112,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             slot="a"
             cenario={props.cenarioA}
             outroCenarioId={bId}
-            areas={props.areas}
             podeMutar={props.podeMutar && !props.ehSocioRestrito}
             modoNome={props.modoNome}
           />
@@ -132,7 +131,6 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
             slot="b"
             cenario={props.cenarioB}
             outroCenarioId={aId}
-            areas={props.areas}
             podeMutar={props.podeMutar && !props.ehSocioRestrito}
             modoNome={props.modoNome}
           />

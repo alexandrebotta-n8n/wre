@@ -136,27 +136,9 @@ export default async function ApresentacaoPage({
     />,
   );
 
-  // Slide 3 — Pesos por área de prática (apenas se cenário usa POR_AREA)
-  if (cA.modelo === "NOVO") {
-    const params = cA.premissa.parametros as Record<string, unknown>;
-    const distrib = params.distribuicaoBlocoB;
-    if (distrib === "POR_AREA" && params.pesosPorArea) {
-      const areas = await prisma.areaPratica.findMany({
-        where: { ativa: true },
-        orderBy: [{ ordem: "asc" }],
-        take: 50,
-      });
-      slides.push(
-        <SlidePesosArea
-          key="pesosArea"
-          areas={areas.map((a) => ({ codigo: a.codigo, nome: a.nome }))}
-          pesos={params.pesosPorArea as PesosPorArea}
-        />,
-      );
-    }
-  }
-
   // Slide 4 — Top sócios do A
+  // (Antes existia "Slide 3 — Pesos por área de prática" condicional ao modo
+  // POR_AREA. Bloco B agora é regra única por nº salários, slide removido.)
   slides.push(<SlideTopSocios key="topA" titulo={`Top sócios — ${cA.nome}`} linhas={topA} />);
 
   // Slides do B (se existir)
@@ -281,61 +263,8 @@ function SlideResumo({
   );
 }
 
-interface PesosPorArea {
-  mixOrganico: number;
-  mixIncremental: number;
-  pesosOrganico: Record<string, number>;
-  pesosIncremental: Record<string, number>;
-}
-
-function SlidePesosArea({
-  areas, pesos,
-}: {
-  areas: Array<{ codigo: string; nome: string }>;
-  pesos: PesosPorArea;
-}) {
-  // Calcula peso efetivo combinado por área = mixOrg×org + mixInc×inc
-  const linhas = areas.map((a) => {
-    const org = pesos.pesosOrganico[a.codigo] ?? 0;
-    const inc = pesos.pesosIncremental[a.codigo] ?? 0;
-    const efetivo = pesos.mixOrganico * org + pesos.mixIncremental * inc;
-    return { ...a, org, inc, efetivo };
-  });
-  const max = Math.max(0.001, ...linhas.map((l) => l.efetivo));
-
-  return (
-    <div className="h-full w-full flex flex-col px-16 py-16">
-      <p className="text-peri-200 text-xs uppercase tracking-[0.2em]">Bloco B · distribuição POR_AREA</p>
-      <h2 className="mt-2 text-3xl font-bold tracking-tight">Pesos por área de prática</h2>
-      <p className="text-sm text-peri-200 mt-1">
-        Mix Orgânico {(pesos.mixOrganico * 100).toFixed(0)}% · Incremental {(pesos.mixIncremental * 100).toFixed(0)}%
-      </p>
-
-      <div className="mt-8 flex-1 grid grid-cols-[1fr_auto_auto_auto] gap-x-6 gap-y-2 text-sm items-center">
-        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50">Área</div>
-        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50 text-right">Orgânico</div>
-        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50 text-right">Incremental</div>
-        <div className="text-xs uppercase tracking-wider text-peri-200 pb-2 border-b border-peri-700/50 text-right">Efetivo</div>
-        {linhas.map((l) => (
-          <div key={l.codigo} className="contents">
-            <div className="font-medium flex items-center gap-3">
-              <span className="w-32 truncate">{l.nome}</span>
-              <div className="flex-1 h-1.5 rounded-full bg-navy-700 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-peri-400 to-mint-400"
-                  style={{ width: `${(l.efetivo / max) * 100}%` }}
-                />
-              </div>
-            </div>
-            <div className="text-right tabular-nums text-peri-200">{(l.org * 100).toFixed(0)}%</div>
-            <div className="text-right tabular-nums text-peri-200">{(l.inc * 100).toFixed(0)}%</div>
-            <div className="text-right tabular-nums font-semibold text-mint-400">{(l.efetivo * 100).toFixed(2)}%</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// (SlidePesosArea removido — Bloco B agora segue regra única por nº salários,
+// configurada no cadastro do sócio; não há mais "pesos por área de prática".)
 
 function SlideTopSocios({
   titulo, linhas,

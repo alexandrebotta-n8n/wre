@@ -18,33 +18,13 @@ export const ParamsAtualSchema = z.object({
 }).strict();
 export type ParamsAtualInput = z.infer<typeof ParamsAtualSchema>;
 
-export const DistribuicaoBlocoBEnum = z.enum([
-  "UNIFORME",
-  "PESO_INDIVIDUAL",
-  "ORIGINACAO",
-  "POR_AREA",
-  "ALVO_NUM_SALARIOS",
-]);
-
-export const PesosPorAreaSchema = z.object({
-  mixOrganico: z.number().min(0).max(1),
-  mixIncremental: z.number().min(0).max(1),
-  pesosOrganico: z.record(z.string(), z.number().min(0).max(1)),
-  pesosIncremental: z.record(z.string(), z.number().min(0).max(1)),
-}).strict().optional();
-
 const TOL = 0.001; // tolerância para somatórios
 
-const PublicoEnum = z.enum([
-  "SOCIO_CAPITAL",
-  "SOCIO_CAPITAL_GESTOR",
-  "SOCIO_CAPITAL_LIDER_UNIDADE",
-  "SOCIO_SERVICOS",
-  "SOCIO_SERVICOS_ESTRATEGICO",
-  "LIDER_UNIDADE_NON_EQUITY",
-  "LIDER_TECNICO",
-  "FUNDADOR",
-]);
+// Distribuição do Bloco B — antes era configurável (5 modos), hoje é regra
+// única ALVO_NUM_SALARIOS (nº salários × base individual). Schemas
+// DistribuicaoBlocoBEnum, PesosPorAreaSchema, pesoCategoria e proRataMinMeses
+// foram REMOVIDOS. Premissas antigas no banco que ainda têm esses campos
+// são saneadas pela migration `_premissa_limpar_distribuicao_blocob`.
 
 export const ParamsNovoSchema = z.object({
   percentualBlocoA: z.number().min(0).max(1),
@@ -62,13 +42,9 @@ export const ParamsNovoSchema = z.object({
   faixaExecMax: z.number().min(0).max(1),
   faixaGestaoMin: z.number().min(0).max(1),
   faixaGestaoMax: z.number().min(0).max(1),
-  proRataMinMeses: z.number().int().min(0).max(12),
-  distribuicaoBlocoB: DistribuicaoBlocoBEnum.default("UNIFORME"),
-  pesosPorArea: PesosPorAreaSchema,
   // Política DSF v1 — itens 5/6/7 dos requisitos:
   proLaboreMensal: z.number().min(0).optional(),         // R$/mês — aplicado a todas as 6 categorias
   taxaComissaoOriginacao: z.number().min(0).max(1).optional(), // ex: 0.05 = 5%
-  pesoCategoria: z.record(PublicoEnum, z.number().min(0).max(5)).optional(),
   // Fator de anualização CLT para LIDER_TECNICO — unificado com ATUAL.
   // Default 14,4 (12 + 13º + ⅓ férias + FGTS médio). Range 12 a 15.
   mesesAnualLiderTecnicoCLT: z.number().min(12).max(15).optional(),
@@ -88,30 +64,7 @@ export const ParamsNovoSchema = z.object({
   )
   .refine((p) => p.faixaOrigMin <= p.faixaOrigMax, { message: "Faixa originação: min > max", path: ["faixaOrigMin"] })
   .refine((p) => p.faixaExecMin <= p.faixaExecMax, { message: "Faixa execução: min > max", path: ["faixaExecMin"] })
-  .refine((p) => p.faixaGestaoMin <= p.faixaGestaoMax, { message: "Faixa gestão: min > max", path: ["faixaGestaoMin"] })
-  .refine(
-    (p) => {
-      if (!p.pesosPorArea) return true;
-      return Math.abs(p.pesosPorArea.mixOrganico + p.pesosPorArea.mixIncremental - 1) <= TOL;
-    },
-    { message: "Mix Orgânico + Incremental deve somar 1.0", path: ["pesosPorArea"] },
-  )
-  .refine(
-    (p) => {
-      if (!p.pesosPorArea) return true;
-      const s = Object.values(p.pesosPorArea.pesosOrganico).reduce((a, v) => a + v, 0);
-      return Math.abs(s - 1) <= TOL;
-    },
-    { message: "Pesos Orgânicos por área devem somar 1.0", path: ["pesosPorArea"] },
-  )
-  .refine(
-    (p) => {
-      if (!p.pesosPorArea) return true;
-      const s = Object.values(p.pesosPorArea.pesosIncremental).reduce((a, v) => a + v, 0);
-      return Math.abs(s - 1) <= TOL;
-    },
-    { message: "Pesos Incrementais por área devem somar 1.0", path: ["pesosPorArea"] },
-  );
+  .refine((p) => p.faixaGestaoMin <= p.faixaGestaoMax, { message: "Faixa gestão: min > max", path: ["faixaGestaoMin"] });
 export type ParamsNovoInput = z.infer<typeof ParamsNovoSchema>;
 
 export const CriarPremissaSchema = z.object({

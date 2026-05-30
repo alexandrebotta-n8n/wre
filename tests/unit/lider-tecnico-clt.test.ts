@@ -148,8 +148,6 @@ describe("Política NOVA — Sócio de Serviços (rem. × 12)", () => {
         faixaOrigMin: 0.2, faixaOrigMax: 0.4,
         faixaExecMin: 0.5, faixaExecMax: 0.7,
         faixaGestaoMin: 0, faixaGestaoMax: 0.15,
-        proRataMinMeses: 3,
-        distribuicaoBlocoB: "UNIFORME",
         tabelaSalarial: tabela,
       },
     });
@@ -157,16 +155,21 @@ describe("Política NOVA — Sócio de Serviços (rem. × 12)", () => {
     expect(r.pacotes[0].remuneracaoGestao).toBe(157_692);
   });
 
-  it("SOCIO_SERVICOS entra no rateio do Bloco B (UNIFORME)", () => {
+  it("SOCIO_SERVICOS entra no rateio do Bloco B (regra única: nº salários)", () => {
     const r = calcularModeloNovo({
       periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
       socios: [
+        // Capital com alvo: base = 8000 (cargo B/INICIAL) + 5000 (pró-labore) = 13000 × 10 = 130k
         { id: "sc1", nome: "Sócio Capital", cargo: "Sócio", publico: "SOCIO_CAPITAL",
-          percentualQuotas: 0.5, originacaoEsperadaAnual: 0, isFundador: false },
+          percentualQuotas: 0.5, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 10 },
+        // Sócios de Serviços: só rem.gestão (sem pró-labore) — base 8000 × 10 = 80k cada
         { id: "ss1", nome: "Líd Téc 1", cargo: "Líder Técnico", publico: "SOCIO_SERVICOS",
-          percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false },
+          percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 10 },
         { id: "ss2", nome: "Líd Téc 2", cargo: "Líder Técnico", publico: "SOCIO_SERVICOS",
-          percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false },
+          percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 10 },
       ],
       resultados: resultadosBase,
       premissas: {
@@ -176,16 +179,14 @@ describe("Política NOVA — Sócio de Serviços (rem. × 12)", () => {
         faixaOrigMin: 0.2, faixaOrigMax: 0.4,
         faixaExecMin: 0.5, faixaExecMax: 0.7,
         faixaGestaoMin: 0, faixaGestaoMax: 0.15,
-        proRataMinMeses: 3,
-        distribuicaoBlocoB: "UNIFORME",
+        proLaboreMensal: 5000,
         tabelaSalarial: tabela,
       },
     });
-    // Bloco B = 35% × 1M = 350k dividido em 3 (UNIFORME entre os 3 elegíveis)
-    const blocoBPorSocio = 350_000 / 3;
-    expect(r.pacotes[0].blocoB).toBeCloseTo(blocoBPorSocio, 2);
-    expect(r.pacotes[1].blocoB).toBeCloseTo(blocoBPorSocio, 2);
-    expect(r.pacotes[2].blocoB).toBeCloseTo(blocoBPorSocio, 2);
+    // RDA=1M, totalBlocoB=350k. Σ alvos = 130k + 80k + 80k = 290k ≤ 350k → cada um recebe alvo cheio.
+    expect(r.pacotes[0].blocoB).toBeCloseTo(130_000, 1);
+    expect(r.pacotes[1].blocoB).toBeCloseTo(80_000, 1);
+    expect(r.pacotes[2].blocoB).toBeCloseTo(80_000, 1);
   });
 
   it("SOCIO_SERVICOS NÃO recebe Bloco A (capital)", () => {
@@ -203,8 +204,6 @@ describe("Política NOVA — Sócio de Serviços (rem. × 12)", () => {
         faixaOrigMin: 0.2, faixaOrigMax: 0.4,
         faixaExecMin: 0.5, faixaExecMax: 0.7,
         faixaGestaoMin: 0, faixaGestaoMax: 0.15,
-        proRataMinMeses: 3,
-        distribuicaoBlocoB: "UNIFORME",
         tabelaSalarial: tabela,
       },
     });

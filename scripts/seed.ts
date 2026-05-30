@@ -101,25 +101,10 @@ const PREMISSA_NOVO_PARAMS = {
   faixaOrigMin: 0.20, faixaOrigMax: 0.40,
   faixaExecMin: 0.50, faixaExecMax: 0.70,
   faixaGestaoMin: 0.00, faixaGestaoMax: 0.15,
-  proRataMinMeses: 3,
-  // POR_AREA é o modo que reflete a planilha 1T2026: cada gestor recebe Bloco B
-  // proporcional ao peso da sua área de prática. Sócios sem área (CEO, Diretores,
-  // fundadores) ficam fora do Bloco B nesse modo.
-  distribuicaoBlocoB: "POR_AREA" as const,
-  // Pesos por área conforme planilha "SISTEMA DE REMUNERAÇÃO" 1T2026
-  // (somente usados quando distribuicaoBlocoB="POR_AREA").
-  pesosPorArea: {
-    mixOrganico: 0.76,
-    mixIncremental: 0.24,
-    pesosOrganico: {
-      civel: 0.20, trabalhista: 0.20, societario: 0.10, tributario: 0.10,
-      imobiliario: 0.10, digital: 0.10, internacional: 0.10, ma: 0.10,
-    },
-    pesosIncremental: {
-      civel: 0.10, trabalhista: 0.10, societario: 0.20, tributario: 0.20,
-      imobiliario: 0.10, digital: 0.10, internacional: 0.10, ma: 0.10,
-    },
-  },
+  // Bloco B segue regra única (Política DSF v1): nº salários × (pró-labore +
+  // rem.gestão) por sócio. O número de salários alvo é configurado por sócio
+  // em /socios. Antes existiam aqui `distribuicaoBlocoB`, `pesosPorArea` e
+  // `proRataMinMeses` — removidos pra simplificar a UI.
 };
 
 async function main() {

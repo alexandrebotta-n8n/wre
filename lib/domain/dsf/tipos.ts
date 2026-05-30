@@ -126,35 +126,13 @@ export interface PremissasModeloAtual {
 // Premissas — Modelo NOVO (Política DSF v1)
 // ============================================================================
 
-// Como o Bloco B é distribuído entre os elegíveis:
-//   - UNIFORME: cada elegível recebe (totalBlocoB / nº elegíveis)
-//   - PESO_INDIVIDUAL: proporcional a SocioInput.pesoBlocoB (default 1.0)
-//   - ORIGINACAO: proporcional a SocioInput.originacaoEsperadaAnual
-//                 (sócios sem originação não recebem Bloco B)
-//   - POR_AREA: combina mistura organico/incremental + pesos por área.
-//               Cada sócio com areaPraticaCodigo recebe peso proporcional a
-//               (mixOrganico × pesoOrganico[area]) + (mixIncremental × pesoIncremental[area]).
-//               Sócios sem área recebem 0.
-// ALVO_NUM_SALARIOS: cada elegível recebe (rem.gestão_mensal + pró-labore_mensal)
-// × `blocoBNumSalariosAlvo`. Se Σ alvos > Bloco B disponível, faz pro-rata.
-// Se Σ alvos ≤ Bloco B, cada um recebe seu alvo exato (sobra vira reserva).
-export type DistribuicaoBlocoB =
-  | "UNIFORME"
-  | "PESO_INDIVIDUAL"
-  | "ORIGINACAO"
-  | "POR_AREA"
-  | "ALVO_NUM_SALARIOS";
-
-// Configuração de pesos por área (planilha 1T2026).
-//   mixOrganico/mixIncremental: 0.76 / 0.24
-//   pesosOrganico: { civel: 0.20, trabalhista: 0.20, ... }
-//   pesosIncremental: { civel: 0.10, societario: 0.20, ... }
-export interface PesosPorArea {
-  mixOrganico: number;       // ex: 0.76
-  mixIncremental: number;    // ex: 0.24
-  pesosOrganico: Record<string, number>;     // codigo área → peso (somam 1)
-  pesosIncremental: Record<string, number>;  // codigo área → peso (somam 1)
-}
+// Distribuição do Bloco B — REGRA ÚNICA da Política DSF v1:
+//   ValorBlocoB(sócio) = blocoBNumSalariosAlvo × (proLaboreMensal + remGestaoMensal)
+// Se Σ alvos > Bloco B disponível, faz pro-rata. Se Σ alvos ≤ Bloco B,
+// cada um recebe seu alvo exato (sobra vira reserva central).
+// Antes existia um enum DistribuicaoBlocoB com 5 modos (UNIFORME,
+// PESO_INDIVIDUAL, ORIGINACAO, POR_AREA, ALVO_NUM_SALARIOS) configurável
+// na Premissa — foi removido para simplificar a UI e padronizar a regra.
 
 export interface PremissasModeloNovo {
   // Blocos do RDA central
@@ -177,15 +155,6 @@ export interface PremissasModeloNovo {
   faixaExecMin: number; faixaExecMax: number;
   faixaGestaoMin: number; faixaGestaoMax: number;
 
-  // Pro-rata mínimo (meses) para elegibilidade no Bloco B
-  proRataMinMeses: number;   // ex: 3
-
-  // Como o Bloco B é distribuído entre os elegíveis (default: UNIFORME)
-  distribuicaoBlocoB?: DistribuicaoBlocoB;
-
-  // Pesos por área (apenas usado quando distribuicaoBlocoB="POR_AREA")
-  pesosPorArea?: PesosPorArea;
-
   // Pró-labore mensal (BRL). Recebido por todas as 6 categorias da Política DSF v1
   // (proporcional ao período). Default 0 → engine não calcula pró-labore.
   proLaboreMensal?: number;
@@ -193,11 +162,6 @@ export interface PremissasModeloNovo {
   // Taxa de comissão sobre originação. Multiplicada pelo valor originado
   // de cada sócio no período. Default 0 → engine não calcula comissão.
   taxaComissaoOriginacao?: number;
-
-  // Pesos por categoria no Bloco B. Multiplicador aplicado ao peso-base de cada
-  // sócio elegível. Default = 1 para todas. Permite favorecer/desfavorecer
-  // categorias específicas (ex: SOCIO_SERVICOS_ESTRATEGICO = 1.2).
-  pesoCategoria?: Partial<Record<Publico, number>>;
 
   // Valor anual arbitrário (BRL) distribuído entre fundadores (isFundador=true).
   // Deduzido do LL da matriz ANTES de formar o RDA central. Vem da ConfiguracaoAno

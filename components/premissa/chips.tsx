@@ -1,12 +1,5 @@
 import { Badge } from "@/components/ui/badge";
 
-const DISTRIB_LABEL: Record<string, string> = {
-  UNIFORME: "B uniforme",
-  PESO_INDIVIDUAL: "B por peso",
-  ORIGINACAO: "B por originação",
-  POR_AREA: "B por área",
-};
-
 /** Chips com os principais parâmetros de uma premissa (substitui JSON cru). */
 export function PremissaChips({
   modelo,
@@ -45,15 +38,16 @@ export function PremissaChips({
   const co = Number(parametros.chaveOriginacao ?? 0);
   const ce = Number(parametros.chaveExecucao ?? 0);
   const cg = Number(parametros.chaveGestaoCP ?? 0);
-  const distrib = String(parametros.distribuicaoBlocoB ?? "UNIFORME");
   const fmt3 = (x: number, y: number, z: number) =>
     `${(x * 100).toFixed(0)}/${(y * 100).toFixed(0)}/${(z * 100).toFixed(0)}`;
+  // Distribuição do Bloco B é regra única (nº salários × base por sócio) —
+  // não há mais badge "B por X" porque não tem mais variação na premissa.
   return (
     <div className="flex flex-wrap gap-1.5">
       <Badge variant="info" size="sm">Blocos A/B/C {fmt3(a, b, c)}</Badge>
       <Badge variant="info" size="sm">Pool S/L/E {fmt3(ps, pl, pe)}</Badge>
       <Badge variant="info" size="sm">Chave O/E/G {fmt3(co, ce, cg)}</Badge>
-      <Badge variant="success" size="sm">{DISTRIB_LABEL[distrib] ?? distrib}</Badge>
+      <Badge variant="success" size="sm">B por nº salários</Badge>
     </div>
   );
 }

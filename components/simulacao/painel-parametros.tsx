@@ -9,20 +9,18 @@ import * as React from "react";
 import { useState } from "react";
 import { Settings2, ChevronDown, HelpCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input, NativeSelect } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { MoneyField } from "@/components/ui/money-input";
 import { Field } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useAutoSubmit, StatusSalvamento } from "@/components/ui/use-auto-submit";
 import { SumValidator } from "@/components/premissa/sum-validator";
-import { MatrizPesosArea } from "@/components/premissa/matriz-pesos-area";
 import { PremissaChips } from "@/components/premissa/chips";
 import { atualizarOverrideAction } from "@/app/simulacao/acoes";
 import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { AreaOption } from "./types";
 
 const TOL = 0.001;
 
@@ -36,7 +34,6 @@ export function PainelParametros({
   parametros,
   temOverride,
   editavel,
-  areas,
   dirty,
   versao,
   valoresPorEtapa = {},
@@ -46,7 +43,6 @@ export function PainelParametros({
   parametros: Record<string, unknown>;
   temOverride: boolean;
   editavel: boolean;
-  areas: AreaOption[];
   dirty: boolean;
   /** Versão do cenário — usada como `key` para remontar o form quando override muda
    *  (uncontrolled inputs com `defaultValue` não re-sincronizam de outra forma). */
@@ -94,7 +90,7 @@ export function PainelParametros({
         {modelo === "ATUAL" ? (
           <FormParamsAtual key={`atual-${cenarioId}-${versao}`} cenarioId={cenarioId} parametros={parametros} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         ) : (
-          <FormParamsNovo key={`novo-${cenarioId}-${versao}`} cenarioId={cenarioId} parametros={parametros} areas={areas} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
+          <FormParamsNovo key={`novo-${cenarioId}-${versao}`} cenarioId={cenarioId} parametros={parametros} valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         )}
       </CollapsibleContent>
     </Collapsible>
@@ -256,17 +252,14 @@ function FormParamsAtual({
 function FormParamsNovo({
   cenarioId,
   parametros,
-  areas,
   valoresPorEtapa,
   dirty,
 }: {
   cenarioId: string;
   parametros: Record<string, unknown>;
-  areas: AreaOption[];
   valoresPorEtapa: Record<string, number>;
   dirty: boolean;
 }) {
-  const distribAtual = String(parametros.distribuicaoBlocoB ?? "UNIFORME");
   const { formRef, onAnyChange, pending, salvouAt } = useAutoSubmit();
 
   return (
@@ -274,17 +267,6 @@ function FormParamsNovo({
       ref={formRef}
       onChange={onAnyChange}
       action={async (fd) => {
-        // Recompõe pesosPorArea a partir dos campos pesoOrg-X / pesoInc-X
-        const pesosOrganico: Record<string, number> = {};
-        const pesosIncremental: Record<string, number> = {};
-        for (const [k, v] of fd.entries()) {
-          if (k.startsWith("pesoOrg-")) pesosOrganico[k.slice(8)] = Number(v) || 0;
-          else if (k.startsWith("pesoInc-")) pesosIncremental[k.slice(8)] = Number(v) || 0;
-        }
-        const mixOrganico = Number(fd.get("mixOrganico") ?? 0);
-        const mixIncremental = Number(fd.get("mixIncremental") ?? 0);
-        const distribuicao = String(fd.get("distribuicaoBlocoB") ?? "UNIFORME");
-
         const blocoA = Number(fd.get("percentualBlocoA"));
         const blocoB = Number(fd.get("percentualBlocoB"));
         const blocoC = Number(fd.get("percentualBlocoC"));
@@ -317,15 +299,6 @@ function FormParamsNovo({
         if (fxOrigMin > fxOrigMax) erros.push("Faixa originação: min > max");
         if (fxExecMin > fxExecMax) erros.push("Faixa execução: min > max");
         if (fxGesMin > fxGesMax) erros.push("Faixa gestão: min > max");
-        if (Object.keys(pesosOrganico).length > 0) {
-          if (!aproxIgual(mixOrganico + mixIncremental, 1)) {
-            erros.push(`Mix Orgânico + Incremental deve somar 1.00 (atual: ${(mixOrganico + mixIncremental).toFixed(2)})`);
-          }
-          const sOrg = Object.values(pesosOrganico).reduce((a, v) => a + v, 0);
-          const sInc = Object.values(pesosIncremental).reduce((a, v) => a + v, 0);
-          if (!aproxIgual(sOrg, 1)) erros.push(`Pesos orgânicos por área devem somar 1.00 (atual: ${sOrg.toFixed(2)})`);
-          if (!aproxIgual(sInc, 1)) erros.push(`Pesos incrementais por área devem somar 1.00 (atual: ${sInc.toFixed(2)})`);
-        }
         if (erros.length > 0) {
           toast.error(erros.join(" · "), { duration: 6000 });
           return;
@@ -347,13 +320,8 @@ function FormParamsNovo({
           faixaExecMax: fxExecMax,
           faixaGestaoMin: fxGesMin,
           faixaGestaoMax: fxGesMax,
-          proRataMinMeses: Number(fd.get("proRataMinMeses")),
-          distribuicaoBlocoB: distribuicao,
           proLaboreMensal: Number(fd.get("proLaboreMensal")),
         };
-        if (Object.keys(pesosOrganico).length > 0) {
-          override.pesosPorArea = { mixOrganico, mixIncremental, pesosOrganico, pesosIncremental };
-        }
         const fd2 = new FormData();
         fd2.set("cenarioId", cenarioId);
         fd2.set("override", JSON.stringify(override));
@@ -430,7 +398,7 @@ function FormParamsNovo({
 
       <Grupo
         titulo="Faixas de ajuste (mín / máx)"
-        ajuda="Limites para a chave O/E/G poder ser ajustada caso a caso. Política da Política: Originação 20-40%, Execução 50-70%, Gestão 0-15%. Pro-rata mínimo: meses para reconhecer parcela proporcional."
+        ajuda="Limites para a chave O/E/G poder ser ajustada caso a caso. Política da Política: Originação 20-40%, Execução 50-70%, Gestão 0-15%."
       >
         <div className="grid grid-cols-2 gap-3">
           <NumField name="faixaOrigMin" label="Orig min" defaultValue={Number(parametros.faixaOrigMin ?? 0.20)} step="0.05" />
@@ -440,42 +408,17 @@ function FormParamsNovo({
           <NumField name="faixaGestaoMin" label="Gestão min" defaultValue={Number(parametros.faixaGestaoMin ?? 0.00)} step="0.05" />
           <NumField name="faixaGestaoMax" label="Gestão max" defaultValue={Number(parametros.faixaGestaoMax ?? 0.15)} step="0.05" />
         </div>
-        <div className="mt-2">
-          <NumField name="proRataMinMeses" label="Pro-rata mín. (meses)" defaultValue={Number(parametros.proRataMinMeses ?? 3)} step="1" min="0" max="12" />
-        </div>
       </Grupo>
 
       <Grupo
-        titulo="Distribuição do Bloco B + Pesos por área"
-        ajuda="O Bloco B (35%) pode ser distribuído por: UNIFORME (igual entre elegíveis), PESO_INDIVIDUAL, ORIGINACAO, POR_AREA (mix orgânico/incremental por área), ou ALVO_NUM_SALARIOS (cada sócio recebe salário_mensal × nº alvos cadastrado em /socios; pro-rata se total estourar)."
+        titulo="Distribuição do Bloco B"
+        ajuda="Regra única (Política DSF v1): cada sócio elegível recebe (pró-labore mensal + rem. de gestão mensal) × número de salários alvo (cadastrado em /socios). Quando Σ alvos > Bloco B disponível, faz pro-rata proporcional."
       >
-        <Field label="Distribuição" htmlFor={`db-${cenarioId}`}>
-          <NativeSelect id={`db-${cenarioId}`} name="distribuicaoBlocoB" defaultValue={distribAtual}>
-            <option value="UNIFORME">Uniforme</option>
-            <option value="PESO_INDIVIDUAL">Por peso individual</option>
-            <option value="ORIGINACAO">Por originação</option>
-            <option value="POR_AREA">Por área de prática</option>
-            <option value="ALVO_NUM_SALARIOS">Por alvo em nº de salários</option>
-          </NativeSelect>
-        </Field>
-        {distribAtual === "ALVO_NUM_SALARIOS" && (
-          <p className="text-[11px] text-neutral-600 mt-2 bg-peri-50/50 border border-peri-200 rounded px-2 py-1.5">
-            💡 Cada sócio recebe <strong>(rem.gestão mensal + pró-labore mensal) × nº alvos</strong> cadastrado em <a href="/socios" className="underline text-peri-700">/socios</a>. Se Σ alvos &gt; Bloco B disponível, faz pro-rata proporcional ao alvo.
-          </p>
-        )}
-        {areas.length > 0 && (
-          <div className="mt-3">
-            <MatrizPesosArea
-              areas={areas}
-              defaults={parametros.pesosPorArea as {
-                mixOrganico: number;
-                mixIncremental: number;
-                pesosOrganico: Record<string, number>;
-                pesosIncremental: Record<string, number>;
-              } | undefined}
-            />
-          </div>
-        )}
+        <p className="text-[11px] text-neutral-600 bg-peri-50/50 border border-peri-200 rounded px-2 py-1.5">
+          💡 <strong>Bloco B (sócio) = nº salários × (pró-labore + rem. de gestão)</strong>. O número
+          de salários por sócio é cadastrado em <a href="/socios" className="underline text-peri-700">/socios</a>.
+          Sócios sem alvo (vazio ou 0) ficam fora do Bloco B.
+        </p>
       </Grupo>
 
       <div className="flex justify-end pt-1 min-h-[18px]">

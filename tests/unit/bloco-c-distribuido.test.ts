@@ -28,8 +28,6 @@ const premissasBase = {
   faixaExecMax: 0.7,
   faixaGestaoMin: 0,
   faixaGestaoMax: 0.15,
-  proRataMinMeses: 3,
-  distribuicaoBlocoB: "ALVO_NUM_SALARIOS" as const,
   proLaboreMensal: 5000,
   tabelaSalarial: tabela,
 };
@@ -80,16 +78,17 @@ describe("Bloco C — distribuído (modo ALVO_NUM_SALARIOS)", () => {
     expect(r.totalReservaCentral).toBeCloseTo(0, 1);
   });
 
-  it("modos diferentes de ALVO_NUM_SALARIOS: Bloco C continua retido", () => {
+  it("sem ninguém com alvo: Bloco C inteiro vai pra reservaCentral", () => {
     const r = calcularModeloNovo({
       periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
       socios: [
+        // Sem blocoBNumSalariosAlvo — fica fora do rateio.
         { id: "ale", nome: "Alessandro", cargo: "CEO", publico: "SOCIO_CAPITAL_GESTOR",
           percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false,
-          nivelCargo: "A", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 20 },
+          nivelCargo: "A", faixaSalarial: "INICIAL" },
       ],
       resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
-      premissas: { ...premissasBase, distribuicaoBlocoB: "UNIFORME" as const },
+      premissas: premissasBase,
     });
     expect(r.pacotes[0].blocoC).toBe(0);
     expect(r.totalReservaCentral).toBeCloseTo(200_000, 1); // 20% × 1M
@@ -124,7 +123,7 @@ describe("Bloco C — distribuído (modo ALVO_NUM_SALARIOS)", () => {
           nivelCargo: "A", faixaSalarial: "INICIAL" },
       ],
       resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 8_000_000 }],
-      premissas: { ...premissasBase, distribuicaoBlocoB: "UNIFORME" as const },
+      premissas: premissasBase,
     });
     // Bloco A = 45% × 8M = 3,6M (sem deduzir admin)
     expect(r.pacotes[0].blocoA).toBeCloseTo(3_600_000, 0);

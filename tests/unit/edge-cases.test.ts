@@ -29,7 +29,6 @@ const baseNovo: PremissasModeloNovo = {
   faixaOrigMin: 0.20, faixaOrigMax: 0.40,
   faixaExecMin: 0.50, faixaExecMax: 0.70,
   faixaGestaoMin: 0.00, faixaGestaoMax: 0.15,
-  proRataMinMeses: 3,
   tabelaSalarial: tabela,
 };
 

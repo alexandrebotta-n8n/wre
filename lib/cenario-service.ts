@@ -338,12 +338,12 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
       faixaExecMax: Number(params.faixaExecMax ?? 0.70),
       faixaGestaoMin: Number(params.faixaGestaoMin ?? 0.00),
       faixaGestaoMax: Number(params.faixaGestaoMax ?? 0.15),
-      proRataMinMeses: Number(params.proRataMinMeses ?? 3),
-      distribuicaoBlocoB: (params.distribuicaoBlocoB as PremissasModeloNovo["distribuicaoBlocoB"]) ?? "UNIFORME",
-      pesosPorArea: params.pesosPorArea as PremissasModeloNovo["pesosPorArea"],
+      // distribuicaoBlocoB / pesosPorArea / pesoCategoria / proRataMinMeses
+      // foram removidos — Bloco B usa regra única (nº salários × base).
       proLaboreMensal: Number(params.proLaboreMensal ?? 5000),
       taxaComissaoOriginacao: params.taxaComissaoOriginacao != null ? Number(params.taxaComissaoOriginacao) : undefined,
-      pesoCategoria: params.pesoCategoria as PremissasModeloNovo["pesoCategoria"],
+      mesesAnualLiderTecnicoCLT:
+        params.mesesAnualLiderTecnicoCLT != null ? Number(params.mesesAnualLiderTecnicoCLT) : undefined,
       fundingFundadoresAno,
       tabelaSalarial,
     };
