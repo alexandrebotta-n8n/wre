@@ -130,7 +130,49 @@ const EXPLICACOES_ETAPAS: Record<string, { titulo: string; corpo: React.ReactNod
       </>
     ),
   },
+  "bloco-C": {
+    titulo: "Bloco C — Estratégico (Modelo NOVO)",
+    corpo: (
+      <>
+        <strong>20% do RDA</strong> — parcela estratégica/longo prazo,
+        <strong> retida na matriz</strong> (expansão, retenção, sucessão,
+        reserva). Não é distribuída automaticamente: cada sócio só recebe
+        quando há <strong>valor manual</strong> cadastrado (<code>/socios</code>)
+        ou no modo <strong>ALVO_NUM_SALARIOS</strong>. Por isso aparece como
+        <strong> R$ 0</strong> para a maioria dos sócios — é excepcional e
+        requer deliberação formal.
+      </>
+    ),
+  },
 };
+
+// Detecta se o trace é do Modelo NOVO (tem Bloco A ou B).
+function ehTraceNovo(trace: TraceItem[]): boolean {
+  return trace.some((t) => /^\d+\.bloco-[AB]$/.test(t.etapa));
+}
+
+// Garante que pacotes do Modelo NOVO sempre exibam a linha de Bloco C, mesmo
+// quando zerada na configuração do sócio (excepcional / retido na matriz).
+// Quando o engine já emitiu um Bloco C (valor manual ou ALVO_NUM_SALARIOS),
+// não duplica. Insere logo após o último Bloco A/B para manter a ordem.
+function garantirBlocoC(trace: TraceItem[]): TraceItem[] {
+  if (!ehTraceNovo(trace)) return trace;
+  if (trace.some((t) => /^\d+\.bloco-C$/.test(t.etapa))) return trace;
+  const linha: TraceItem = {
+    etapa: "8.bloco-C",
+    descricao: "retido na matriz · reserva estratégica (não distribuído a este sócio)",
+    valor: 0,
+  };
+  let idx = -1;
+  trace.forEach((t, i) => {
+    if (/^\d+\.bloco-[AB]$/.test(t.etapa)) idx = i;
+  });
+  if (idx === -1) return [...trace, linha];
+  return [...trace.slice(0, idx + 1), linha, ...trace.slice(idx + 1)];
+}
+
+// É a linha de Bloco C? (sempre mostrada no waterfall, mesmo zerada.)
+const ehBlocoC = (t: TraceItem): boolean => /^\d+\.bloco-C$/.test(t.etapa);
 
 function explicacaoPara(etapa: string): { titulo: string; corpo: React.ReactNode } | null {
   // "8.bloco-A" → "bloco-A"
@@ -212,10 +254,15 @@ function Coluna({
   trace: TraceItem[];
   alertas: string[];
 }) {
-  // Filtra etapas com valor; etapas sem valor (como "9.ajustes" descritivos) ficam ao final
-  const comValor = trace.filter((t) => t.valor !== undefined && t.valor !== 0);
-  const semValor = trace.filter((t) => t.valor === undefined || t.valor === 0);
-  const maxAbs = Math.max(...comValor.map((t) => Math.abs(t.valor!)), 1);
+  // Garante a linha de Bloco C (Modelo NOVO) mesmo quando zerada no sócio.
+  const traceComBlocoC = garantirBlocoC(trace);
+  // Filtra etapas com valor; etapas sem valor (como "9.ajustes" descritivos) ficam ao final.
+  // Bloco C é exceção: sempre vai pra lista principal (mesmo zerado), pra deixar
+  // explícita a estrutura 45/35/20 e que esta parcela é retida na matriz.
+  const temValor = (t: TraceItem) => (t.valor !== undefined && t.valor !== 0) || ehBlocoC(t);
+  const comValor = traceComBlocoC.filter(temValor);
+  const semValor = traceComBlocoC.filter((t) => !temValor(t));
+  const maxAbs = Math.max(...comValor.map((t) => Math.abs(t.valor ?? 0)), 1);
 
   return (
     <div>
@@ -225,8 +272,10 @@ function Coluna({
       </div>
       <ol className="space-y-1.5">
         {comValor.map((t, i) => {
-          const pct = (Math.abs(t.valor!) / maxAbs) * 100;
-          const negativo = t.valor! < 0;
+          const valor = t.valor ?? 0;
+          const pct = (Math.abs(valor) / maxAbs) * 100;
+          const negativo = valor < 0;
+          const zero = valor === 0;
           const exp = explicacaoPara(t.etapa);
           return (
             <li key={i} className="text-xs">
@@ -253,18 +302,20 @@ function Coluna({
                 <span
                   className={
                     "tabular-nums font-medium flex-shrink-0 " +
-                    (negativo ? "text-red-700" : "text-navy-900")
+                    (zero ? "text-neutral-400" : negativo ? "text-red-700" : "text-navy-900")
                   }
                 >
-                  {negativo ? "" : "+"}
-                  {brl(t.valor!, true)}
+                  {zero || negativo ? "" : "+"}
+                  {brl(valor, true)}
                 </span>
               </div>
               <div className="h-1.5 rounded bg-neutral-200/60 overflow-hidden">
-                <div
-                  className={(negativo ? "bg-red-300" : "bg-peri-400") + " h-full"}
-                  style={{ width: `${Math.max(pct, 1)}%` }}
-                />
+                {!zero && (
+                  <div
+                    className={(negativo ? "bg-red-300" : "bg-peri-400") + " h-full"}
+                    style={{ width: `${Math.max(pct, 1)}%` }}
+                  />
+                )}
               </div>
             </li>
           );
