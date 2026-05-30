@@ -28,6 +28,7 @@ const DEFAULTS_ATUAL = {
 };
 
 const DEFAULTS_NOVO = {
+  proLaboreMensal: 5000,
   percentualBlocoA: 0.45, percentualBlocoB: 0.35, percentualBlocoC: 0.20,
   poolSociedade: 0.50, poolLider: 0.30, poolEquipeReserva: 0.20,
   chaveOriginacao: 0.30, chaveExecucao: 0.60, chaveGestaoCP: 0.10,

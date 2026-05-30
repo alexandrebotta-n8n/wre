@@ -88,6 +88,7 @@ const PREMISSA_ATUAL_PARAMS = {
 };
 
 const PREMISSA_NOVO_PARAMS = {
+  proLaboreMensal: 5000,
   percentualBlocoA: 0.45,
   percentualBlocoB: 0.35,
   percentualBlocoC: 0.20,

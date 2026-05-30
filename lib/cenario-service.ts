@@ -341,7 +341,7 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
       proRataMinMeses: Number(params.proRataMinMeses ?? 3),
       distribuicaoBlocoB: (params.distribuicaoBlocoB as PremissasModeloNovo["distribuicaoBlocoB"]) ?? "UNIFORME",
       pesosPorArea: params.pesosPorArea as PremissasModeloNovo["pesosPorArea"],
-      proLaboreMensal: params.proLaboreMensal != null ? Number(params.proLaboreMensal) : undefined,
+      proLaboreMensal: Number(params.proLaboreMensal ?? 5000),
       taxaComissaoOriginacao: params.taxaComissaoOriginacao != null ? Number(params.taxaComissaoOriginacao) : undefined,
       pesoCategoria: params.pesoCategoria as PremissasModeloNovo["pesoCategoria"],
       fundingFundadoresAno,

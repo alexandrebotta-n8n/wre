@@ -374,7 +374,7 @@ function FormParamsNovo({
           }
           htmlFor={`pl-novo-${cenarioId}`}
         >
-          <MoneyField id={`pl-novo-${cenarioId}`} name="proLaboreMensal" initial={Number(parametros.proLaboreMensal ?? 0)} required />
+          <MoneyField id={`pl-novo-${cenarioId}`} name="proLaboreMensal" initial={Number(parametros.proLaboreMensal ?? 5000)} required />
           <ChipValor etapa="pro-labore" valoresPorEtapa={valoresPorEtapa} dirty={dirty} />
         </Field>
         <p className="text-[11px] text-neutral-500 mt-2">
