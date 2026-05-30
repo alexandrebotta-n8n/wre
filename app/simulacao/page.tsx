@@ -61,8 +61,14 @@ export default async function SimulacaoPage({
   ]);
 
   // Ano de referência: do cenário ativo (A > B > query param > ano atual).
+  // Number(sp.ano) pode ser NaN (param ausente/inválido) e NaN NÃO é nullish,
+  // então `?? ano atual` não o trataria — sem cenário carregado isso vazaria
+  // NaN para as queries Prisma (campo Int) e quebraria a página. Guard explícito.
+  const anoParam = sp.ano ? Number(sp.ano) : NaN;
   const anoRef =
-    cenarioA?.ano ?? cenarioB?.ano ?? Number(sp.ano) ?? new Date().getFullYear();
+    cenarioA?.ano ??
+    cenarioB?.ano ??
+    (Number.isFinite(anoParam) ? anoParam : new Date().getFullYear());
 
   // Painel global — só carrega se for editor.
   const [unidadesGlobais, draftsDoAno] = escopo.podeMutar
