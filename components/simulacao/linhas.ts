@@ -51,14 +51,15 @@ export function construirLinhasComparativas(
   const mapB = agregar(b?.remuneracoes);
   // Classificações por sócio — preferir o cenário B (NOVO), fallback A.
   // Também coletamos quotas para ordenação por equity.
-  const publicoPorSocio = new Map<string, string>();
+  const publicoAPorSocio = new Map<string, string>();
+  const publicoBPorSocio = new Map<string, string>();
   const quotaPorSocio = new Map<string, number>();
   for (const c of a?.classificacoes ?? []) {
-    publicoPorSocio.set(c.socioId, c.publico);
+    publicoAPorSocio.set(c.socioId, c.publico);
     quotaPorSocio.set(c.socioId, c.percentualQuotas ?? 0);
   }
   for (const c of b?.classificacoes ?? []) {
-    publicoPorSocio.set(c.socioId, c.publico);
+    publicoBPorSocio.set(c.socioId, c.publico);
     quotaPorSocio.set(c.socioId, c.percentualQuotas ?? 0);
   }
   const ids = Array.from(new Set([...mapA.keys(), ...mapB.keys()]));
@@ -70,10 +71,15 @@ export function construirLinhasComparativas(
     const totalB = rb?.total ?? null;
     const diff = (totalB ?? 0) - (totalA ?? 0);
     const diffPct = totalA && totalA !== 0 ? diff / totalA : null;
+    const publicoA = publicoAPorSocio.get(sid) ?? null;
+    const publicoB = publicoBPorSocio.get(sid) ?? null;
     return {
       socioId: sid,
       nome: nomeOriginal,
-      publico: publicoPorSocio.get(sid) ?? "—",
+      // efetivo (sort + single): preferir B, fallback A
+      publico: publicoB ?? publicoA ?? "—",
+      publicoA,
+      publicoB,
       isFundador: ra?.isFundador ?? rb?.isFundador ?? false,
       quota: quotaPorSocio.get(sid) ?? 0,
       totalA,

@@ -57,8 +57,13 @@ export interface TraceItem {
 export interface LinhaComparativa {
   socioId: string;
   nome: string;
-  /** Classificação (público) — preferir o do cenário B (NOVO); fallback A. */
+  /** Classificação efetiva (público) — preferir B (NOVO); fallback A.
+   *  Usada para ordenação e para o modo single. */
   publico: string;
+  /** Classificação no cenário A (ATUAL); null se o sócio não está em A. */
+  publicoA: string | null;
+  /** Classificação no cenário B (NOVO); null se o sócio não está em B. */
+  publicoB: string | null;
   isFundador: boolean;
   /** Percentual de quotas do sócio (0..1) — preferir B; fallback A; senão 0.
    *  Usado pelo sort: capital por equity desc, serviços por nome alfabético. */

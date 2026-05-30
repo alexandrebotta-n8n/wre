@@ -11,6 +11,31 @@ import { cn } from "@/lib/utils";
 import { SocioWaterfall } from "./socio-waterfall";
 import type { LinhaComparativa } from "./types";
 
+// Labels curtos das classificações DSF v1 — combinam bem na largura
+// limitada da coluna na tabela.
+const PUBLICOS_LABEL: Record<string, string> = {
+  SOCIO_CAPITAL: "Sócio de Capital",
+  SOCIO_CAPITAL_GESTOR: "Sócio de Capital — Gestor",
+  SOCIO_CAPITAL_LIDER_UNIDADE: "Sócio de Capital — Líder Un.",
+  SOCIO_SERVICOS: "Sócio de Serviços",
+  SOCIO_SERVICOS_ESTRATEGICO: "Sócio de Serviços Estratégico",
+  LIDER_UNIDADE_NON_EQUITY: "Líder de Un. Non-Equity",
+  LIDER_TECNICO: "Líder Técnico (legado)",
+  FUNDADOR: "Fundador",
+};
+
+// Badge de classificação reutilizado pelas células de público.
+// `mudou` aplica um leve destaque (sinaliza que a classificação variou entre cenários).
+function BadgePublico({ publico, mudou }: { publico: string | null; mudou?: boolean }) {
+  if (!publico) return <span className="text-neutral-400">—</span>;
+  const label = PUBLICOS_LABEL[publico] ?? publico;
+  return (
+    <Badge variant={mudou ? "warning" : "info"} size="sm" title={label}>
+      {label}
+    </Badge>
+  );
+}
+
 export function LinhaSocio({
   linha: l,
   podeCompararDiff,
@@ -34,18 +59,9 @@ export function LinhaSocio({
 
   const temAlgumTrace = l.traceA.length > 0 || l.traceB.length > 0;
 
-  // Labels curtos das classificações DSF v1 — combinam bem na largura
-  // limitada da coluna na tabela.
-  const PUBLICOS_LABEL: Record<string, string> = {
-    SOCIO_CAPITAL: "Sócio de Capital",
-    SOCIO_CAPITAL_GESTOR: "Sócio de Capital — Gestor",
-    SOCIO_CAPITAL_LIDER_UNIDADE: "Sócio de Capital — Líder Un.",
-    SOCIO_SERVICOS: "Sócio de Serviços",
-    SOCIO_SERVICOS_ESTRATEGICO: "Sócio de Serviços Estratégico",
-    LIDER_UNIDADE_NON_EQUITY: "Líder de Un. Non-Equity",
-    LIDER_TECNICO: "Líder Técnico (legado)",
-    FUNDADOR: "Fundador",
-  };
+  // Classificação mudou entre os cenários (ambos presentes e distintos).
+  const publicoMudou =
+    !singleLado && l.publicoA != null && l.publicoB != null && l.publicoA !== l.publicoB;
 
   return (
     <>
@@ -76,11 +92,20 @@ export function LinhaSocio({
             </span>
           )}
         </TD>
-        <TD>
-          <Badge variant="info" size="sm" title={PUBLICOS_LABEL[l.publico] ?? l.publico}>
-            {PUBLICOS_LABEL[l.publico] ?? l.publico}
-          </Badge>
-        </TD>
+        {singleLado ? (
+          <TD>
+            <BadgePublico publico={l.publico} />
+          </TD>
+        ) : (
+          <>
+            <TD>
+              <BadgePublico publico={l.publicoA} />
+            </TD>
+            <TD>
+              <BadgePublico publico={l.publicoB} mudou={publicoMudou} />
+            </TD>
+          </>
+        )}
         {singleLado ? (
           <TD className="text-right tabular-nums">
             {(singleLado === "a" ? l.totalA : l.totalB) != null

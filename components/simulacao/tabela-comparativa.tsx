@@ -41,9 +41,9 @@ export function TabelaComparativa({
   const nomeUnico = lado === "a" ? nomeA : lado === "b" ? nomeB : undefined;
   const totalUnico = lado === "a" ? totalA : totalB;
 
-  // Modo comparativo: Sócio + Classif + Total A + Total B + Δ R$ + Δ %  → 6
-  // Modo single:     Sócio + Classif + Total                            → 3
-  const colSpan = single ? 3 : 2 + 2 + (podeCompararDiff ? 2 : 0);
+  // Modo comparativo: Sócio + Classif A + Classif B + Total A + Total B + Δ R$ + Δ %  → 7
+  // Modo single:     Sócio + Classif + Total                                          → 3
+  const colSpan = single ? 3 : 3 + 2 + (podeCompararDiff ? 2 : 0);
 
   return (
     <Card className="overflow-hidden">
@@ -92,11 +92,15 @@ export function TabelaComparativa({
         <THead>
           <tr>
             <TH className="px-4">Sócio</TH>
-            <TH>Classificação</TH>
             {single ? (
-              <TH className="text-right">Total</TH>
+              <>
+                <TH>Classificação</TH>
+                <TH className="text-right">Total</TH>
+              </>
             ) : (
               <>
+                <TH>Classif. A</TH>
+                <TH>Classif. B</TH>
                 <TH className="text-right">Total {temA ? "A" : ""}{nomeA ? ` · ${truncar(nomeA)}` : ""}</TH>
                 <TH className="text-right">Total {temB ? "B" : ""}{nomeB ? ` · ${truncar(nomeB)}` : ""}</TH>
                 {podeCompararDiff && <TH className="text-right">Δ R$</TH>}
@@ -127,11 +131,15 @@ export function TabelaComparativa({
           {linhas.length > 0 && (
             <tr className="bg-neutral-50 font-semibold">
               <td className="px-4 py-2.5">Total geral</td>
-              <td />
               {single ? (
-                <td className="px-3 py-2.5 text-right tabular-nums">{brl(totalUnico, true)}</td>
+                <>
+                  <td />
+                  <td className="px-3 py-2.5 text-right tabular-nums">{brl(totalUnico, true)}</td>
+                </>
               ) : (
                 <>
+                  <td />
+                  <td />
                   <td className="px-3 py-2.5 text-right tabular-nums">{brl(totalA, true)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{brl(totalB, true)}</td>
                   {podeCompararDiff && (
