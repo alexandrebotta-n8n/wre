@@ -2,10 +2,17 @@
 import * as React from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "./dialog";
 import { Button, type ButtonProps } from "./button";
+import { TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent } from "./tooltip";
 
 export interface ConfirmDialogProps {
   /** Trigger renderizado em torno disso (use asChild para herdar). */
   trigger: React.ReactNode;
+  /** Tooltip opcional no trigger. Renderizado com os triggers aninhados
+   *  (TooltipTrigger → DialogTrigger → trigger) para compor corretamente sobre
+   *  o mesmo nó DOM — evita o erro de hidratação de dois `asChild` aninhados
+   *  em volta de um componente função. */
+  tooltip?: React.ReactNode;
+  tooltipSide?: "top" | "right" | "bottom" | "left";
   title: string;
   description?: React.ReactNode;
   /** Server action ou client handler. Se for server action, o form é submetido com hiddenFields. */
@@ -21,6 +28,8 @@ export interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   trigger,
+  tooltip,
+  tooltipSide = "top",
   title,
   description,
   action,
@@ -32,7 +41,18 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Dialog>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {tooltip ? (
+        <TooltipProvider delayDuration={300}>
+          <TooltipRoot>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>{trigger}</DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent side={tooltipSide}>{tooltip}</TooltipContent>
+          </TooltipRoot>
+        </TooltipProvider>
+      ) : (
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
+      )}
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

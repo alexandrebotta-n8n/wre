@@ -7,7 +7,6 @@ import { FileCheck2, ListTree, Calculator, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Tooltip } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { brl } from "@/lib/format";
@@ -256,19 +255,15 @@ export function ColunaCenario({
         {editavel && jaCalculou && (
           <ConfirmDialog
             trigger={
-              <Tooltip
-                side="top"
-                content={
-                  errosCount > 0
-                    ? `Resolva os ${errosCount} alerta(s) ERROR antes de salvar.`
-                    : "Salva uma versão final do cenário (snapshot imutável). Outras versões finais do mesmo modelo+ano são arquivadas automaticamente."
-                }
-              >
-                <Button variant="primary" size="sm" disabled={!podePublicar}>
-                  <FileCheck2 className="h-3.5 w-3.5" />
-                  Salvar versão
-                </Button>
-              </Tooltip>
+              <Button variant="primary" size="sm" disabled={!podePublicar}>
+                <FileCheck2 className="h-3.5 w-3.5" />
+                Salvar versão
+              </Button>
+            }
+            tooltip={
+              errosCount > 0
+                ? `Resolva os ${errosCount} alerta(s) ERROR antes de salvar.`
+                : "Salva uma versão final do cenário (snapshot imutável). Outras versões finais do mesmo modelo+ano são arquivadas automaticamente."
             }
             title="Salvar versão final deste cenário?"
             description={
