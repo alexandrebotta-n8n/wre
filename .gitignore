@@ -22,3 +22,8 @@ tsconfig.tsbuildinfo
 prisma/dev.db*
 
 .vercel
+
+# Claude Code — worktrees e launch.json contêm .env com segredos; nunca versionar
+.claude
+
+wre.iml
