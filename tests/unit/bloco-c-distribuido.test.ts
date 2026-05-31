@@ -1,6 +1,11 @@
-// Bloco C — distribuído com mesma fórmula do Bloco B quando modo é
-// ALVO_NUM_SALARIOS. Reusa `blocoBNumSalariosAlvo`. Sobra (caso Σ alvos
-// < totalBlocoC) vira reserva central.
+// Bloco C — DIFERIDO (Política DSF v1, item 3.3.4).
+//
+// Default = 0 para todos. Só recebe quando há valor manual cadastrado em
+// `Socio.blocoCValorManualAno` (deliberação estratégica formal). Tudo
+// que não é alocado vira `totalReservaCentral` (20% × RDA − Σ manuais).
+//
+// Antes existia distribuição automática via mesma fórmula do Bloco B
+// (ALVO_NUM_SALARIOS) — foi removida para refletir o caráter diferido.
 import { describe, it, expect } from "vitest";
 import { calcularModeloNovo } from "@/lib/domain/dsf/modelo-novo";
 import type { TabelaSalarial } from "@/lib/domain/dsf/tipos";
@@ -32,66 +37,112 @@ const premissasBase = {
   tabelaSalarial: tabela,
 };
 
-describe("Bloco C — distribuído (modo ALVO_NUM_SALARIOS)", () => {
-  it("Σ alvos ≤ Bloco C: cada sócio recebe alvo cheio; sobra fica em reservaCentral", () => {
-    // LL grande → Bloco C = 20% × 100M = 20M (>> alvos).
+describe("Bloco C — diferido (apenas valor manual)", () => {
+  it("nenhum sócio com manual: Bloco C inteiro vai pra reservaCentral", () => {
     const r = calcularModeloNovo({
       periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
       socios: [
+        // Mesmo com alvo de Bloco B preenchido, sem manual de C → C = 0.
         { id: "ale", nome: "Alessandro", cargo: "CEO", publico: "SOCIO_CAPITAL_GESTOR",
           percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false,
           nivelCargo: "A", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 20 },
-        { id: "bar", nome: "Bárbara", cargo: "Gestora", publico: "SOCIO_SERVICOS",
-          percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false,
-          remuneracaoGestaoMensalOverride: 11400, blocoBNumSalariosAlvo: 10 },
-      ],
-      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 100_000_000 }],
-      premissas: premissasBase,
-    });
-    // Alvos Bloco C (mesma fórmula B): Alessandro 292.000, Bárbara 114.000.
-    expect(r.pacotes[0].blocoC).toBe(292_000);
-    expect(r.pacotes[1].blocoC).toBe(114_000);
-    // totalBlocoC = 20.000.000; distribuído = 406.000; reserva = sobra
-    expect(r.totalReservaCentral).toBeCloseTo(20_000_000 - 406_000, 0);
-  });
-
-  it("Σ alvos > Bloco C: pro-rata; reservaCentral = 0", () => {
-    // LL pequeno → Bloco C limitado, alvos estouram.
-    const r = calcularModeloNovo({
-      periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
-      socios: [
-        { id: "ale", nome: "Alessandro", cargo: "CEO", publico: "SOCIO_CAPITAL_GESTOR",
-          percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false,
-          nivelCargo: "A", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 20 },
-        { id: "bar", nome: "Bárbara", cargo: "Gestora", publico: "SOCIO_SERVICOS",
-          percentualQuotas: 0, originacaoEsperadaAnual: 0, isFundador: false,
-          remuneracaoGestaoMensalOverride: 11400, blocoBNumSalariosAlvo: 10 },
-      ],
-      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
-      premissas: premissasBase,
-    });
-    // totalBlocoC = 20% × 1M = 200.000. Σ alvos = 406.000.
-    const fator = 200_000 / 406_000;
-    expect(r.pacotes[0].blocoC).toBeCloseTo(292_000 * fator, 1);
-    expect(r.pacotes[1].blocoC).toBeCloseTo(114_000 * fator, 1);
-    expect(r.pacotes[0].blocoC + r.pacotes[1].blocoC).toBeCloseTo(200_000, 0);
-    expect(r.totalReservaCentral).toBeCloseTo(0, 1);
-  });
-
-  it("sem ninguém com alvo: Bloco C inteiro vai pra reservaCentral", () => {
-    const r = calcularModeloNovo({
-      periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
-      socios: [
-        // Sem blocoBNumSalariosAlvo — fica fora do rateio.
-        { id: "ale", nome: "Alessandro", cargo: "CEO", publico: "SOCIO_CAPITAL_GESTOR",
-          percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false,
-          nivelCargo: "A", faixaSalarial: "INICIAL" },
       ],
       resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
       premissas: premissasBase,
     });
     expect(r.pacotes[0].blocoC).toBe(0);
     expect(r.totalReservaCentral).toBeCloseTo(200_000, 1); // 20% × 1M
+  });
+
+  it("manual=120.000 em período ANO: blocoC = 120.000; reserva = totalBlocoC − 120k", () => {
+    const r = calcularModeloNovo({
+      periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
+      socios: [
+        { id: "ric", nome: "Ricardo", cargo: "Diretor", publico: "SOCIO_CAPITAL_GESTOR",
+          percentualQuotas: 0.5, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL",
+          blocoCValorManualAno: 120_000 },
+        // Sem manual: Bloco C = 0.
+        { id: "out", nome: "Outro", cargo: "Sócio", publico: "SOCIO_CAPITAL_GESTOR",
+          percentualQuotas: 0.5, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL" },
+      ],
+      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
+      premissas: premissasBase,
+    });
+    const ricardo = r.pacotes.find((p) => p.socioId === "ric")!;
+    const outro = r.pacotes.find((p) => p.socioId === "out")!;
+    expect(ricardo.blocoC).toBe(120_000);
+    expect(outro.blocoC).toBe(0);
+    // totalBlocoC = 20% × 1M = 200k; reserva = 200k − 120k = 80k.
+    expect(r.totalReservaCentral).toBeCloseTo(80_000, 1);
+    // Trace tem etapa 9.bloco-C com valor manual.
+    const t = ricardo.trace.find((x) => x.etapa === "9.bloco-C");
+    expect(t).toBeDefined();
+    expect(t!.valor).toBe(120_000);
+  });
+
+  it("manual em período TRIMESTRE: pro-rata × meses/12", () => {
+    const r = calcularModeloNovo({
+      periodo: { rotulo: "1T2026", tipo: "TRIMESTRE", meses: 3 },
+      socios: [
+        { id: "ric", nome: "Ricardo", cargo: "Diretor", publico: "SOCIO_CAPITAL_GESTOR",
+          percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL",
+          blocoCValorManualAno: 120_000 },
+      ],
+      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 1_000_000 }],
+      premissas: premissasBase,
+    });
+    // 120.000 × 3/12 = 30.000
+    expect(r.pacotes[0].blocoC).toBe(30_000);
+  });
+
+  it("alvo Bloco B NÃO afeta Bloco C (regras independentes)", () => {
+    // Sócio com alvo B=20 mas SEM manual de C → recebe Bloco B mas C=0.
+    const r = calcularModeloNovo({
+      periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
+      socios: [
+        { id: "a", nome: "A", cargo: "X", publico: "SOCIO_CAPITAL_GESTOR",
+          percentualQuotas: 0.5, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL", blocoBNumSalariosAlvo: 20 },
+        // Outro com manual C explícito mas sem alvo B → C=manual, B=0.
+        { id: "b", nome: "B", cargo: "X", publico: "SOCIO_CAPITAL_GESTOR",
+          percentualQuotas: 0.5, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "B", faixaSalarial: "INICIAL",
+          blocoCValorManualAno: 50_000 },
+      ],
+      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 10_000_000 }],
+      premissas: premissasBase,
+    });
+    const a = r.pacotes.find((p) => p.socioId === "a")!;
+    const b = r.pacotes.find((p) => p.socioId === "b")!;
+    // a: alvo B=20 × base 13000 = 260.000; sem C.
+    expect(a.blocoB).toBeCloseTo(260_000, 1);
+    expect(a.blocoC).toBe(0);
+    // b: sem alvo B = 0; C = manual.
+    expect(b.blocoB).toBe(0);
+    expect(b.blocoC).toBe(50_000);
+  });
+
+  it("Σ manuais excede totalBlocoC: paga integral + alerta global; reserva clamped em 0", () => {
+    // RDA pequeno: totalBlocoC = 20% × 500k = 100k. Manual de 200k estoura.
+    const r = calcularModeloNovo({
+      periodo: { rotulo: "2026", tipo: "ANO", meses: 12 },
+      socios: [
+        { id: "a", nome: "A", cargo: "X", publico: "SOCIO_CAPITAL_GESTOR",
+          percentualQuotas: 1.0, originacaoEsperadaAnual: 0, isFundador: false,
+          nivelCargo: "A", faixaSalarial: "INICIAL",
+          blocoCValorManualAno: 200_000 },
+      ],
+      resultados: [{ unidadeCodigo: "DSF", isMatriz: true, lucroLiquido: 500_000 }],
+      premissas: premissasBase,
+    });
+    // Engine paga integralmente (deliberação vincula); reserva clamped em 0.
+    expect(r.pacotes[0].blocoC).toBe(200_000);
+    expect(r.totalReservaCentral).toBe(0);
+    // Alerta global emitido.
+    expect(r.alertasGlobais.some((m) => /Bloco C.*excede/i.test(m))).toBe(true);
   });
 
   it("pró-labore só para Sócios de Capital; Sócio de Serviço não recebe", () => {

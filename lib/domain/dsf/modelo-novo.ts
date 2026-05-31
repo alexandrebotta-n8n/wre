@@ -165,24 +165,25 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     baseMensalPorSocio.set(s.id, remGestaoMensal + proLaboreMensalSocio);
   }
 
-  // Distribui o total (B ou C) pelos alvos individuais, com pro-rata.
+  // Distribui o Bloco B pelos alvos individuais, com pro-rata.
+  // Bloco C NÃO entra aqui — é diferido e só sai para o sócio quando há
+  // valor manual em Socio.blocoCValorManualAno (registrado por deliberação
+  // estratégica, item 3.3.4 da Política DSF v1). Tudo que não for alocado
+  // manualmente fica em `totalReservaCentral`.
   const valorBlocoBAbsoluto = new Map<string, number>();
-  const valorBlocoCAbsoluto = new Map<string, number>();
-  const distribuirPorAlvo = (total: number, destino: Map<string, number>) => {
-    for (const s of elegiveisB) {
-      const n = s.blocoBNumSalariosAlvo ?? 0;
-      const base = baseMensalPorSocio.get(s.id) ?? 0;
-      if (n <= 0 || base <= 0) continue;
-      destino.set(s.id, base * n);
+  for (const s of elegiveisB) {
+    const n = s.blocoBNumSalariosAlvo ?? 0;
+    const base = baseMensalPorSocio.get(s.id) ?? 0;
+    if (n <= 0 || base <= 0) continue;
+    valorBlocoBAbsoluto.set(s.id, base * n);
+  }
+  const somaB = Array.from(valorBlocoBAbsoluto.values()).reduce((a, v) => a + v, 0);
+  const fatorB = somaB > totalBlocoB && somaB > 0 ? totalBlocoB / somaB : 1;
+  if (fatorB !== 1) {
+    for (const [id, alvo] of valorBlocoBAbsoluto) {
+      valorBlocoBAbsoluto.set(id, alvo * fatorB);
     }
-    const soma = Array.from(destino.values()).reduce((a, v) => a + v, 0);
-    const fator = soma > total && soma > 0 ? total / soma : 1;
-    if (fator !== 1) {
-      for (const [id, alvo] of destino) destino.set(id, alvo * fator);
-    }
-  };
-  distribuirPorAlvo(totalBlocoB, valorBlocoBAbsoluto);
-  distribuirPorAlvo(totalBlocoC, valorBlocoCAbsoluto);
+  }
 
   const taxaComissao = premissas.taxaComissaoOriginacao ?? 0;
 
@@ -245,9 +246,8 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     }
 
     // Bloco B — valor absoluto direto: nº salários × (pró-labore + rem.gestão).
-    // Já pro-ratado pelo `distribuirPorAlvo` quando Σ alvos > totalBlocoB.
+    // Já pro-ratado pelo cálculo acima quando Σ alvos > totalBlocoB.
     const blocoB = valorBlocoBAbsoluto.get(s.id) ?? 0;
-    let blocoC = valorBlocoCAbsoluto.get(s.id) ?? 0;
     if (blocoB > 0) {
       const n = s.blocoBNumSalariosAlvo ?? 0;
       trace.push({
@@ -256,19 +256,12 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
         valor: blocoB,
       });
     }
-    if (blocoC > 0) {
-      const n = s.blocoBNumSalariosAlvo ?? 0;
-      trace.push({
-        etapa: "8.bloco-C",
-        descricao: `${n} salários × base (mesma fórmula do Bloco B)`,
-        valor: blocoC,
-      });
-    }
 
-    // Bloco C — VALOR MANUAL por sócio (cadastro /socios). Quando setado,
-    // sobrescreve o que veio do modo de distribuição. Pro-rata pelo período
-    // (× meses/12). Política DSF v1, item 3.3.4: "Bloco C é excepcional —
-    // depende de deliberação estratégica formal para cada sócio".
+    // Bloco C — DIFERIDO. Default = 0 para todos. Só recebe quando há
+    // deliberação estratégica registrada em Socio.blocoCValorManualAno
+    // (Política DSF v1, item 3.3.4). O que não é alocado vira reserva
+    // central. Pro-rata pelo período (× meses/12).
+    let blocoC = 0;
     const manualAno = s.blocoCValorManualAno;
     if (manualAno != null && manualAno > 0) {
       blocoC = manualAno * (periodo.meses / 12);
@@ -343,10 +336,19 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     alertasGlobais.push("Soma do Pool (sociedade+líder+equipe) não é 100%.");
   }
 
-  // Reserva central = Bloco C que NÃO foi distribuído. Em todos os modos,
-  // somamos o blocoC efetivo de cada pacote (já inclui ALVO_NUM_SALARIOS +
-  // valores manuais por sócio). Reserva = totalBlocoC − Σ distribuído.
+  // Reserva central = Bloco C que NÃO foi distribuído. Como o Bloco C agora
+  // só sai por deliberação estratégica (valor manual por sócio), a reserva
+  // tipicamente absorve a maior parte dos 20%×RDA. Se a soma dos manuais
+  // excede totalBlocoC: cada sócio recebe seu valor integral mesmo assim
+  // (decisão estratégica vincula); reserva fica clamped em 0 e emitimos
+  // alerta global pra o usuário revisar.
   const blocoCDistribuido = pacotes.reduce((a, p) => a + p.blocoC, 0);
+  if (blocoCDistribuido > totalBlocoC + 0.01) {
+    alertasGlobais.push(
+      `Σ Bloco C manual (R$ ${blocoCDistribuido.toLocaleString("pt-BR")}) excede o disponível ` +
+      `(R$ ${totalBlocoC.toLocaleString("pt-BR")} = 20% × RDA). Revisar deliberações estratégicas em /socios.`,
+    );
+  }
   const reservaCentral = Math.max(0, totalBlocoC - blocoCDistribuido);
   return {
     modelo: "NOVO",
