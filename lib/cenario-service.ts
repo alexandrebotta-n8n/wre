@@ -19,8 +19,6 @@ import {
   type NivelCargo,
   type FaixaSalarial,
 } from "@/lib/domain/dsf";
-import { redistribuirQuotas } from "@/lib/domain/dsf/quotas";
-import type { ModoQuotas } from "@prisma/client";
 import type {
   Cenario, ClassificacaoSocio, Socio, Unidade,
 } from "@prisma/client";
@@ -50,22 +48,7 @@ interface ClassificacaoComSocio extends ClassificacaoSocio {
 function classificacoesParaSocioInput(
   classificacoes: ClassificacaoComSocio[],
   originacaoLegadaPorSocio: Map<string, number>,
-  modoQuotas: ModoQuotas = "ORIGINAL",
 ): SocioInput[] {
-  // Pré-processamento: se modo REDISTRIBUIDA, calcula novas quotas com base
-  // no conjunto de sócios. Helper puro (lib/domain/dsf/quotas.ts).
-  const quotasFinais =
-    modoQuotas === "REDISTRIBUIDA"
-      ? redistribuirQuotas(
-          classificacoes.map((c) => ({
-            id: c.socioId,
-            publico: c.publico as Publico,
-            isFundador: c.socio.isFundador,
-            percentualQuotas: c.percentualQuotas,
-          })),
-        )
-      : null;
-
   return classificacoes.map((c) => {
     // Originação efetiva: prioridade ao novo campo Socio.originacaoAnualPadrao
     // (cadastro em /socios). Fallback: OriginacaoPeriodo legado por ano
@@ -75,15 +58,13 @@ function classificacoesParaSocioInput(
       origPadrao != null && origPadrao > 0
         ? origPadrao
         : originacaoLegadaPorSocio.get(c.socioId) ?? 0;
-    // Quota efetiva: redistribuída se modo for REDISTRIBUIDA, senão a do cenário.
-    const quotaEfetiva = quotasFinais?.get(c.socioId) ?? c.percentualQuotas;
     return {
       id: c.socioId,
       nome: c.socio.nome,
       cargo: c.socio.cargo,
       publico: c.publico as Publico,
       unidadeCodigo: c.unidade?.codigo,
-      percentualQuotas: quotaEfetiva,
+      percentualQuotas: c.percentualQuotas,
       originacaoEsperadaAnual: c.originacaoEsperada,
       originacaoEfetiva: origEfetiva,
       pesoBlocoB: c.pesoBlocoB ?? undefined,
@@ -268,25 +249,12 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
   // classificacoesParaSocioInput). O fallback `originacaoEfetiva` busca
   // OriginacaoPeriodo ANO legado para sócios sem o novo campo preenchido.
   //
-  // Modo de quotas: vive em ConfiguracaoAno (config GLOBAL por ano). Cenário
-  // espelha o valor em Cenario.modoQuotas pra snapshot APPLIED preservar.
-  // ORIGINAL (default) usa quotas como cadastradas.
-  // REDISTRIBUIDA zera fundadores+SOCIO_SERVICOS e distribui pra capital remanescente.
-  const cfgAno = await prisma.configuracaoAno.findUnique({
-    where: { ano: cenario.ano },
-    select: { modoQuotas: true },
-  });
-  const modoEfetivo = cfgAno?.modoQuotas ?? "ORIGINAL";
-  if (cenario.modoQuotas !== modoEfetivo) {
-    await prisma.cenario.update({
-      where: { id: cenario.id },
-      data: { modoQuotas: modoEfetivo },
-    });
-  }
+  // Quotas: sempre ORIGINAIS (cadastro direto). Não há redistribuição — a
+  // política NOVA reserva as quotas de fundadores + Sócios de Serviço em
+  // tesouraria (ver modelo-novo.ts: Bloco A retém essa fatia).
   const socios = classificacoesParaSocioInput(
     cenario.classificacoes,
     originacaoEfetiva,
-    modoEfetivo,
   );
   // Funding fundadores agora é per-sócio (Socio.fundingFundadorAnual), já
   // propagado em cada SocioInput. O parâmetro global foi mantido em 0 por
@@ -383,11 +351,16 @@ export async function calcularCenario(args: { cenarioId: string }): Promise<Resu
   await prisma.$transaction([
     prisma.cenario.update({
       where: { id: args.cenarioId },
-      // Cache do resultado.totalReservaCentral (Bloco C não distribuído no
-      // NOVO; reserva 5% do ATUAL quando reservaViraPremio=false). UI lê
-      // direto sem recalcular — usado em /simulacao para mostrar "Reserva
-      // 20% (NOVO)" abaixo do diff total.
-      data: { parametrosDirty: false, totalReservaCentral: resultado.totalReservaCentral },
+      // Cache dos agregados do resultado (Bloco C não distribuído + tesouraria
+      // de quotas reservadas). UI lê direto sem recalcular — usado em
+      // /simulacao para mostrar "Reserva 20% (NOVO)" e "Tesouraria — quotas
+      // reservadas" abaixo do diff total.
+      data: {
+        parametrosDirty: false,
+        totalReservaCentral: resultado.totalReservaCentral,
+        tesourariaQuotasReservadas: resultado.quotasReservadasTesouraria,
+        tesourariaValorBlocoA: resultado.tesourariaBlocoA,
+      },
     }),
     prisma.remuneracaoCalculada.deleteMany({
       where: { cenarioId: args.cenarioId, periodoId: periodoAno.id },

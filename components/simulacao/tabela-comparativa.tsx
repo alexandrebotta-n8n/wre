@@ -18,6 +18,8 @@ export function TabelaComparativa({
   nomeB,
   drawerHref,
   reservaB,
+  tesourariaQuotasB,
+  tesourariaValorB,
 }: {
   linhas: LinhaComparativa[];
   temA: boolean;
@@ -29,6 +31,11 @@ export function TabelaComparativa({
    *  presente, é exibida abaixo do "Diff total (B−A)" como contrapeso —
    *  ajuda o leitor a contextualizar o gap negativo (parte vai pra reserva). */
   reservaB?: number | null;
+  /** Tesouraria do cenário B/NOVO — quotas reservadas (fração 0..1) e R$ do
+   *  Bloco A retido (não distribuído). Fundadores + Sócios de Serviço não
+   *  redistribuem; a fatia fica reservada. */
+  tesourariaQuotasB?: number | null;
+  tesourariaValorB?: number | null;
 }) {
   const totalA = linhas.reduce((acc, l) => acc + (l.totalA ?? 0), 0);
   const totalB = linhas.reduce((acc, l) => acc + (l.totalB ?? 0), 0);
@@ -83,6 +90,18 @@ export function TabelaComparativa({
               <div className="text-[11px] text-neutral-500 mt-1">
                 Reserva (NOVO): <span className="font-medium text-navy-900 tabular-nums">{brl(reservaB, true)}</span>
                 <span className="ml-1 text-neutral-400">— Bloco C não distribuído</span>
+              </div>
+            )}
+            {tesourariaQuotasB != null && tesourariaQuotasB > 0 && (
+              <div className="text-[11px] text-neutral-500 mt-1">
+                Tesouraria — quotas reservadas:{" "}
+                <span className="font-medium text-amber-700 tabular-nums">{pct(tesourariaQuotasB)}</span>
+                {tesourariaValorB != null && tesourariaValorB > 0 && (
+                  <>
+                    {" "}(<span className="font-medium text-navy-900 tabular-nums">{brl(tesourariaValorB, true)}</span>{" "}
+                    retido do Bloco A)
+                  </>
+                )}
               </div>
             )}
           </div>

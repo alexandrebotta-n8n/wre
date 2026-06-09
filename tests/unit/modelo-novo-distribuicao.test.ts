@@ -48,11 +48,12 @@ describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", ()
       percentualQuotas: 0.10, originacaoEsperadaAnual: 0, isFundador: false },
   ];
 
-  it("fundador no NOVO recebe ZERO (engine ignora fundingFundadorAnual); Bloco A vai pros não-fund", () => {
+  it("fundador no NOVO recebe ZERO; Bloco A é rateio DIRETO pela quota (sem absorver)", () => {
     // Mudança intencional (Política DSF v1 - de/para planilha):
     // Engine NOVO ignora fundingFundadorAnual. Campo só vale pra engine ATUAL.
-    // RDA = LL = 1.000.000 (sem desconto de fundador).
-    // Bloco A = 450.000 distribuído entre s2 + s3 (soma quotas não-fund = 0.30).
+    // RDA = LL = 1.000.000; Bloco A = 450.000.
+    // Rateio DIRETO: cada não-fundador recebe quota × 450k. A fatia do fundador
+    // (e qualquer quota não alocada) NÃO é redistribuída — fica em tesouraria.
     const V = 100_000;
     const sociosV = sociosComFundador.map((s) =>
       s.id === "s1" ? { ...s, fundingFundadorAnual: V } : s,
@@ -66,14 +67,17 @@ describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", ()
     const s3 = r.pacotes.find((p) => p.socioId === "s3")!;
     expect(fund.remuneracaoFundador).toBe(0);
     expect(fund.blocoA).toBe(0);
-    expect(s2.blocoA).toBeCloseTo(300_000, 1); // 450k × 0.20/0.30
-    expect(s3.blocoA).toBeCloseTo(150_000, 1); // 450k × 0.10/0.30
-    expect(s2.blocoA + s3.blocoA).toBeCloseTo(450_000, 1);
+    expect(s2.blocoA).toBeCloseTo(90_000, 1); // 450k × 0.20
+    expect(s3.blocoA).toBeCloseTo(45_000, 1); // 450k × 0.10
+    expect(s2.blocoA + s3.blocoA).toBeCloseTo(135_000, 1);
+    // Fundador (quota 0.40) reservado em tesouraria; o resto do Bloco A é retido.
+    expect(r.quotasReservadasTesouraria).toBeCloseTo(0.40, 6);
+    expect(r.tesourariaBlocoA).toBeCloseTo(315_000, 1); // 450k − 135k
     // Trace do fundador NÃO contém a etapa de remuneração de fundador.
     expect(fund.trace.find((t) => t.etapa === "3.fundador")).toBeUndefined();
   });
 
-  it("sem discricionário (V=0), fundador continua fora do Bloco A (mudança intencional)", () => {
+  it("sem discricionário (V=0), fundador continua fora do Bloco A (rateio direto)", () => {
     const r = calcularModeloNovo({
       periodo, socios: sociosComFundador, resultados: baseResultados,
       premissas: basePremissas,
@@ -83,12 +87,13 @@ describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", ()
     const s3 = r.pacotes.find((p) => p.socioId === "s3")!;
     expect(fund.remuneracaoFundador).toBe(0);
     expect(fund.blocoA).toBe(0);
-    expect(s2.blocoA).toBeCloseTo(300_000, 1);
-    expect(s3.blocoA).toBeCloseTo(150_000, 1);
+    expect(s2.blocoA).toBeCloseTo(90_000, 1);
+    expect(s3.blocoA).toBeCloseTo(45_000, 1);
   });
 
-  it("fundadores não aparecem na base de quotas do Bloco A", () => {
-    // 2 fundadores + 1 não-fundador. Não-fundador absorve 100% do Bloco A.
+  it("fatia de fundadores NÃO é absorvida pelos remanescentes — vai pra tesouraria", () => {
+    // 2 fundadores (0.50 + 0.30) + 1 não-fundador (0.20). O não-fundador recebe
+    // SÓ a sua quota; a fatia dos fundadores fica retida (sem redistribuição).
     const socios2: SocioInput[] = [
       { id: "f1", nome: "Fund 1", cargo: "Fundador", publico: "SOCIO_CAPITAL",
         percentualQuotas: 0.50, originacaoEsperadaAnual: 0, isFundador: true },
@@ -102,8 +107,11 @@ describe("Modelo NOVO — discricionário fundador + Bloco A sem fundadores", ()
       premissas: basePremissas,
     });
     const n1 = r.pacotes.find((p) => p.socioId === "n1")!;
-    // Bloco A = 1.000.000 × 0.45 = 450.000; n1 sozinho na base → recebe tudo.
-    expect(n1.blocoA).toBeCloseTo(450_000, 1);
+    // Bloco A = 450.000; n1 recebe APENAS 0.20 × 450k = 90.000.
+    expect(n1.blocoA).toBeCloseTo(90_000, 1);
+    // Fundadores (0.50 + 0.30 = 0.80) reservados; tesouraria = 450k − 90k = 360k.
+    expect(r.quotasReservadasTesouraria).toBeCloseTo(0.80, 6);
+    expect(r.tesourariaBlocoA).toBeCloseTo(360_000, 1);
   });
 });
 

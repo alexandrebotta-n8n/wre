@@ -246,11 +246,6 @@ model Socio {
 // ClassificacaoSocio.valorDiscricionario (BRL por sócio, por cenário).
 model ConfiguracaoAno {
   ano                  Int          @id
-  // Modo de quotas global do ano. Vale pra TODOS cenários DRAFT do ano.
-  // Trocar via action `salvarModoQuotasAction` marca os DRAFTs como dirty
-  // + sincroniza `Cenario.modoQuotas` neles. Cenários APPLIED preservam
-  // o modo do snapshot (não tocados).
-  modoQuotas           ModoQuotas   @default(ORIGINAL)
   atualizadoEm         DateTime     @updatedAt
   atualizadoPorId      String?
 }
@@ -378,19 +373,6 @@ enum CenarioStatus {
   ARCHIVED   // referência histórica
 }
 
-// Modo de quotas usado pelo cenário ao calcular Bloco A (NOVO) e distribuição
-// residual (ATUAL).
-//   ORIGINAL      → engine usa Socio.percentualQuotasDefault como está.
-//   REDISTRIBUIDA → engine zera quotas de fundadores e SOCIO_SERVICOS;
-//                   o saldo é redistribuído proporcionalmente entre Sócios
-//                   de Capital remanescentes (helper lib/domain/dsf/quotas.ts).
-// Cenário decide o modo individualmente. Snapshot APPLIED preserva o modo
-// usado quando publicou. Default ORIGINAL → compat com cenários existentes.
-enum ModoQuotas {
-  ORIGINAL
-  REDISTRIBUIDA
-}
-
 model Cenario {
   id              String         @id @default(cuid())
   nome            String
@@ -422,15 +404,19 @@ model Cenario {
   // cenário ainda não foi recalculado. UI mostra ponto vermelho e destaca
   // botão "Recalcular".
   parametrosDirty    Boolean       @default(false)
-  // Modo de quotas (ver enum ModoQuotas). Permite simular "e se fundadores
-  // e Sócios de Serviços não tivessem quota de capital?".
-  modoQuotas         ModoQuotas    @default(ORIGINAL)
   // Optimistic locking: incrementa em cada update de DRAFT.
   versao          Int            @default(1)
   // Reserva central (Bloco C não distribuído) do último cálculo. Apenas para
   // cenários NOVO. Persistido para que a UI possa mostrar abaixo do diff
   // total (B−A) sem recalcular. Null = cenário ainda não calculado ou ATUAL.
   totalReservaCentral Float?
+  // Tesouraria — quotas reservadas (fundadores + Sócios de Serviço) que NÃO
+  // são redistribuídas. Cache do último cálculo (modelo NOVO):
+  //   tesourariaQuotasReservadas → fração 0..1 da sociedade reservada.
+  //   tesourariaValorBlocoA      → R$ do Bloco A retido (não distribuído).
+  // Null = cenário ainda não calculado ou ATUAL.
+  tesourariaQuotasReservadas Float?
+  tesourariaValorBlocoA      Float?
   criadoPorId     String?
   criadoPor       Usuario?       @relation("CenarioCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   criadoEm        DateTime       @default(now())

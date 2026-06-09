@@ -156,6 +156,8 @@ export function SimulacaoShell(props: SimulacaoShellProps) {
           nomeA={props.cenarioA?.nome}
           nomeB={props.cenarioB?.nome}
           reservaB={props.cenarioB?.totalReservaCentral ?? null}
+          tesourariaQuotasB={props.cenarioB?.tesourariaQuotasReservadas ?? null}
+          tesourariaValorB={props.cenarioB?.tesourariaValorBlocoA ?? null}
           drawerHref={(() => {
             const sp = new URLSearchParams();
             if (aId) sp.set("a", aId);

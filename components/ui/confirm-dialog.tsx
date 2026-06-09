@@ -44,8 +44,16 @@ export function ConfirmDialog({
       {tooltip ? (
         <TooltipProvider delayDuration={300}>
           <TooltipRoot>
+            {/* Wrapper <span> entre os dois triggers: evita que dois `asChild`
+                (Tooltip + Dialog) mesclem props no MESMO componente-função, o
+                que causava erro de hidratação. Agora só o DialogTrigger usa
+                asChild no Button; o Tooltip ancora no span. Bônus: tooltip
+                funciona mesmo quando o botão está `disabled` (botão desabilitado
+                não emite os eventos de ponteiro que o tooltip precisa). */}
             <TooltipTrigger asChild>
-              <DialogTrigger asChild>{trigger}</DialogTrigger>
+              <span className="inline-flex">
+                <DialogTrigger asChild>{trigger}</DialogTrigger>
+              </span>
             </TooltipTrigger>
             <TooltipContent side={tooltipSide}>{tooltip}</TooltipContent>
           </TooltipRoot>

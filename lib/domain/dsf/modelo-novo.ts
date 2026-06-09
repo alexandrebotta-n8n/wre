@@ -128,13 +128,22 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
   const totalBlocoB = rda * premissas.percentualBlocoB;
   const totalBlocoC = rda * premissas.percentualBlocoC;
 
-  // Distribuição Bloco A — proporcional a quotas entre Sócios de Capital
-  // NÃO-fundadores. Fundadores recebem só o funding individual (etapa 3.5);
-  // incluí-los no Bloco A seria duplo benefício.
-  const elegiveisA = socios.filter(
-    (s) => PUBLICOS_CAPITAL.includes(s.publico) && !s.isFundador,
+  // Distribuição Bloco A — rateio DIRETO pela quota ORIGINAL (fração de 100%)
+  // entre Sócios de Capital não-fundadores. SEM redistribuição: a fatia que
+  // corresponde às quotas reservadas (fundadores + Sócios de Serviço) NÃO é
+  // paga aos remanescentes — fica retida em tesouraria (`tesourariaBlocoA`).
+  // Fundadores recebem só funding individual (etapa 3.5); incluí-los no
+  // Bloco A seria duplo benefício.
+  //
+  // Quotas reservadas = Σ quotas de fundadores e Sócios de Serviço. Demonstra
+  // quanto da sociedade está "estacionado" em tesouraria (não distribuído).
+  const quotasReservadasTesouraria = socios.reduce(
+    (acc, s) =>
+      s.isFundador || s.publico === "SOCIO_SERVICOS"
+        ? acc + s.percentualQuotas
+        : acc,
+    0,
   );
-  const somaQuotasA = elegiveisA.reduce((acc, s) => acc + s.percentualQuotas, 0);
 
   // Distribuição Bloco B — regra ÚNICA da Política DSF v1: cada sócio
   // elegível recebe um valor direto em R$ igual a:
@@ -189,6 +198,7 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
 
   const pacotes: PacoteRemuneracao[] = [];
   let totalDistribuido = 0;
+  let totalBlocoADistribuido = 0;
 
   for (const s of socios) {
     const trace: TraceItem[] = [];
@@ -234,13 +244,18 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
       });
     }
 
-    // Bloco A — exclui fundadores (recebem só funding individual, etapa 3.5).
+    // Bloco A — rateio direto pela quota original; exclui fundadores (recebem
+    // só funding individual, etapa 3.5). A quota é a fração direta de 100% —
+    // a parcela das quotas reservadas NÃO é distribuída (vai pra tesouraria).
     let blocoA = 0;
-    if (PUBLICOS_CAPITAL.includes(s.publico) && !s.isFundador && somaQuotasA > 0) {
-      blocoA = (s.percentualQuotas / somaQuotasA) * totalBlocoA;
+    if (PUBLICOS_CAPITAL.includes(s.publico) && !s.isFundador) {
+      blocoA = s.percentualQuotas * totalBlocoA;
+    }
+    if (blocoA > 0) {
+      totalBlocoADistribuido += blocoA;
       trace.push({
         etapa: "8.bloco-A",
-        descricao: `${((s.percentualQuotas / somaQuotasA) * 100).toFixed(2)}% × Bloco A (${(premissas.percentualBlocoA * 100).toFixed(0)}% RDA)`,
+        descricao: `${(s.percentualQuotas * 100).toFixed(2)}% × Bloco A (${(premissas.percentualBlocoA * 100).toFixed(0)}% RDA)`,
         valor: blocoA,
       });
     }
@@ -350,13 +365,29 @@ export function calcularModeloNovo(input: InputModeloNovo): ResultadoSimulacao {
     );
   }
   const reservaCentral = Math.max(0, totalBlocoC - blocoCDistribuido);
+
+  // Tesouraria — fatia do Bloco A NÃO distribuída (corresponde às quotas
+  // reservadas + quaisquer quotas de públicos não-capital). Retida, não paga.
+  // Edge case: se as quotas dos capitais somam > 100% (erro de cadastro), o
+  // distribuído excede o disponível — clamp em 0 e alerta pra revisão.
+  const tesourariaBlocoA = Math.max(0, totalBlocoA - totalBlocoADistribuido);
+  if (totalBlocoADistribuido > totalBlocoA + 0.01) {
+    alertasGlobais.push(
+      `Σ Bloco A distribuído (R$ ${totalBlocoADistribuido.toLocaleString("pt-BR")}) excede o disponível ` +
+      `(R$ ${totalBlocoA.toLocaleString("pt-BR")} = ${(premissas.percentualBlocoA * 100).toFixed(0)}% × RDA). ` +
+      `Revisar quotas dos Sócios de Capital em /socios.`,
+    );
+  }
+
   return {
     modelo: "NOVO",
     periodo,
     pacotes,
     totalDistribuido,
     totalReservaCentral: reservaCentral,
-    totalNaoAlocado: llMatriz - totalDistribuido - reservaCentral,
+    totalNaoAlocado: llMatriz - totalDistribuido - reservaCentral - tesourariaBlocoA,
+    quotasReservadasTesouraria,
+    tesourariaBlocoA,
     alertasGlobais,
   };
 }

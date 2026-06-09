@@ -117,8 +117,7 @@ export function LinhaSocio({
   modoNome,
   colSpan,
   cenariosDraftCount,
-  quotaRedistribuida,
-  modoQuotasGlobal,
+  quotaReservada,
 }: {
   socio: SocioRow;
   areas: AreaOption[];
@@ -129,10 +128,8 @@ export function LinhaSocio({
   colSpan: number;
   /** Quantos cenários DRAFT existem hoje. Banner de impacto usa essa contagem. */
   cenariosDraftCount: number;
-  /** Quota redistribuída deste sócio (calculada server-side com todos os sócios). */
-  quotaRedistribuida: number;
-  /** Modo global ATIVO do ano. Usado pra destacar a coluna em uso na tabela. */
-  modoQuotasGlobal: "ORIGINAL" | "REDISTRIBUIDA";
+  /** True se a quota deste sócio está reservada em tesouraria (fundador ou Sócio de Serviço). */
+  quotaReservada: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -143,15 +140,8 @@ export function LinhaSocio({
 
   const fmtPct = (v: number) => (v > 0 ? (v * 100).toFixed(4) + "%" : "—");
   const quotaOriginalFmt = fmtPct(socio.percentualQuotasDefault);
-  const quotaRedistFmt = fmtPct(quotaRedistribuida);
-  // Razão pela qual a redistribuída ficou diferente (informativo).
-  const motivoRedist = (() => {
-    if (quotaRedistribuida === socio.percentualQuotasDefault) return null;
-    if (quotaRedistribuida === 0) {
-      return socio.isFundador ? "fundador" : "S. Serviços";
-    }
-    return "absorveu";
-  })();
+  // Motivo da reserva em tesouraria (informativo).
+  const motivoReserva = socio.isFundador ? "fundador" : "S. Serviços";
 
   return (
     <>
@@ -203,28 +193,20 @@ export function LinhaSocio({
         <TD className="text-neutral-600 truncate max-w-[240px]" title={socio.cargo}>
           {socio.cargo}
         </TD>
-        <TD
-          className={cn(
-            "text-right tabular-nums text-neutral-700",
-            modoQuotasGlobal === "ORIGINAL" && "bg-peri-50/40 font-medium text-navy-900",
-          )}
-        >
+        <TD className="text-right tabular-nums bg-peri-50/40 font-medium text-navy-900">
           {quotaOriginalFmt}
         </TD>
-        <TD
-          className={cn(
-            "text-right tabular-nums text-neutral-700",
-            modoQuotasGlobal === "REDISTRIBUIDA" && "bg-peri-50/40 font-medium text-navy-900",
-          )}
-        >
-          <span className="inline-flex items-center gap-1 justify-end">
-            {quotaRedistFmt}
-            {motivoRedist && (
-              <span className="text-[9px] text-neutral-500 uppercase tracking-wide">
-                ({motivoRedist})
+        <TD className="text-right tabular-nums text-neutral-700">
+          {quotaReservada && socio.percentualQuotasDefault > 0 ? (
+            <span className="inline-flex items-center gap-1 justify-end">
+              {quotaOriginalFmt}
+              <span className="text-[9px] text-amber-700 uppercase tracking-wide">
+                ({motivoReserva})
               </span>
-            )}
-          </span>
+            </span>
+          ) : (
+            <span className="text-neutral-300">—</span>
+          )}
         </TD>
         <TD className="text-center tabular-nums text-sm">
           {socio.blocoBNumSalariosAlvo != null && socio.blocoBNumSalariosAlvo > 0

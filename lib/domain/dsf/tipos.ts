@@ -221,5 +221,12 @@ export interface ResultadoSimulacao {
   totalDistribuido: number;
   totalReservaCentral: number;
   totalNaoAlocado: number;
+  // Tesouraria (modelo NOVO) — quotas que NÃO são redistribuídas.
+  //   quotasReservadasTesouraria: fração 0..1 (Σ quotas de fundadores + Sócios
+  //     de Serviço). Demonstra quanto da sociedade está reservado em tesouraria.
+  //   tesourariaBlocoA: R$ do Bloco A retido (parcela não distribuída).
+  // Modelo ATUAL retorna 0 em ambos (conceito é exclusivo da política NOVA).
+  quotasReservadasTesouraria: number;
+  tesourariaBlocoA: number;
   alertasGlobais: string[];
 }

@@ -21,9 +21,7 @@ import { Button } from "@/components/ui/button";
 import { TableShell, THead, TBody, TH } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LinhaSocio } from "@/components/socios/linha-socio";
-import { ModoQuotasGlobalCard } from "@/components/socios/modo-quotas-global-card";
-import { redistribuirQuotas } from "@/lib/domain/dsf/quotas";
-import type { Publico } from "@/lib/domain/dsf";
+import { Scale } from "lucide-react";
 
 // Labels da classificação política DSF v1 — exibidos no filtro.
 const PUBLICOS_LABEL: Record<string, string> = {
@@ -38,7 +36,7 @@ const PUBLICOS_LABEL: Record<string, string> = {
 };
 
 // Número de colunas na tabela (chevron + 7 colunas visíveis: sócio, cargo,
-// quota original, quota redistribuída, n° sal. B, classificação, status).
+// quota original, reservada (tesouraria), n° sal. B, classificação, status).
 // Usado pelo colSpan da linha expandida (linha-socio.tsx).
 const TABLE_COLS = 8;
 
@@ -48,9 +46,6 @@ export default async function SociosPage({
   searchParams: Promise<{ q?: string; area?: string; tipo?: string; publico?: string; ano?: string }>;
 }) {
   const sp = await searchParams;
-  // Ano de referência pro toggle global de modo de quotas. Pega da query
-  // string OU usa o ano corrente (compat: hoje só existe 2026 em uso).
-  const anoRef = sp.ano ? Number(sp.ano) : new Date().getFullYear();
   const session = await auth();
   const escopo = escopoDe(session?.user as SessionUser | undefined);
   const modoNome = await getModoNome();
@@ -99,38 +94,27 @@ export default async function SociosPage({
     prisma.cenario.count({ where: { status: "DRAFT" } }),
   ]);
 
-  // Modo de quotas global do ano + contagem de DRAFTs DO ano (usados pelo
-  // toggle no topo de /socios). Default ORIGINAL se ano ainda não tem config.
-  const [configAno, draftsDoAnoCount] = escopo.podeMutar
-    ? await Promise.all([
-        prisma.configuracaoAno.findUnique({ where: { ano: anoRef }, select: { modoQuotas: true } }),
-        prisma.cenario.count({ where: { status: "DRAFT", ano: anoRef } }),
-      ])
-    : [null, 0];
-  const modoQuotasGlobal: "ORIGINAL" | "REDISTRIBUIDA" =
-    (configAno?.modoQuotas as "ORIGINAL" | "REDISTRIBUIDA") ?? "ORIGINAL";
-
-  // Quotas redistribuídas — chip read-only ao lado do input de cada sócio.
-  // Cálculo é determinístico sobre o conjunto de sócios ativos (independe de
-  // cenário): zera fundadores + SOCIO_SERVICOS, capital remanescente absorve
-  // proporcional. Cenários decidem se USAM via Cenario.modoQuotas.
-  // Calculamos sobre TODOS os sócios (sem filtros) pra preservar a base global
-  // mesmo quando o filtro deixa só um subset visível.
+  // Quotas reservadas em tesouraria — fundadores + Sócios de Serviço. NÃO são
+  // redistribuídas: a fatia fica reservada (ver engine modelo-novo.ts, Bloco A).
+  // Total calculado sobre TODOS os sócios ativos (sem filtros) pra refletir a
+  // base global mesmo quando o filtro deixa só um subset visível.
+  const ehReservada = (publico: string, isFundador: boolean) =>
+    isFundador || publico === "SOCIO_SERVICOS";
   const todosSociosAtivos = escopo.ehSocioRestrito
-    ? socios // SOCIO restrito só vê própria linha — redistribuir só com 1 sócio é meaningless
+    ? socios // SOCIO restrito só vê própria linha — total global não se aplica.
     : await prisma.socio.findMany({
         where: { ativo: true },
         select: { id: true, publicoDefault: true, isFundador: true, percentualQuotasDefault: true },
         take: 200,
       });
-  const quotasRedistribuidasMap = redistribuirQuotas(
-    todosSociosAtivos.map((s) => ({
-      id: s.id,
-      publico: s.publicoDefault as Publico,
-      isFundador: s.isFundador,
-      percentualQuotas: s.percentualQuotasDefault,
-    })),
+  const totalQuotasReservadas = todosSociosAtivos.reduce(
+    (acc, s) =>
+      ehReservada(s.publicoDefault, s.isFundador) ? acc + s.percentualQuotasDefault : acc,
+    0,
   );
+  const qtdSociosReservados = todosSociosAtivos.filter((s) =>
+    ehReservada(s.publicoDefault, s.isFundador),
+  ).length;
 
   const semFiltros = !sp.q && !sp.area && !sp.tipo && !sp.publico;
 
@@ -141,13 +125,22 @@ export default async function SociosPage({
         description={`${socios.length} pessoa(s) — clique na linha pra editar inline. Auto-save ao mudar.`}
       />
 
-      {escopo.podeMutar && (
-        <ModoQuotasGlobalCard
-          ano={anoRef}
-          modo={modoQuotasGlobal}
-          draftsCount={draftsDoAnoCount}
-          editavel={escopo.podeMutar}
-        />
+      {!escopo.ehSocioRestrito && (
+        <Card className="px-4 py-2.5 border-peri-200">
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            <Scale className="h-4 w-4 text-peri-700" />
+            <span className="font-semibold text-navy-900">Quotas reservadas em tesouraria:</span>
+            <span className="tabular-nums font-medium text-amber-700">
+              {(totalQuotasReservadas * 100).toFixed(4)}%
+            </span>
+            <span className="text-neutral-500">
+              ({qtdSociosReservados} sócio(s) — fundadores + Sócios de Serviço)
+            </span>
+            <span className="ml-auto text-[11px] text-neutral-500 hidden md:inline">
+              Não redistribuídas — a política NOVA reserva essa fatia (Bloco A retido).
+            </span>
+          </div>
+        </Card>
       )}
 
       <Card className="overflow-hidden">
@@ -215,21 +208,14 @@ export default async function SociosPage({
                 <TH className="px-4 w-8" aria-label="Expandir" />
                 <TH className="px-2">Sócio</TH>
                 <TH>Cargo</TH>
-                <TH className={"text-right " + (modoQuotasGlobal === "ORIGINAL" ? "bg-peri-50/70" : "")}>
+                <TH className="text-right bg-peri-50/70">
                   <span className="inline-flex items-center gap-1.5">
                     Quota Original
-                    {modoQuotasGlobal === "ORIGINAL" && (
-                      <span className="text-[9px] uppercase tracking-wider font-medium px-1 py-0.5 rounded bg-peri-700 text-white">em uso</span>
-                    )}
+                    <span className="text-[9px] uppercase tracking-wider font-medium px-1 py-0.5 rounded bg-peri-700 text-white">em uso</span>
                   </span>
                 </TH>
-                <TH className={"text-right " + (modoQuotasGlobal === "REDISTRIBUIDA" ? "bg-peri-50/70" : "")}>
-                  <span className="inline-flex items-center gap-1.5">
-                    Quota Redistribuída
-                    {modoQuotasGlobal === "REDISTRIBUIDA" && (
-                      <span className="text-[9px] uppercase tracking-wider font-medium px-1 py-0.5 rounded bg-peri-700 text-white">em uso</span>
-                    )}
-                  </span>
+                <TH className="text-right" title="Quotas de fundadores e Sócios de Serviço, reservadas em tesouraria (não redistribuídas).">
+                  Reservada (tesouraria)
                 </TH>
                 <TH className="text-center" title="Alvo do Bloco B em número de salários (modo ALVO_NUM_SALARIOS no engine NOVO). Calibrável por sócio.">
                   Nº Sal. B
@@ -270,8 +256,7 @@ export default async function SociosPage({
                   modoNome={modoNome}
                   colSpan={TABLE_COLS}
                   cenariosDraftCount={cenariosDraftCount}
-                  quotaRedistribuida={quotasRedistribuidasMap.get(s.id) ?? s.percentualQuotasDefault}
-                  modoQuotasGlobal={modoQuotasGlobal}
+                  quotaReservada={ehReservada(s.publicoDefault, s.isFundador)}
                 />
               ))}
             </TBody>

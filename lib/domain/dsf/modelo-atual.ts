@@ -200,6 +200,9 @@ export function calcularModeloAtual(input: InputModeloAtual): ResultadoSimulacao
     totalDistribuido,
     totalReservaCentral: reservaCentral,
     totalNaoAlocado: llMatriz - totalDistribuido - reservaCentral,
+    // Tesouraria é conceito exclusivo da política NOVA.
+    quotasReservadasTesouraria: 0,
+    tesourariaBlocoA: 0,
     alertasGlobais: [],
   };
 }
